@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: regalito_db
+    restart: always
+    environment:
+      POSTGRES_USER: regalito_admin
+      POSTGRES_PASSWORD: Regalito_2026
+      POSTGRES_DB: regalito_pos
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  postgres_data:

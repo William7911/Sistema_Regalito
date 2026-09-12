@@ -1,0 +1,124 @@
+/* Design Tokens & Custom Styles para El Regalito */
+:root {
+    --color-teal-dark: #0A5C5E;
+    --color-teal: #0D7377;
+    --color-teal-light: rgba(13, 115, 119, 0.1);
+    --color-bg-light: #F5F5F5;
+    --color-text-dark: #1F2937;
+    --color-text-muted: #6B7280;
+    --color-success: #10B981;
+    --color-danger: #EF4444;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    color: var(--color-text-dark);
+}
+
+.bg-light-gray { background-color: var(--color-bg-light) !important; }
+.bg-teal { background-color: var(--color-teal) !important; }
+.bg-teal-dark { background-color: var(--color-teal-dark) !important; }
+.bg-teal-light { background-color: var(--color-teal-light) !important; }
+.text-teal { color: var(--color-teal) !important; }
+.text-teal-dark { color: var(--color-teal-dark) !important; }
+.text-teal-light { color: #AEE2E4 !important; }
+.text-muted-teal { color: #82B3B4 !important; }
+
+.btn-teal {
+    background-color: var(--color-teal);
+    color: white;
+    border: none;
+    transition: all 0.2s ease;
+}
+.btn-teal:hover {
+    background-color: var(--color-teal-dark);
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Auth Module - Desert Background */
+.auth-bg {
+    background: linear-gradient(rgba(10, 92, 94, 0.6), rgba(10, 92, 94, 0.8)), url('https://images.unsplash.com/photo-1473448912268-2022ce9509d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center/cover no-repeat fixed;
+}
+
+/* Glassmorphism */
+.glass-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.logo-circle {
+    width: 64px;
+    height: 64px;
+}
+
+.icon-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.bg-danger-light { background-color: rgba(239, 68, 68, 0.1) !important; }
+.bg-warning-light { background-color: rgba(245, 158, 11, 0.1) !important; }
+.text-warning-dark { color: #B45309 !important; }
+
+/* Status Indicators */
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.status-normal { background-color: var(--color-success); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+.status-critical { background-color: var(--color-danger); box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
+
+/* Verification Code Inputs */
+.code-input {
+    width: 50px;
+    height: 60px;
+}
+.code-input:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 0.25rem var(--color-teal-light);
+}
+
+/* Sidebar Styles */
+.sidebar-link {
+    transition: all 0.2s;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+.sidebar-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white !important;
+}
+.nav-pills .nav-link.active {
+    background-color: var(--color-teal);
+    border-radius: 0.5rem;
+}
+
+/* Animations */
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Module Buttons on Dashboard */
+.module-btn {
+    transition: all 0.2s;
+}
+.module-btn:hover {
+    background-color: var(--color-teal-light) !important;
+    border-color: var(--color-teal) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}

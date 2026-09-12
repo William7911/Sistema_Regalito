@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curiosidades El Regalito - POS</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-light-gray">
+
+    <!-- Auth Module (Login, Register, Recover) -->
+    <div id="auth-module" class="auth-bg d-flex align-items-center justify-content-center min-vh-100">
+        
+        <!-- Login Form -->
+        <div id="view-login" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in" style="width: 100%; max-width: 450px;">
+            <div class="text-center mb-4">
+                <div class="logo-circle bg-teal text-white mx-auto mb-3 d-flex align-items-center justify-content-center fs-2 rounded-circle shadow">
+                    <i class="bi bi-gift-fill"></i>
+                </div>
+                <h3 class="fw-bold text-dark">El Regalito</h3>
+                <p class="text-muted">Inicia sesión en tu cuenta</p>
+            </div>
+            
+            <form id="form-login">
+                <div class="mb-3">
+                    <label class="form-label text-dark fw-medium">Usuario / Email</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-person text-muted"></i></span>
+                        <input type="text" id="login-user" class="form-control border-start-0 ps-0" placeholder="usuario" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-dark fw-medium">Contraseña</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-lock text-muted"></i></span>
+                        <input type="password" id="login-pass" class="form-control border-start-0 ps-0" placeholder="••••••••" required>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="remember-me">
+                        <label class="form-check-label text-muted small" for="remember-me">Recordarme</label>
+                    </div>
+                    <a href="#" class="text-teal small text-decoration-none fw-medium" onclick="switchView('view-recover')">¿Olvidaste tu contraseña?</a>
+                </div>
+                
+                <div class="alert alert-danger d-none small" id="login-error"></div>
+                
+                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Ingresar al Sistema</button>
+                <div class="text-center">
+                    <span class="text-muted small">¿No tienes cuenta? <a href="#" class="text-teal fw-medium text-decoration-none" onclick="switchView('view-register')">Regístrate</a></span>
+                </div>
+            </form>
+        </div>
+
+        <!-- Register Form -->
+        <div id="view-register" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in d-none" style="width: 100%; max-width: 450px;">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold text-dark">Registro</h3>
+                <p class="text-muted">Crea una cuenta nueva</p>
+            </div>
+            <form id="form-register">
+                <div class="mb-3">
+                    <label class="form-label text-dark fw-medium">Usuario</label>
+                    <input type="text" id="reg-user" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-dark fw-medium">Contraseña</label>
+                    <input type="password" id="reg-pass" class="form-control" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label text-dark fw-medium">Confirmar Contraseña</label>
+                    <input type="password" id="reg-pass-confirm" class="form-control" required>
+                </div>
+                <div class="alert alert-danger d-none small" id="reg-error"></div>
+                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Crear Cuenta</button>
+                <div class="text-center">
+                    <a href="#" class="text-teal small text-decoration-none fw-medium" onclick="switchView('view-login')">Volver al Login</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Recover Password Form -->
+        <div id="view-recover" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in d-none" style="width: 100%; max-width: 450px;">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold text-dark">Recuperar Contraseña</h3>
+                <p class="text-muted small">Ingresa tu correo o usuario y te enviaremos un código</p>
+            </div>
+            <form id="form-recover">
+                <div class="mb-4">
+                    <label class="form-label text-dark fw-medium">Correo Electrónico</label>
+                    <input type="email" id="recover-email" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Enviar Código</button>
+                <div class="text-center">
+                    <a href="#" class="text-teal small text-decoration-none fw-medium" onclick="switchView('view-login')">Cancelar</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Verify Code Form -->
+        <div id="view-verify" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in d-none" style="width: 100%; max-width: 450px;">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold text-dark">Verificar Código</h3>
+                <p class="text-muted small">Ingresa el código de 6 dígitos enviado a tu correo</p>
+            </div>
+            <form id="form-verify">
+                <div class="mb-4 d-flex justify-content-between gap-2">
+                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
+                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
+                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
+                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
+                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
+                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
+                </div>
+                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm">Verificar</button>
+            </form>
+        </div>
+
+        <!-- Reset Password Form -->
+        <div id="view-reset" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in d-none" style="width: 100%; max-width: 450px;">
+            <div class="text-center mb-4">
+                <h3 class="fw-bold text-dark">Nueva Contraseña</h3>
+                <p class="text-muted small">Ingresa tu nueva contraseña</p>
+            </div>
+            <form id="form-reset">
+                <div class="mb-3">
+                    <label class="form-label text-dark fw-medium">Nueva Contraseña</label>
+                    <input type="password" id="reset-pass" class="form-control" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label text-dark fw-medium">Confirmar Contraseña</label>
+                    <input type="password" id="reset-pass-confirm" class="form-control" required>
+                </div>
+                <div class="alert alert-danger d-none small" id="reset-error"></div>
+                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm">Guardar Contraseña</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main System Dashboard (Hidden by default) -->
+    <div id="system-module" class="d-none min-vh-100 d-flex flex-column flex-md-row">
+        <!-- Sidebar -->
+        <aside class="sidebar bg-teal-dark text-white p-3 d-flex flex-column" style="width: 280px; min-height: 100vh;">
+            <div class="sidebar-brand d-flex align-items-center mb-4 px-2 mt-2">
+                <i class="bi bi-gift-fill fs-3 me-2 text-teal-light"></i>
+                <span class="fs-4 fw-bold">El Regalito</span>
+            </div>
+            
+            <ul class="nav nav-pills flex-column mb-auto gap-1">
+                <li class="nav-item">
+                    <a href="#" class="nav-link active text-white" aria-current="page">
+                        <i class="bi bi-grid-1x2-fill me-2"></i> Panel Principal
+                    </a>
+                </li>
+                
+                <li class="nav-item mt-3">
+                    <span class="text-uppercase text-muted-teal small fw-bold px-3">— OPERACIÓN DIARIA —</span>
+                </li>
+                <li>
+                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                        <i class="bi bi-cart-fill me-2"></i> POS / Ventas
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                        <i class="bi bi-box-seam-fill me-2"></i> Inventario / Bodega
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                        <i class="bi bi-bag-check-fill me-2"></i> Compras
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                        <i class="bi bi-cash-coin me-2"></i> Caja
+                    </a>
+                </li>
+
+                <li class="nav-item mt-3">
+                    <span class="text-uppercase text-muted-teal small fw-bold px-3">— ADMINISTRACIÓN —</span>
+                </li>
+                <li>
+                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                        <i class="bi bi-people-fill me-2"></i> Usuarios / Personal
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                        <i class="bi bi-journal-text me-2"></i> Catálogos
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                        <i class="bi bi-bar-chart-fill me-2"></i> Reportes
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                        <i class="bi bi-gear-fill me-2"></i> Configuración
+                    </a>
+                </li>
+            </ul>
+            
+            <hr class="border-secondary">
+            <div class="dropdown">
+                <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
+                    <img src="https://ui-avatars.com/api/?name=Admin&background=0A5C5E&color=fff" alt="" width="32" height="32" class="rounded-circle me-2">
+                    <strong id="sidebar-username">Admin</strong>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser">
+                    <li><a class="dropdown-item" href="#">Configuración</a></li>
+                    <li><a class="dropdown-item" href="#">Perfil</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="#" id="btn-logout">Cerrar Sesión</a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-grow-1 bg-light-gray d-flex flex-column h-100">
+            <!-- Header -->
+            <header class="bg-white shadow-sm px-4 py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div>
+                    <h5 class="mb-0 fw-bold text-dark" id="header-greeting">¡Hola, Admin!</h5>
+                    <small class="text-muted" id="header-date">Septiembre 2026</small>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="badge bg-teal-light text-teal-dark px-3 py-2 rounded-pill"><i class="bi bi-shield-check"></i> <span id="header-role">Administrador</span></span>
+                    <button class="btn btn-light rounded-circle position-relative"><i class="bi bi-bell"></i><span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span></button>
+                </div>
+            </header>
+
+            <!-- Dashboard Content -->
+            <div class="p-4 flex-grow-1 overflow-auto">
+                <div class="mb-4">
+                    <h4 class="fw-bold">Panel Principal</h4>
+                    <p class="text-muted">Resumen del día en tu tienda</p>
+                </div>
+                
+                <!-- KPI Cards -->
+                <div class="row g-4 mb-4">
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-3">
+                                    <div class="icon-circle bg-teal-light text-teal-dark"><i class="bi bi-currency-dollar"></i></div>
+                                    <span class="status-dot status-normal" title="Normal"></span>
+                                </div>
+                                <p class="text-muted mb-1 fw-medium">Ventas de hoy</p>
+                                <h3 class="fw-bold text-dark">Q 1,245.00</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-3">
+                                    <div class="icon-circle bg-danger-light text-danger"><i class="bi bi-box-seam"></i></div>
+                                    <span class="status-dot status-critical" title="Crítico"></span>
+                                </div>
+                                <p class="text-muted mb-1 fw-medium">Stock crítico</p>
+                                <h3 class="fw-bold text-dark">12 <small class="text-muted fs-6">productos</small></h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-3">
+                                    <div class="icon-circle bg-warning-light text-warning-dark"><i class="bi bi-receipt"></i></div>
+                                    <span class="status-dot status-critical" title="Crítico"></span>
+                                </div>
+                                <p class="text-muted mb-1 fw-medium">Cuentas por pagar</p>
+                                <h3 class="fw-bold text-dark">3 <small class="text-muted fs-6">pendientes</small></h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-3">
+                                    <div class="icon-circle bg-teal-light text-teal-dark"><i class="bi bi-people"></i></div>
+                                    <span class="status-dot status-normal" title="Normal"></span>
+                                </div>
+                                <p class="text-muted mb-1 fw-medium">Clientes nuevos</p>
+                                <h3 class="fw-bold text-dark">5 <small class="text-muted fs-6">hoy</small></h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Access Icons Module -->
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-4">Módulos del Sistema</h5>
+                        <div class="row g-4 text-center">
+                            <div class="col-6 col-md-4 col-lg-2">
+                                <button class="btn btn-light p-4 w-100 rounded-4 module-btn border">
+                                    <i class="bi bi-cart-fill fs-2 text-teal d-block mb-2"></i>
+                                    <span class="fw-medium text-dark">POS</span>
+                                </button>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-2">
+                                <button class="btn btn-light p-4 w-100 rounded-4 module-btn border">
+                                    <i class="bi bi-box-seam-fill fs-2 text-teal d-block mb-2"></i>
+                                    <span class="fw-medium text-dark">Bodega</span>
+                                </button>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-2">
+                                <button class="btn btn-light p-4 w-100 rounded-4 module-btn border">
+                                    <i class="bi bi-bag-check-fill fs-2 text-teal d-block mb-2"></i>
+                                    <span class="fw-medium text-dark">Compras</span>
+                                </button>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-2">
+                                <button class="btn btn-light p-4 w-100 rounded-4 module-btn border">
+                                    <i class="bi bi-cash-coin fs-2 text-teal d-block mb-2"></i>
+                                    <span class="fw-medium text-dark">Caja</span>
+                                </button>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-2">
+                                <button class="btn btn-light p-4 w-100 rounded-4 module-btn border">
+                                    <i class="bi bi-people-fill fs-2 text-teal d-block mb-2"></i>
+                                    <span class="fw-medium text-dark">Usuarios</span>
+                                </button>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-2">
+                                <button class="btn btn-light p-4 w-100 rounded-4 module-btn border">
+                                    <i class="bi bi-journal-text fs-2 text-teal d-block mb-2"></i>
+                                    <span class="fw-medium text-dark">Catálogos</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- App Logic -->
+    <script src="js/app.js"></script>
+</body>
+</html>
