@@ -6,11 +6,49 @@ const systemModule = document.getElementById('system-module');
 // Array of all auth views to easily hide them
 const authViews = ['view-login', 'view-register', 'view-recover', 'view-verify', 'view-reset'];
 
-// Check token on load
+// ---------------------------------------------------------------------------
+// Auth Guard: control de acceso y redirección
+// ---------------------------------------------------------------------------
+
+function hasActiveSession() {
+    return !!localStorage.getItem('jwt_token');
+}
+
+// Limpia la sesión local y muestra la pantalla de Login (sin recarga innecesaria).
+function showLogin() {
+    localStorage.removeItem('jwt_token');
+    systemModule.classList.add('d-none');
+    authModule.classList.remove('d-none');
+    authViews.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('d-none');
+    });
+    const login = document.getElementById('view-login');
+    if (login) login.classList.remove('d-none');
+}
+
+// Manejo central de respuestas 401: sesión inválida/expirada => Login inmediato.
+function handleUnauthorized() {
+    showLogin();
+}
+
+// Interceptor global: cualquier petición con 401 limpia la sesión y redirige a Login.
+const nativeFetch = window.fetch;
+window.fetch = function (...args) {
+    return nativeFetch.apply(this, args).then((response) => {
+        if (response.status === 401 && !response.url.endsWith('/auth/login')) {
+            handleUnauthorized();
+        }
+        return response;
+    });
+};
+
+// Guardia de autenticación al inicializar la aplicación.
 document.addEventListener('DOMContentLoaded', () => {
-    const token = localStorage.getItem('jwt_token');
-    if (token) {
+    if (hasActiveSession()) {
         showDashboard();
+    } else {
+        showLogin();
     }
 });
 
@@ -21,6 +59,106 @@ window.switchView = function(viewId) {
     });
     document.getElementById(viewId).classList.remove('d-none');
 }
+
+// ---------------------------------------------------------------------------
+// Navegación SPA (Hash Routing): conmutación de contenedores + sincronización
+// del menú lateral + persistencia de la vista activa en la URL (sin recarga).
+// ---------------------------------------------------------------------------
+
+const mainViews = ['dashboard', 'users', 'catalog'];
+
+let currentView = null;
+
+function setActiveNav(viewKey) {
+    document.querySelectorAll('[data-nav]').forEach(link => {
+        const isActive = link.getAttribute('data-nav') === viewKey;
+        link.classList.toggle('active', isActive);
+        link.classList.toggle('text-white', isActive);
+        link.classList.toggle('text-white-50', !isActive);
+        if (isActive) link.setAttribute('aria-current', 'page');
+        else link.removeAttribute('aria-current');
+    });
+}
+
+// Lee el identificador de ruta desde el hash de la URL. Ruta vacía o desconocida
+// se normaliza al Panel Principal.
+function parseHash() {
+    const raw = (location.hash || '').replace(/^#/, '');
+    return mainViews.includes(raw) ? raw : 'dashboard';
+}
+
+// Renderiza la vista correspondiente (conmutación de contenedores y sidebar).
+function renderView(viewKey) {
+    if (!mainViews.includes(viewKey)) viewKey = 'dashboard';
+    if (currentView === viewKey) return;
+    currentView = viewKey;
+
+    document.querySelectorAll('[data-main-view]').forEach(container => {
+        container.classList.add('d-none');
+    });
+    const target = document.querySelector(`[data-main-view="${viewKey}"]`);
+    if (target) target.classList.remove('d-none');
+    setActiveNav(viewKey);
+
+    if (viewKey === 'users' && typeof window.showUsersModule === 'function') {
+        window.showUsersModule();
+    }
+    if (viewKey === 'catalog' && typeof window.showCatalogModule === 'function') {
+        window.showCatalogModule();
+    }
+}
+
+// Navega a un módulo actualizando el hash de la URL sin recargar la página.
+// El cambio de hash dispara 'hashchange' -> renderView().
+window.navigateTo = function(viewKey) {
+    if (!hasActiveSession()) {
+        showLogin();
+        return;
+    }
+    if (!mainViews.includes(viewKey)) viewKey = 'dashboard';
+    if (location.hash === `#${viewKey}`) {
+        renderView(viewKey);
+        return;
+    }
+    location.hash = viewKey;
+}
+
+// Soporte de avance/retroceso del navegador: sincroniza la vista con la ruta.
+window.addEventListener('hashchange', () => {
+    if (!hasActiveSession()) {
+        showLogin();
+        return;
+    }
+    renderView(parseHash());
+});
+
+// ---------------------------------------------------------------------------
+// Accesos directos del Dashboard ("Módulos del Sistema")
+// ---------------------------------------------------------------------------
+
+const moduleLabels = {
+    pos: 'POS / Ventas',
+    inventario: 'Inventario / Bodega',
+    compras: 'Compras',
+    caja: 'Caja',
+    users: 'Usuarios / Personal',
+    catalog: 'Catálogos',
+    reportes: 'Reportes',
+    configuracion: 'Configuración',
+};
+
+// Abre un módulo desde el dashboard: navega si ya existe; avisa con un toast si
+// está en construcción (evita pantallas en blanco o interfaz congelada).
+window.openModule = function(moduleKey) {
+    if (mainViews.includes(moduleKey)) {
+        navigateTo(moduleKey);
+        return;
+    }
+    const name = moduleLabels[moduleKey] || 'Módulo';
+    if (typeof window.showToast === 'function') {
+        window.showToast(`El módulo "${name}" se encuentra en construcción.`, 'info');
+    }
+};
 
 // 1. Login Logic
 document.getElementById('form-login').addEventListener('submit', async (e) => {
@@ -48,6 +186,7 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
         });
 
         if (!response.ok) {
+            if (response.status === 401) handleUnauthorized();
             throw new Error('Credenciales incorrectas o usuario inactivo');
         }
 
@@ -151,9 +290,12 @@ function showDashboard() {
     const options = { month: 'long', year: 'numeric' };
     const formattedDate = now.toLocaleDateString('es-GT', options);
     document.getElementById('header-date').innerText = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+
+    // Restaura la vista activa desde la URL (hash) si existe; si no, Panel Principal.
+    currentView = null;
+    renderView(parseHash());
 }
 
 document.getElementById('btn-logout').addEventListener('click', () => {
-    localStorage.removeItem('jwt_token');
-    location.reload();
+    showLogin();
 });

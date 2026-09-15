@@ -1,9 +1,18 @@
 fastapi
 uvicorn
-sqlalchemy
+sqlalchemy>=2.0
 psycopg2-binary
+asyncpg
 pydantic
 pydantic-settings
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt==4.0.1
 python-multipart
+
+# Desarrollo / pruebas
+pytest
+pytest-asyncio
+aiosqlite
+httpx
+alembic
