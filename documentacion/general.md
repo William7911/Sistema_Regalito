@@ -81,6 +81,16 @@ Sistema_Regalito/
   - Usuarios (`GET /api/usuarios`): `name`, `lastname`, `code`, `is_active`, `role_id`, `department_id`, `created_from`, `created_to`, `limit`, `offset`.
 - **Unicidad**: `name` de categorías/roles/departamentos; `sku` y `barcode` de productos; `code`, `username` de usuarios.
 
+### Frontend — Módulo de Usuarios (estándar empresarial)
+El formulario se muestra en un **modal de Bootstrap** (`#user-modal`). `frontend/js/users.js` implementa:
+- **Validación visual inline**: los errores **422** se muestran debajo de cada campo (`.invalid-feedback`) con traducción al español (`translateValidation`); los **400** y errores generales en `#user-form-alert`.
+- **Errores 422**: `renderFieldErrors()` recorre `errorData.detail`, extrae el campo con `err.loc[err.loc.length - 1]`, agrega `is-invalid` y coloca `err.msg` traducido en su `.invalid-feedback`.
+- **Notificaciones Toast** (`showToast`): reemplazan todo `alert()` de éxito/error; **confirmación no nativa** (`confirmModal`) reemplaza `confirm()`.
+- **Micro-interacciones**: limpieza de errores en tiempo real (`input`/`change`), envío con **Enter**, autofocus en el primer campo y **reseteo impecable** al cerrar el modal (`hidden.bs.modal` → `resetUserForm()`).
+- **Defensivo**: `.trim()` en campos de texto y **bloqueo del botón Guardar** con spinner (`setSaving`) para evitar dobles clics.
+- **Estado vacío**: `#users-empty` muestra "No hay usuarios registrados" cuando la tabla está vacía.
+- IDs de los campos alineados a Pydantic (`name`, `lastname`, `code`, `username`, `password`, `role_id`, `department_id`, `is_active`); `role_id`/`department_id` se envían como enteros (`parseInt(..., 10)`); en edición se excluye `password` si va vacío.
+
 ## 5. Base de datos
 
 ### Conexión
