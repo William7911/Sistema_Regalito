@@ -459,14 +459,11 @@ window.addEventListener('beforeunload', (event) => {
 // ---------------------------------------------------------------------------
 
 window.showUsersModule = async function () {
-    document.getElementById('dashboard-content').classList.add('d-none');
-    document.getElementById('users-view').classList.remove('d-none');
     await loadUsers();
 };
 
 window.goToDashboard = function () {
-    document.getElementById('users-view').classList.add('d-none');
-    document.getElementById('dashboard-content').classList.remove('d-none');
+    if (typeof window.navigateTo === 'function') window.navigateTo('dashboard');
 };
 
 window.editUser = editUser;
@@ -479,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const modalEl = document.getElementById('user-modal');
     if (modalEl) modalEl.addEventListener('hidden.bs.modal', resetUserForm); // reseteo impecable al cerrar
-    document.querySelectorAll('[data-bs-close-modal]').forEach((btn) => {
+    document.querySelectorAll('#user-modal [data-bs-close-modal]').forEach((btn) => {
         btn.addEventListener('click', safeCloseUserModal);
     });
     const btnNew = document.getElementById('btn-new-user');

@@ -1,5 +1,6 @@
 from typing import Optional, List
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Product
 from app.interfaces.repositories import ProductRepository
@@ -12,7 +13,9 @@ class ProductRepositoryImpl(ProductRepository):
         self.db = db
 
     async def get_by_id(self, product_id: int) -> Optional[Product]:
-        result = await self.db.execute(select(Product).where(Product.id == product_id))
+        result = await self.db.execute(
+            select(Product).options(selectinload(Product.category)).where(Product.id == product_id)
+        )
         return result.scalar_one_or_none()
 
     async def get_by_barcode(self, barcode: str) -> Optional[Product]:
@@ -65,7 +68,7 @@ class ProductRepositoryImpl(ProductRepository):
         conditions = self._build_filters(
             name, sku, barcode, is_active, category_id, created_from, created_to
         )
-        stmt = select(Product)
+        stmt = select(Product).options(selectinload(Product.category))
         if conditions:
             stmt = stmt.where(*conditions)
         stmt = stmt.order_by(Product.name).limit(limit).offset(offset)
