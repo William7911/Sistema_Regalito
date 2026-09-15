@@ -1,13 +1,26 @@
+import os
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from app.core.config import settings
+from sqlalchemy.orm import declarative_base, sessionmaker
+from dotenv import load_dotenv
 
-engine = create_engine(settings.DATABASE_URL)
+# Cargar variables de entorno
+load_dotenv()
+
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not SQLALCHEMY_DATABASE_URL:
+    raise ValueError("La variable DATABASE_URL no está configurada en el archivo .env")
+
+# Crear el motor de la base de datos
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
+# Crear la fábrica de sesiones
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Clase base para nuestros modelos
 Base = declarative_base()
 
+# Dependencia para inyectar la sesión en los endpoints de FastAPI
 def get_db():
     db = SessionLocal()
     try:
