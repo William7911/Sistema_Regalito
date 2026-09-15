@@ -5,6 +5,67 @@ Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `
 
 ---
 
+## [2026-09-15] Resiliencia de Datos de Entrada (Unload Guard & Modal Trigger Alignment)
+
+### Contexto
+Corrección de la inconsistencia en el control de cierre del modal de usuarios y adición de una capa de defensa a nivel de ventana del navegador para evitar la pérdida no intencional de datos ante recargas o cierres de pestaña accidentales.
+
+### Componentes modificados
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | Homologación del `.btn-close` del header: se confirmó que usa `data-bs-close-modal` (firma del selector que enlaza `safeCloseUserModal()`) y no contiene `data-bs-dismiss="modal"`. |
+| `frontend/js/users.js` | Nuevo listener global `beforeunload` que interrumpe la salida solo si el modal está desplegado (`#user-modal.show`) y `formHasData()` retorna `true`. |
+
+### 1. Alineación del disparador en cabecera
+- El botón `.btn-close` del `#user-modal` usa `data-bs-close-modal`, la misma firma de selector que enlaza `safeCloseUserModal()` en `DOMContentLoaded`, compartiendo idéntico comportamiento defensivo que el botón "Cancelar".
+- Se garantiza que NO posee el atributo nativo `data-bs-dismiss="modal"`.
+
+### 2. Guardia de ciclo de vida (beforeunload)
+- Se registra `window.addEventListener('beforeunload', ...)` que previene navegación/recarga/cierre de pestaña.
+- La alerta del navegador solo se activa si: el modal está visible (`#user-modal` con clase `show`) **y** `formHasData()` es `true`.
+- Emplea el estándar defensivo: `event.preventDefault()` + `event.returnValue = ''` para compatibilidad con navegadores modernos.
+
+### 3. Regla obligatoria para formularios transaccionales
+> **Regla obligatoria para formularios transaccionales:** todo módulo con captura modal debe enlazar transversalmente los controles de salida (`.btn-close`, botones cancelar) a la rutina de verificación de cambios sucios (dirty check) e integrar el listener `beforeunload` para salvaguardar el estado frente a recargas o cierres de pestaña accidentales.
+
+### Verificación
+- `node --check frontend/js/users.js`: sin errores de sintaxis.
+- Probar en navegador: abrir modal, ingresar datos y recargar/cerrar pestaña (debe aparecer la alerta del navegador); con modal vacío o cerrado no debe interrumpirse la navegación.
+
+---
+
+## [2026-09-15] Protección contra pérdida de datos en Modales (Static Backdrop y Dirty Form Check)
+
+### Contexto
+Implementación de una política estricta de protección de formulario en el modal de Usuarios para prevenir la pérdida accidental de datos capturados al cerrar el modal (clic exterior o tecla Escape) o al pulsar los botones de cierre/cancelar.
+
+### Componentes modificados
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | `#user-modal` ahora usa `data-bs-backdrop="static"` y `data-bs-keyboard="false"` (no cierra con clic exterior ni Escape). Se eliminó `data-bs-dismiss="modal"` del botón "X" (`.btn-close`) y del botón "Cancelar", reemplazado por `data-bs-close-modal` para control manual. |
+| `frontend/js/users.js` | Nuevas funciones `formHasData()` y `safeCloseUserModal()`; wiring de los botones `[data-bs-close-modal]` en `DOMContentLoaded`. |
+
+### 1. Bloqueo de cierre accidental (backdrop estático)
+- `data-bs-backdrop="static"`: el modal ya no se cierra al hacer clic en el fondo oscuro.
+- `data-bs-keyboard="false"`: el modal ya no se cierra con la tecla **Escape**.
+
+### 2. Confirmación defensiva al cerrar
+- Se removió el cierre nativo `data-bs-dismiss="modal"` del botón "X" y de "Cancelar" para controlar el evento manualmente mediante `[data-bs-close-modal]`.
+- **`formHasData()`**: recorre los campos `input[type=text]`, `input[type=password]`, `textarea` y `select`; devuelve `true` si algún valor tiene texto (`value.trim().length > 0`).
+- **`safeCloseUserModal()`**:
+  - Si el formulario está **completamente vacío**, cierra el modal de inmediato y limpia errores.
+  - Si **contiene datos**, despliega la confirmación no nativa: *"¿Tienes datos sin guardar. ¿Deseas descartar los cambios y salir?"*.
+  - Solo al confirmar: `form.reset()`, se remueven las clases `is-invalid`, se vacían los `.invalid-feedback` y se cierra el modal con `modalInstance.hide()`.
+
+### 3. Regla global para futuros módulos (Ventas, Compras, Inventario)
+> **Regla estándar de diseño:** Todo modal con formulario de captura debe usar **backdrop estático** (`data-bs-backdrop="static"` + `data-bs-keyboard="false"`) y **confirmación condicional de descarte** si contiene campos completados, replicando `formHasData()` + `safeCloseUserModal()` de `frontend/js/users.js`.
+
+### Verificación
+- `node --check frontend/js/users.js`: sin errores de sintaxis.
+- Probar en navegador: abrir modal (crear), hacer clic en el fondo y pulsar Escape (no debe cerrar), ingresar datos y pulsar Cancelar/X (debe pedir confirmación), y cerrar con el formulario vacío (debe cerrar al instante).
+
+---
+
 ## [2026-09-14] Auditoría y Mejoras de UX/UI Nivel Empresarial (Módulo de Usuarios)
 
 ### Contexto

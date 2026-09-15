@@ -273,6 +273,37 @@ async function loadUsers() {
 }
 
 // ---------------------------------------------------------------------------
+// Protección contra pérdida de datos (dirty form check + cierre seguro)
+// ---------------------------------------------------------------------------
+
+// Indica si el formulario tiene datos ingresados por el usuario (texto no vacío).
+function formHasData() {
+    const form = document.getElementById('user-form');
+    if (!form) return false;
+    let hasData = false;
+    form.querySelectorAll('input[type="text"], input[type="password"], textarea, select').forEach((el) => {
+        if (el.value && el.value.trim().length > 0) hasData = true;
+    });
+    return hasData;
+}
+
+// Cierre seguro: si hay datos sin guardar pide confirmación; si está vacío cierra al instante.
+async function safeCloseUserModal() {
+    const modal = getModal('user-modal');
+    if (!modal) return;
+    if (formHasData()) {
+        const ok = await confirmModal('¿Tienes datos sin guardar. ¿Deseas descartar los cambios y salir?');
+        if (!ok) return;
+    }
+    clearValidationErrors();
+    const form = document.getElementById('user-form');
+    if (form) form.reset();
+    document.querySelectorAll('#user-form .is-invalid').forEach((el) => el.classList.remove('is-invalid'));
+    document.querySelectorAll('#user-form .invalid-feedback').forEach((el) => { el.textContent = ''; });
+    modal.hide();
+}
+
+// ---------------------------------------------------------------------------
 // Formulario / Modal
 // ---------------------------------------------------------------------------
 
@@ -410,6 +441,20 @@ async function deactivateUser(userId) {
 }
 
 // ---------------------------------------------------------------------------
+// Resiliencia de datos: guardia contra navegación/recarga involuntaria
+// ---------------------------------------------------------------------------
+
+window.addEventListener('beforeunload', (event) => {
+    const userModal = document.getElementById('user-modal');
+    const isModalVisible = userModal && userModal.classList.contains('show');
+
+    if (isModalVisible && typeof formHasData === 'function' && formHasData()) {
+        event.preventDefault();
+        event.returnValue = '';
+    }
+});
+
+// ---------------------------------------------------------------------------
 // Navegación
 // ---------------------------------------------------------------------------
 
@@ -434,6 +479,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const modalEl = document.getElementById('user-modal');
     if (modalEl) modalEl.addEventListener('hidden.bs.modal', resetUserForm); // reseteo impecable al cerrar
+    document.querySelectorAll('[data-bs-close-modal]').forEach((btn) => {
+        btn.addEventListener('click', safeCloseUserModal);
+    });
     const btnNew = document.getElementById('btn-new-user');
     if (btnNew) btnNew.addEventListener('click', openCreateModal);
     const btnFilter = document.getElementById('btn-filter-users');
