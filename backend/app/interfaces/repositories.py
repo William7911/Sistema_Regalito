@@ -4,6 +4,7 @@ from app.db.models import (
     Categoria, Subcategoria, UnidadMedida, Sucursal, AreaBodega,
     Producto, VarianteProducto, InventarioSucursal,
     Rol, DepartamentoGeografico, Usuario,
+    Caja, TurnoCaja,
 )
 
 
@@ -72,6 +73,10 @@ class UserRepository(ABC):
         name: Optional[str] = None,
         is_active: Optional[bool] = None,
         role_id: Optional[int] = None,
+        created_from=None,
+        created_to=None,
+        sort_by: Optional[str] = None,
+        sort_dir: str = "asc",
         limit: int = 100,
         offset: int = 0,
     ) -> List[Usuario]:
@@ -83,6 +88,8 @@ class UserRepository(ABC):
         name: Optional[str] = None,
         is_active: Optional[bool] = None,
         role_id: Optional[int] = None,
+        created_from=None,
+        created_to=None,
     ) -> int:
         ...
 
@@ -149,6 +156,10 @@ class ProductRepository(ABC):
         barcode: Optional[str] = None,
         is_active: Optional[bool] = None,
         subcategoria_id: Optional[int] = None,
+        created_from=None,
+        created_to=None,
+        sort_by: Optional[str] = None,
+        sort_dir: str = "asc",
         limit: int = 100,
         offset: int = 0,
     ) -> List[Producto]:
@@ -161,6 +172,8 @@ class ProductRepository(ABC):
         barcode: Optional[str] = None,
         is_active: Optional[bool] = None,
         subcategoria_id: Optional[int] = None,
+        created_from=None,
+        created_to=None,
     ) -> int:
         ...
 
@@ -214,4 +227,74 @@ class ProductRepository(ABC):
 
     @abstractmethod
     async def rollback(self) -> None:
+        ...
+
+
+class CajaRepository(ABC):
+    """Contrato de acceso a datos para Cajas (modelo relacional Caja)."""
+
+    @abstractmethod
+    async def get_by_id(self, caja_id: int) -> Optional[Caja]:
+        ...
+
+    @abstractmethod
+    async def list_all(self, include_inactive: bool = False) -> List[Caja]:
+        ...
+
+    @abstractmethod
+    async def create(self, caja: Caja) -> Caja:
+        ...
+
+    @abstractmethod
+    async def update(self, caja: Caja) -> Caja:
+        ...
+
+
+class TurnoCajaRepository(ABC):
+    """Contrato de acceso a datos para Turnos de Caja (modelo relacional TurnoCaja)."""
+
+    @abstractmethod
+    async def get_by_id(self, turno_id: int) -> Optional[TurnoCaja]:
+        ...
+
+    @abstractmethod
+    async def get_active_by_user(self, user_id: int) -> Optional[TurnoCaja]:
+        ...
+
+    @abstractmethod
+    async def get_active_by_caja(self, caja_id: int) -> Optional[TurnoCaja]:
+        ...
+
+    @abstractmethod
+    async def search(
+        self,
+        fecha_desde=None,
+        fecha_hasta=None,
+        estado: Optional[str] = None,
+        id_caja: Optional[int] = None,
+        id_usuario: Optional[int] = None,
+        sort_by: Optional[str] = None,
+        sort_dir: str = "desc",
+        limit: int = 10,
+        offset: int = 0,
+    ) -> List[TurnoCaja]:
+        ...
+
+    @abstractmethod
+    async def count_search(
+        self,
+        fecha_desde=None,
+        fecha_hasta=None,
+        estado: Optional[str] = None,
+        id_caja: Optional[int] = None,
+        id_usuario: Optional[int] = None,
+    ) -> int:
+        ...
+
+    @abstractmethod
+    async def create(self, turno: TurnoCaja) -> TurnoCaja:
+        ...
+
+    @abstractmethod
+    async def update(self, turno: TurnoCaja) -> TurnoCaja:
         ...

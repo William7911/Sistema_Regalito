@@ -24,6 +24,10 @@ class ConcreteUserService(UserService):
             name=filters.name,
             is_active=filters.is_active,
             role_id=filters.role_id,
+            created_from=filters.created_from,
+            created_to=filters.created_to,
+            sort_by=filters.sort_by,
+            sort_dir=filters.sort_dir or "asc",
             limit=filters.limit,
             offset=filters.offset,
         )
@@ -34,6 +38,8 @@ class ConcreteUserService(UserService):
             name=filters.name,
             is_active=filters.is_active,
             role_id=filters.role_id,
+            created_from=filters.created_from,
+            created_to=filters.created_to,
         )
 
     async def get_user(self, user_id: int) -> schemas.UserResponse:

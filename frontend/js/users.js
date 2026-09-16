@@ -7,12 +7,32 @@ const ROLES_API = '/api/roles';
 
 let baseSaveText = 'Guardar';
 
+// Estado de paginación y ordenamiento del listado.
+let usersState = {
+    page: 1,
+    pageSize: 10,
+    total: 0,
+    sortBy: 'nombre_completo',
+    sortDir: 'asc',
+};
+
 function authHeaders() {
     const token = localStorage.getItem('jwt_token');
     return {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
     };
+}
+
+// Formatea una fecha (ISO/UTC) a DD/MM/YYYY.
+function formatDate(value) {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '-';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
 }
 
 function getModal(id) {
@@ -230,13 +250,29 @@ async function loadRoleFilter() {
 async function loadUsers() {
     const tbody = document.getElementById('users-table-body');
     const empty = document.getElementById('users-empty');
+    if (!tbody) return;
+
     const params = new URLSearchParams();
-    const name = document.getElementById('filter-name').value.trim();
-    const role = document.getElementById('filter-role').value;
-    const isActive = document.getElementById('filter-active').value;
+    const name = (document.getElementById('filter-name')?.value || '').trim();
+    const role = document.getElementById('filter-role')?.value || '';
+    const isActive = document.getElementById('filter-active')?.value ?? '';
+    const from = document.getElementById('filter-from')?.value || '';
+    const to = document.getElementById('filter-to')?.value || '';
+
     if (name) params.append('name', name);
     if (role) params.append('role_id', role);
     if (isActive !== '') params.append('is_active', isActive);
+    if (from) params.append('created_from', from);
+    if (to) params.append('created_to', to);
+
+    const pageSize = parseInt(document.getElementById('users-page-size')?.value || String(usersState.pageSize || 10), 10) || 10;
+    usersState.pageSize = pageSize;
+    const page = usersState.page || 1;
+
+    params.append('sort_by', usersState.sortBy || 'id_usuario');
+    params.append('sort_dir', usersState.sortDir || 'asc');
+    params.append('limit', pageSize);
+    params.append('offset', (page - 1) * pageSize);
 
     try {
         const res = await fetch(`${USERS_API}?${params.toString()}`, { headers: authHeaders() });
@@ -251,6 +287,7 @@ async function loadUsers() {
             tbody.innerHTML = data.items.map(u => {
                 const rol = u.rol ? u.rol.nombre : '-';
                 const activo = u.estado === 'Activo';
+                const fecha = u.fecha_creacion ? formatDate(u.fecha_creacion) : '-';
                 return `
                 <tr>
                     <td>${u.id_usuario}</td>
@@ -258,7 +295,9 @@ async function loadUsers() {
                     <td>${u.username}</td>
                     <td>${rol}</td>
                     <td><span class="badge ${activo ? 'bg-success' : 'bg-secondary'}">${activo ? 'Activo' : 'Inactivo'}</span></td>
+                    <td>${fecha}</td>
                     <td class="text-end">
+                        <button class="btn btn-sm btn-outline-info" onclick="viewUserDetail(${u.id_usuario})" title="Ver detalle"><i class="bi bi-eye"></i></button>
                         <button class="btn btn-sm btn-outline-primary" onclick="editUser(${u.id_usuario})" title="Editar"><i class="bi bi-pencil"></i></button>
                         ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateUser(${u.id_usuario})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
                     </td>
@@ -272,9 +311,68 @@ async function loadUsers() {
             tbody.closest('.table-responsive').classList.add('d-none');
             if (empty) empty.classList.remove('d-none');
         }
+        usersState.total = data.total || 0;
+        renderPagination();
     } catch (err) {
         showToast(err.message, 'danger');
     }
+}
+
+// Renderiza la barra de paginación a partir del estado actual.
+function renderPagination() {
+    const pagination = document.getElementById('users-pagination');
+    if (!pagination) return;
+    const totalPages = Math.max(1, Math.ceil(usersState.total / usersState.pageSize));
+    if (usersState.page > totalPages) usersState.page = totalPages;
+    const info = document.getElementById('users-page-info');
+    const prev = document.getElementById('users-prev-page');
+    const next = document.getElementById('users-next-page');
+    if (info) info.textContent = `Página ${usersState.page} de ${totalPages}`;
+    if (prev) prev.disabled = usersState.page <= 1;
+    if (next) next.disabled = usersState.page >= totalPages;
+    if (usersState.total === 0) {
+        pagination.classList.add('d-none');
+    } else {
+        pagination.classList.remove('d-none');
+    }
+}
+
+// Va a una página concreta y recarga el listado.
+function goToPage(page) {
+    const totalPages = Math.max(1, Math.ceil(usersState.total / usersState.pageSize));
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    if (page === usersState.page) return;
+    usersState.page = page;
+    loadUsers();
+}
+
+// Alterna el orden (asc/desc) de una columna y recarga.
+function toggleSort(column) {
+    if (usersState.sortBy === column) {
+        usersState.sortDir = usersState.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        usersState.sortBy = column;
+        usersState.sortDir = 'asc';
+    }
+    usersState.page = 1;
+    updateSortIndicators();
+    loadUsers();
+}
+
+// Pinta los indicadores asc/desc en las cabeceras ordenables de usuarios.
+function updateSortIndicators() {
+    document.querySelectorAll('#users-view th.sortable').forEach((th) => {
+        const col = th.getAttribute('data-sort');
+        const existing = th.querySelector('.sort-icon');
+        if (existing) th.removeChild(existing);
+        if (col === usersState.sortBy) {
+            const icon = document.createElement('span');
+            icon.className = 'sort-icon';
+            icon.textContent = usersState.sortDir === 'asc' ? '▲' : '▼';
+            th.appendChild(icon);
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -358,6 +456,31 @@ async function editUser(userId) {
         if (text) text.textContent = baseSaveText;
         await Promise.all([loadRoles(u.id_rol), loadRoleFilter()]);
         const modal = getModal('user-modal');
+        if (modal) modal.show();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// Modal informativo de detalle (solo lectura, backdrop estático).
+async function viewUserDetail(userId) {
+    try {
+        const res = await fetch(`${USERS_API}/${userId}`, { headers: authHeaders() });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => null);
+            showToast((errData && errData.detail) || 'No se encontró el usuario', 'danger');
+            return;
+        }
+        const u = await res.json();
+        document.getElementById('detail-id').textContent = u.id_usuario;
+        document.getElementById('detail-nombre').textContent = u.nombre_completo || '-';
+        document.getElementById('detail-username').textContent = u.username || '-';
+        document.getElementById('detail-rol').textContent = (u.rol && u.rol.nombre) ? u.rol.nombre : '-';
+        document.getElementById('detail-estado').textContent = u.estado || '-';
+        document.getElementById('detail-fecha').textContent = u.fecha_creacion
+            ? new Date(u.fecha_creacion).toLocaleString()
+            : '-';
+        const modal = getModal('user-detail-modal');
         if (modal) modal.show();
     } catch (err) {
         showToast(err.message, 'danger');
@@ -461,6 +584,7 @@ window.addEventListener('beforeunload', (event) => {
 // ---------------------------------------------------------------------------
 
 window.showUsersModule = async function () {
+    updateSortIndicators();
     await Promise.all([loadUsers(), loadRoleFilter()]);
 };
 
@@ -469,6 +593,7 @@ window.goToDashboard = function () {
 };
 
 window.editUser = editUser;
+window.viewUserDetail = viewUserDetail;
 
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('user-form');
@@ -484,5 +609,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnNew = document.getElementById('btn-new-user');
     if (btnNew) btnNew.addEventListener('click', openCreateModal);
     const btnFilter = document.getElementById('btn-filter-users');
-    if (btnFilter) btnFilter.addEventListener('click', loadUsers);
+    if (btnFilter) btnFilter.addEventListener('click', () => {
+        usersState.page = 1;
+        loadUsers();
+    });
+    // Paginación
+    const pageSize = document.getElementById('users-page-size');
+    if (pageSize) pageSize.addEventListener('change', () => {
+        usersState.pageSize = parseInt(pageSize.value, 10);
+        usersState.page = 1;
+        loadUsers();
+    });
+    const prevBtn = document.getElementById('users-prev-page');
+    if (prevBtn) prevBtn.addEventListener('click', () => goToPage(usersState.page - 1));
+    const nextBtn = document.getElementById('users-next-page');
+    if (nextBtn) nextBtn.addEventListener('click', () => goToPage(usersState.page + 1));
+    // Ordenamiento de columnas
+    document.querySelectorAll('#users-view th.sortable').forEach((th) => {
+        th.addEventListener('click', () => toggleSort(th.getAttribute('data-sort')));
+    });
 });

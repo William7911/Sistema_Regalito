@@ -181,7 +181,7 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                    <a href="#" id="nav-cash" class="nav-link text-white-50 sidebar-link" data-nav="cash" onclick="navigateTo('cash'); return false;">
                         <i class="bi bi-cash-coin me-2"></i> Caja
                     </a>
                 </li>
@@ -373,16 +373,24 @@
 
                 <!-- Filtros -->
                 <div class="card border-0 shadow-sm rounded-4 mb-4">
-                    <div class="card-body d-flex gap-2 flex-wrap">
-                        <input type="text" id="filter-name" class="form-control" style="max-width: 220px;" placeholder="Nombre">
-                        <select id="filter-role" class="form-select" style="max-width: 180px;">
+                    <div class="card-body d-flex gap-2 flex-wrap align-items-center">
+                        <input type="text" id="filter-name" class="form-control" style="max-width: 200px;" placeholder="Nombre">
+                        <select id="filter-role" class="form-select" style="max-width: 170px;">
                             <option value="">Todos los roles</option>
                         </select>
-                        <select id="filter-active" class="form-select" style="max-width: 160px;">
+                        <select id="filter-active" class="form-select" style="max-width: 140px;">
                             <option value="">Estado</option>
                             <option value="true">Activo</option>
                             <option value="false">Inactivo</option>
                         </select>
+                        <div class="input-group" style="max-width: 190px;">
+                            <span class="input-group-text bg-white text-muted small"><i class="bi bi-calendar-event me-1"></i>Desde</span>
+                            <input type="date" id="filter-from" class="form-control form-control-sm" title="Fecha registro desde">
+                        </div>
+                        <div class="input-group" style="max-width: 190px;">
+                            <span class="input-group-text bg-white text-muted small"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
+                            <input type="date" id="filter-to" class="form-control form-control-sm" title="Fecha registro hasta">
+                        </div>
                         <button id="btn-filter-users" class="btn btn-teal"><i class="bi bi-funnel"></i> Filtrar</button>
                     </div>
                 </div>
@@ -391,15 +399,16 @@
                 <div class="card border-0 shadow-sm rounded-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table align-middle mb-0">
-                                <thead>
+                            <table class="table align-middle table-hover mb-0">
+                                <thead class="thead-users">
                                     <tr>
-                                        <th>ID</th>
-                                        <th>Nombre</th>
-                                        <th>Usuario</th>
-                                        <th>Rol</th>
-                                        <th>Estado</th>
-                                        <th></th>
+                                        <th class="sortable" data-sort="id_usuario" style="width: 70px;">ID <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="nombre_completo">Nombre <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="username">Usuario <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="rol">Rol <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="estado">Estado <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="fecha_creacion">Fecha Reg. <span class="sort-icon"></span></th>
+                                        <th class="text-end" style="width: 140px;">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="users-table-body"></tbody>
@@ -409,6 +418,24 @@
                         <div id="users-empty" class="text-center text-muted py-5 d-none">
                             <i class="bi bi-people fs-1 d-block mb-2 opacity-50"></i>
                             <span>No hay usuarios registrados</span>
+                        </div>
+
+                        <!-- Paginación Reactiva Usuarios -->
+                        <div id="users-pagination" class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 d-none">
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="text-muted small mb-0">Registros por página</label>
+                                <select id="users-page-size" class="form-select form-select-sm" style="width: 80px;">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <button id="users-prev-page" class="btn btn-sm btn-outline-secondary" title="Página anterior"><i class="bi bi-chevron-left"></i></button>
+                                <span id="users-page-info" class="text-muted small px-2">Página 1 de 1</span>
+                                <button id="users-next-page" class="btn btn-sm btn-outline-secondary" title="Página siguiente"><i class="bi bi-chevron-right"></i></button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -450,12 +477,20 @@
 
                         <!-- Filtros Productos -->
                         <div class="card border-0 shadow-sm rounded-4 mb-4">
-                            <div class="card-body d-flex gap-2 flex-wrap">
-                                <input type="text" id="filter-product-name" class="form-control" style="max-width: 220px;" placeholder="Nombre">
-                                <input type="text" id="filter-product-barcode" class="form-control" style="max-width: 180px;" placeholder="Código de barras">
-                                <select id="filter-product-subcategoria" class="form-select" style="max-width: 220px;">
+                            <div class="card-body d-flex gap-2 flex-wrap align-items-center">
+                                <input type="text" id="filter-product-name" class="form-control" style="max-width: 200px;" placeholder="Nombre">
+                                <input type="text" id="filter-product-barcode" class="form-control" style="max-width: 170px;" placeholder="Código de barras">
+                                <select id="filter-product-subcategoria" class="form-select" style="max-width: 200px;">
                                     <option value="">Todas las subcategorías</option>
                                 </select>
+                                <div class="input-group" style="max-width: 190px;">
+                                    <span class="input-group-text bg-white text-muted small"><i class="bi bi-calendar-event me-1"></i>Desde</span>
+                                    <input type="date" id="filter-product-from" class="form-control form-control-sm" title="Fecha registro desde">
+                                </div>
+                                <div class="input-group" style="max-width: 190px;">
+                                    <span class="input-group-text bg-white text-muted small"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
+                                    <input type="date" id="filter-product-to" class="form-control form-control-sm" title="Fecha registro hasta">
+                                </div>
                                 <button id="btn-filter-products" class="btn btn-celeste"><i class="bi bi-funnel"></i> Filtrar</button>
                             </div>
                         </div>
@@ -464,15 +499,17 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle mb-0">
+                                    <table class="table align-middle table-hover mb-0">
                                         <thead class="thead-catalog">
                                             <tr>
-                                                <th>Nombre</th>
-                                                <th>Subcategoría</th>
-                                                <th>Precio Detalle</th>
-                                                <th>Stock</th>
-                                                <th>Estado</th>
-                                                <th></th>
+                                                <th class="sortable" data-sort="id_producto" style="width: 70px;">ID <span class="sort-icon"></span></th>
+                                                <th class="sortable" data-sort="nombre">Nombre <span class="sort-icon"></span></th>
+                                                <th class="sortable" data-sort="subcategoria">Subcategoría <span class="sort-icon"></span></th>
+                                                <th class="sortable" data-sort="precio_detalle">Precio Detalle <span class="sort-icon"></span></th>
+                                                <th class="sortable" data-sort="stock">Stock <span class="sort-icon"></span></th>
+                                                <th class="sortable" data-sort="estado">Estado <span class="sort-icon"></span></th>
+                                                <th class="sortable" data-sort="fecha_creacion">Fecha Reg. <span class="sort-icon"></span></th>
+                                                <th class="text-end" style="width: 140px;">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody id="products-table-body"></tbody>
@@ -481,6 +518,24 @@
                                 <div id="products-empty" class="text-center text-muted py-5 d-none">
                                     <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
                                     <span>No hay productos registrados</span>
+                                </div>
+
+                                <!-- Paginación Reactiva Productos -->
+                                <div id="products-pagination" class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 d-none">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <label class="text-muted small mb-0">Registros por página</label>
+                                        <select id="products-page-size" class="form-select form-select-sm" style="width: 80px;">
+                                            <option value="5">5</option>
+                                            <option value="10" selected>10</option>
+                                            <option value="20">20</option>
+                                            <option value="50">50</option>
+                                        </select>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <button id="products-prev-page" class="btn btn-sm btn-outline-secondary" title="Página anterior"><i class="bi bi-chevron-left"></i></button>
+                                        <span id="products-page-info" class="text-muted small px-2">Página 1 de 1</span>
+                                        <button id="products-next-page" class="btn btn-sm btn-outline-secondary" title="Página siguiente"><i class="bi bi-chevron-right"></i></button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -510,13 +565,13 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle mb-0">
+                                    <table class="table align-middle table-hover mb-0">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th>Nombre</th>
                                                 <th>Descripción</th>
                                                 <th>Estado</th>
-                                                <th></th>
+                                                <th class="text-end" style="width: 120px;">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody id="categories-table-body"></tbody>
@@ -526,6 +581,142 @@
                                     <i class="bi bi-journal-text fs-1 d-block mb-2 opacity-50"></i>
                                     <span>No hay categorías registradas</span>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cash Register Module View -->
+            <div id="cash-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="cash">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-1">Módulo de Caja</h4>
+                        <p class="text-muted small mb-0">Control de apertura, cierre de turnos y arqueo de efectivo</p>
+                    </div>
+                    <div>
+                        <button id="btn-open-cash" class="btn btn-verde d-none" onclick="openOpenCashModal()">
+                            <i class="bi bi-door-open-fill me-1"></i> Abrir Turno
+                        </button>
+                        <button id="btn-close-cash" class="btn btn-rosado d-none" onclick="openCloseCashModal()">
+                            <i class="bi bi-door-closed-fill me-1"></i> Cerrar Turno
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tarjeta de Estado del Turno Actual -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4" id="cash-status-card">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-3 border-bottom gap-2">
+                            <div class="d-flex align-items-center gap-3">
+                                <div id="cash-status-icon-box" class="icon-circle bg-teal-light text-teal fs-4 rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                    <i class="bi bi-cash-stack"></i>
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold mb-0" id="cash-status-title">Estado de la Caja</h5>
+                                    <small class="text-muted" id="cash-status-subtitle">Consultando estado actual...</small>
+                                </div>
+                            </div>
+                            <div>
+                                <span id="cash-status-badge" class="badge bg-secondary px-3 py-2 rounded-pill fs-6">
+                                    <i class="bi bi-clock-history me-1"></i> Verificando...
+                                </span>
+                            </div>
+                        </div>
+                        <div id="cash-active-details" class="row g-3 d-none">
+                            <div class="col-12 col-md-3">
+                                <span class="text-muted small d-block">Caja asignada</span>
+                                <strong class="text-dark" id="cash-active-caja">-</strong>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <span class="text-muted small d-block">Cajero a cargo</span>
+                                <strong class="text-dark" id="cash-active-cajero">-</strong>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <span class="text-muted small d-block">Monto inicial</span>
+                                <strong class="text-verde fs-5" id="cash-active-monto">Q 0.00</strong>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <span class="text-muted small d-block">Fecha y hora apertura</span>
+                                <strong class="text-dark" id="cash-active-fecha">-</strong>
+                            </div>
+                        </div>
+                        <div id="cash-closed-message" class="text-muted py-2">
+                            <i class="bi bi-info-circle me-1 text-teal"></i>
+                            <span>No tienes un turno de caja abierto en este momento. Haz clic en <strong>"Abrir Turno"</strong> para comenzar a registrar operaciones.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historial de Turnos de Caja -->
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2 text-celeste"></i>Historial de Turnos</h5>
+                        </div>
+
+                        <!-- Filtros Inteligentes -->
+                        <div class="d-flex gap-2 flex-wrap align-items-center mb-4 p-3 bg-light rounded-3">
+                            <div class="input-group" style="max-width: 210px;">
+                                <span class="input-group-text bg-white text-muted small"><i class="bi bi-calendar-event me-1"></i>Desde</span>
+                                <input type="date" id="filter-cash-from" class="form-control form-control-sm" title="Fecha desde">
+                            </div>
+                            <div class="input-group" style="max-width: 210px;">
+                                <span class="input-group-text bg-white text-muted small"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
+                                <input type="date" id="filter-cash-to" class="form-control form-control-sm" title="Fecha hasta">
+                            </div>
+                            <div style="max-width: 180px;">
+                                <select id="filter-cash-status" class="form-select form-select-sm">
+                                    <option value="">-- Todos los Estados --</option>
+                                    <option value="Abierto">Abierto</option>
+                                    <option value="Cerrado">Cerrado</option>
+                                </select>
+                            </div>
+                            <button id="btn-filter-cash" class="btn btn-sm btn-celeste"><i class="bi bi-funnel"></i> Filtrar</button>
+                            <button id="btn-clear-cash-filters" class="btn btn-sm btn-outline-secondary" title="Limpiar filtros"><i class="bi bi-x-circle"></i> Limpiar</button>
+                        </div>
+
+                        <!-- Tabla de Turnos -->
+                        <div class="table-responsive">
+                            <table class="table align-middle table-hover mb-0" id="cash-table">
+                                <thead class="thead-cash">
+                                    <tr>
+                                        <th class="sortable" data-sort="id_turno"># <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="caja">Caja <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="usuario">Cajero <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="monto_apertura">Monto Inicial <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="monto_cierre">Monto Cierre <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="fecha_apertura">Fecha Apertura <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="fecha_cierre">Fecha Cierre <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="estado">Estado <span class="sort-icon"></span></th>
+                                        <th>Notas</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cash-table-body"></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Estado Vacío -->
+                        <div id="cash-empty" class="text-center text-muted py-5 d-none">
+                            <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+                            <span>No se encontraron turnos de caja registrados</span>
+                        </div>
+
+                        <!-- Paginación Reactiva -->
+                        <div id="cash-pagination" class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 d-none">
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="text-muted small mb-0">Registros por página</label>
+                                <select id="cash-page-size" class="form-select form-select-sm" style="width: 80px;">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <button id="cash-prev-page" class="btn btn-sm btn-outline-secondary" title="Página anterior"><i class="bi bi-chevron-left"></i></button>
+                                <span id="cash-page-info" class="text-muted small px-2">Página 1 de 1</span>
+                                <button id="cash-next-page" class="btn btn-sm btn-outline-secondary" title="Página siguiente"><i class="bi bi-chevron-right"></i></button>
                             </div>
                         </div>
                     </div>
@@ -768,6 +959,190 @@
         </div>
     </div>
 
+    <!-- Modal: Detalle de Usuario (Solo lectura, Defensivo) -->
+    <div class="modal fade" id="user-detail-modal" tabindex="-1" aria-labelledby="userDetailModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="userDetailModalTitle"><i class="bi bi-person-badge text-teal me-2"></i>Ficha de Usuario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted small">ID:</span>
+                            <strong class="text-dark small" id="detail-id">-</strong>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted small">Nombre completo:</span>
+                            <strong class="text-dark small" id="detail-nombre">-</strong>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted small">Nombre de usuario:</span>
+                            <span class="text-dark small" id="detail-username">-</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted small">Rol asignado:</span>
+                            <span class="badge bg-teal-light text-teal-dark" id="detail-rol">-</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted small">Estado:</span>
+                            <span class="badge bg-success" id="detail-estado">-</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted small">Fecha de registro:</span>
+                            <span class="text-dark small" id="detail-fecha">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detalle de Producto (Solo lectura, Defensivo) -->
+    <div class="modal fade" id="product-detail-modal" tabindex="-1" aria-labelledby="productDetailModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="productDetailModalTitle"><i class="bi bi-box-seam text-celeste me-2"></i>Ficha Técnica del Producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded-3 h-100">
+                                <h6 class="fw-bold text-dark mb-2">Información General</h6>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">ID:</span><strong class="text-dark small" id="pdetail-id">-</strong></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Nombre:</span><strong class="text-dark small" id="pdetail-nombre">-</strong></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Descripción:</span><span class="text-dark small" id="pdetail-descripcion">-</span></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Subcategoría:</span><span class="text-dark small" id="pdetail-subcategoria">-</span></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Unidad:</span><span class="text-dark small" id="pdetail-unidad">-</span></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Estado:</span><span class="badge bg-success" id="pdetail-estado">-</span></div>
+                                <div class="d-flex justify-content-between"><span class="text-muted small">Fecha Registro:</span><span class="text-dark small" id="pdetail-fecha">-</span></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded-3 h-100">
+                                <h6 class="fw-bold text-dark mb-2">Variante y Precios</h6>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Código de barras:</span><span class="text-dark small font-monospace" id="pdetail-barcode">-</span></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Talla / Color:</span><span class="text-dark small"><span id="pdetail-talla">-</span> / <span id="pdetail-color">-</span></span></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Precio Detalle:</span><strong class="text-verde small" id="pdetail-precio-detalle">-</strong></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Precio Mayoreo:</span><span class="text-dark small" id="pdetail-precio-mayoreo">-</span></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Costo Promedio:</span><span class="text-dark small" id="pdetail-costo">-</span></div>
+                                <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Sucursal / Bodega:</span><span class="text-dark small" id="pdetail-sucursal">-</span></div>
+                                <div class="d-flex justify-content-between"><span class="text-muted small">Stock Actual / Mínimo:</span><span class="text-dark small"><strong id="pdetail-stock">-</strong> (mín: <span id="pdetail-stock-min">-</span>)</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Apertura de Caja (Defensivo) -->
+    <div class="modal fade" id="open-cash-modal" tabindex="-1" aria-labelledby="openCashModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="openCashModalTitle"><i class="bi bi-door-open-fill text-verde me-2"></i>Apertura de Turno de Caja</h5>
+                    <button type="button" class="btn-close" onclick="safeCloseOpenCashModal()" aria-label="Cerrar"></button>
+                </div>
+                <form id="open-cash-form" novalidate>
+                    <div class="modal-body py-3">
+                        <div class="alert alert-danger d-none small mb-3" id="open-cash-alert"></div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-dark fw-medium" for="open-cash-caja">Caja Registradora <span class="text-danger">*</span></label>
+                            <select class="form-select" id="open-cash-caja" required>
+                                <option value="">-- Seleccione una caja --</option>
+                            </select>
+                            <div class="invalid-feedback" id="error-id_caja">Seleccione una caja para abrir turno.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-dark fw-medium" for="open-cash-monto">Monto Inicial de Apertura (Q) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white">Q</span>
+                                <input type="number" class="form-control" id="open-cash-monto" min="0" step="0.01" placeholder="0.00" required>
+                                <div class="invalid-feedback" id="error-monto_apertura">Ingrese un monto de apertura válido (mayor o igual a 0).</div>
+                            </div>
+                            <small class="text-muted">Efectivo base asignado para cambio y operaciones iniciales.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-outline-secondary" onclick="safeCloseOpenCashModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-verde" id="btn-submit-open-cash">
+                            <span class="spinner-border spinner-border-sm me-1 d-none" id="open-cash-spinner" role="status" aria-hidden="true"></span>
+                            <span id="open-cash-btn-text">Abrir Caja</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Cierre de Caja (Defensivo) -->
+    <div class="modal fade" id="close-cash-modal" tabindex="-1" aria-labelledby="closeCashModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="closeCashModalTitle"><i class="bi bi-door-closed-fill text-rosado me-2"></i>Cierre de Turno de Caja</h5>
+                    <button type="button" class="btn-close" onclick="safeCloseCloseCashModal()" aria-label="Cerrar"></button>
+                </div>
+                <form id="close-cash-form" novalidate>
+                    <div class="modal-body py-3">
+                        <div class="alert alert-danger d-none small mb-3" id="close-cash-alert"></div>
+
+                        <!-- Resumen del turno en curso -->
+                        <div class="p-3 bg-light rounded-3 mb-3 border">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small">Caja:</span>
+                                <strong class="text-dark small" id="close-summary-caja">-</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small">Apertura:</span>
+                                <span class="text-dark small" id="close-summary-fecha">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted small">Monto inicial:</span>
+                                <strong class="text-verde small" id="close-summary-monto">Q 0.00</strong>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-dark fw-medium" for="close-cash-monto">Monto Final en Caja / Arqueo (Q) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white">Q</span>
+                                <input type="number" class="form-control" id="close-cash-monto" min="0" step="0.01" placeholder="0.00" required>
+                                <div class="invalid-feedback" id="error-monto_cierre">Ingrese el monto total contado en caja.</div>
+                            </div>
+                            <small class="text-muted">Total de efectivo en gaveta al momento de concluir el turno.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-dark fw-medium" for="close-cash-notas">Notas u Observaciones (Opcional)</label>
+                            <textarea class="form-control" id="close-cash-notas" rows="2" maxlength="255" placeholder="Observaciones sobre faltantes, sobrantes o incidencias..."></textarea>
+                            <div class="invalid-feedback" id="error-notas"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-outline-secondary" onclick="safeCloseCloseCashModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-rosado" id="btn-submit-close-cash">
+                            <span class="spinner-border spinner-border-sm me-1 d-none" id="close-cash-spinner" role="status" aria-hidden="true"></span>
+                            <span id="close-cash-btn-text">Cerrar Caja</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Confirmación de eliminación (sin confirm() nativo) -->
     <div class="modal fade" id="confirm-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -787,5 +1162,6 @@
     <script src="js/app.js"></script>
     <script src="js/users.js"></script>
     <script src="js/catalog.js"></script>
+    <script src="js/cash_register.js"></script>
 </body>
 </html>

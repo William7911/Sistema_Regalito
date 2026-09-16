@@ -11,12 +11,14 @@ from app.repositories.product_repository import ProductRepositoryImpl
 from app.repositories.role_repository import RoleRepositoryImpl
 from app.repositories.department_repository import DepartmentRepositoryImpl
 from app.repositories.user_repository import UserRepositoryImpl
+from app.repositories.cash_repository import CajaRepositoryImpl, TurnoCajaRepositoryImpl
 from app.services.category_service import ConcreteCategoryService
 from app.services.product_service import ConcreteProductService
 from app.services.catalogo_service import ConcreteCatalogoService
 from app.services.role_service import ConcreteRoleService
 from app.services.department_service import ConcreteDepartmentService
 from app.services.user_service import ConcreteUserService
+from app.services.cash_service import ConcreteCashService
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
@@ -48,6 +50,14 @@ class UnitOfWork:
     @property
     def users(self):
         return UserRepositoryImpl(self.db)
+
+    @property
+    def cajas(self):
+        return CajaRepositoryImpl(self.db)
+
+    @property
+    def turnos(self):
+        return TurnoCajaRepositoryImpl(self.db)
 
 
 async def get_current_user(
@@ -99,3 +109,7 @@ def get_department_service(db: AsyncSession = Depends(get_db)) -> ConcreteDepart
 
 def get_user_service(db: AsyncSession = Depends(get_db)) -> ConcreteUserService:
     return ConcreteUserService(UnitOfWork(db))
+
+
+def get_cash_service(db: AsyncSession = Depends(get_db)) -> ConcreteCashService:
+    return ConcreteCashService(UnitOfWork(db))

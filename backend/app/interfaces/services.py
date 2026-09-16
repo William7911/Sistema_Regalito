@@ -161,3 +161,31 @@ class CatalogoService(ABC):
     @abstractmethod
     async def list_areas(self, sucursal_id: Optional[int] = None) -> List[schemas.AreaBodegaOut]:
         ...
+
+
+class CashRegisterService(ABC):
+    """Contrato de la lógica de negocio de Caja y Turnos."""
+
+    @abstractmethod
+    async def abrir_caja(self, data: schemas.TurnoApertura, user_id: int) -> schemas.TurnoResponse:
+        ...
+
+    @abstractmethod
+    async def cerrar_caja(self, data: schemas.TurnoCierre, user_id: int) -> schemas.TurnoResponse:
+        ...
+
+    @abstractmethod
+    async def get_estado_actual(self, user_id: int) -> Optional[schemas.TurnoResponse]:
+        ...
+
+    @abstractmethod
+    async def list_turnos(self, filters: schemas.TurnoFilter) -> List[schemas.TurnoResponse]:
+        ...
+
+    @abstractmethod
+    async def count_turnos(self, filters: schemas.TurnoFilter) -> int:
+        ...
+
+    @abstractmethod
+    async def list_cajas(self, include_inactive: bool = False) -> List[schemas.CajaOut]:
+        ...

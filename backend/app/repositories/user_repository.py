@@ -2,7 +2,7 @@ from typing import Optional, List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from app.db.models import Usuario
+from app.db.models import Usuario, Rol
 from app.interfaces.repositories import UserRepository
 
 _USER_LOADS = (
@@ -33,6 +33,8 @@ class UserRepositoryImpl(UserRepository):
         name: Optional[str],
         is_active: Optional[bool],
         role_id: Optional[int],
+        created_from=None,
+        created_to=None,
     ):
         conditions = []
         if name:
@@ -42,21 +44,43 @@ class UserRepositoryImpl(UserRepository):
             conditions.append(Usuario.estado == estado)
         if role_id is not None:
             conditions.append(Usuario.id_rol == role_id)
+        if created_from is not None:
+            conditions.append(Usuario.fecha_creacion >= created_from)
+        if created_to is not None:
+            conditions.append(Usuario.fecha_creacion <= created_to)
         return conditions
+
+    _SORTABLE = {
+        "id_usuario": Usuario.id_usuario,
+        "nombre_completo": Usuario.nombre_completo,
+        "username": Usuario.username,
+        "rol": Rol.nombre,
+        "estado": Usuario.estado,
+        "fecha_creacion": Usuario.fecha_creacion,
+    }
 
     async def search(
         self,
         name: Optional[str] = None,
         is_active: Optional[bool] = None,
         role_id: Optional[int] = None,
+        created_from=None,
+        created_to=None,
+        sort_by: Optional[str] = None,
+        sort_dir: str = "asc",
         limit: int = 100,
         offset: int = 0,
     ) -> List[Usuario]:
-        conditions = self._build_filters(name, is_active, role_id)
+        conditions = self._build_filters(name, is_active, role_id, created_from, created_to)
         stmt = select(Usuario).options(*_USER_LOADS)
         if conditions:
             stmt = stmt.where(*conditions)
-        stmt = stmt.order_by(Usuario.nombre_completo).limit(limit).offset(offset)
+        if sort_by == "rol":
+            stmt = stmt.join(Usuario.rol)
+        column = self._SORTABLE.get(sort_by, Usuario.nombre_completo)
+        if sort_dir == "desc":
+            column = column.desc()
+        stmt = stmt.order_by(column).limit(limit).offset(offset)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
@@ -65,8 +89,10 @@ class UserRepositoryImpl(UserRepository):
         name: Optional[str] = None,
         is_active: Optional[bool] = None,
         role_id: Optional[int] = None,
+        created_from=None,
+        created_to=None,
     ) -> int:
-        conditions = self._build_filters(name, is_active, role_id)
+        conditions = self._build_filters(name, is_active, role_id, created_from, created_to)
         stmt = select(func.count()).select_from(Usuario)
         if conditions:
             stmt = stmt.where(*conditions)

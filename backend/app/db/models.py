@@ -30,6 +30,7 @@ class Usuario(Base):
     username = Column(String(50), nullable=False)
     password_hash = Column(String(255), nullable=False)
     estado = Column(String(20), nullable=False)
+    fecha_creacion = Column(DateTime, server_default=func.now(), nullable=False)
 
     rol = relationship("Rol", back_populates="usuarios")
 
@@ -215,6 +216,7 @@ class Producto(Base):
     descripcion = Column(String(255), nullable=True)
     imagen_url = Column(String(255), nullable=True)
     estado = Column(String(20), nullable=False)
+    fecha_creacion = Column(DateTime, server_default=func.now(), nullable=False)
 
     subcategoria = relationship("Subcategoria", back_populates="productos")
     unidad = relationship("UnidadMedida", back_populates="productos")
@@ -361,6 +363,8 @@ class TurnoCaja(Base):
     fecha_apertura = Column(DateTime, nullable=False)
     fecha_cierre = Column(DateTime, nullable=True)
     estado = Column(String(20), nullable=False)
+    monto_cierre = Column(Numeric(10, 2), nullable=True)
+    notas = Column(String(255), nullable=True)
 
     caja = relationship("Caja", back_populates="turnos")
     usuario = relationship("Usuario")
