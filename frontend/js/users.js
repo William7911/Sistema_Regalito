@@ -1,9 +1,9 @@
 // Módulo de Usuarios - Tienda el Regalito
-// Cero datos quemados: Roles y Departamentos se cargan desde la BD.
+// Migrado al esquema Usuario del DERCAS (id_usuario, id_rol, nombre_completo,
+// username, estado). Cero datos quemados: el Rol se carga desde la BD.
 // Validación visual inline con Bootstrap + notificaciones Toast (sin alert() nativos).
 const USERS_API = '/api/usuarios';
 const ROLES_API = '/api/roles';
-const DEPARTMENTS_API = '/api/departamentos';
 
 let baseSaveText = 'Guardar';
 
@@ -54,6 +54,12 @@ function confirmModal(message) {
         const modal = new bootstrap.Modal(modalEl);
         msgEl.textContent = message;
         modal.show();
+        // El diálogo de confirmación se muestra sobre cualquier modal abierto
+        // (p. ej. #user-modal). Subimos su z-index y el de su backdrop para que
+        // quede centrado, completamente visible y oscurezca el fondo correctamente.
+        modalEl.style.zIndex = '2000';
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        if (backdrops.length) backdrops[backdrops.length - 1].style.zIndex = '1990';
 
         const cleanup = (val) => {
             modal.hide();
@@ -172,7 +178,8 @@ function setSaving(saving) {
 // ---------------------------------------------------------------------------
 
 async function loadRoles(selectedId = null) {
-    const select = document.getElementById('role_id');
+    const select = document.getElementById('id_rol');
+    if (!select) return;
     select.innerHTML = '<option value="">Cargando roles...</option>';
     try {
         const res = await fetch(ROLES_API, { headers: authHeaders() });
@@ -185,9 +192,9 @@ async function loadRoles(selectedId = null) {
         select.innerHTML = '<option value="">-- Seleccione rol --</option>';
         roles.forEach(r => {
             const opt = document.createElement('option');
-            opt.value = r.id;
-            opt.textContent = r.name;
-            if (selectedId && r.id === selectedId) opt.selected = true;
+            opt.value = r.id_rol;
+            opt.textContent = r.nombre;
+            if (selectedId && String(r.id_rol) === String(selectedId)) opt.selected = true;
             select.appendChild(opt);
         });
     } catch (err) {
@@ -196,27 +203,22 @@ async function loadRoles(selectedId = null) {
     }
 }
 
-async function loadDepartments(selectedId = null) {
-    const select = document.getElementById('department_id');
-    select.innerHTML = '<option value="">Cargando departamentos...</option>';
+// Select del filtro de la tabla (rol), independiente del del modal.
+async function loadRoleFilter() {
+    const select = document.getElementById('filter-role');
+    if (!select) return;
     try {
-        const res = await fetch(DEPARTMENTS_API, { headers: authHeaders() });
-        if (!res.ok) {
-            const errData = await res.json().catch(() => null);
-            showToast((errData && errData.detail) || 'No se pudieron cargar los departamentos', 'danger');
-            return;
-        }
-        const departments = await res.json();
-        select.innerHTML = '<option value="">-- Seleccione departamento --</option>';
-        departments.forEach(d => {
+        const res = await fetch(ROLES_API, { headers: authHeaders() });
+        if (!res.ok) return;
+        const roles = await res.json();
+        select.innerHTML = '<option value="">Todos los roles</option>';
+        roles.forEach(r => {
             const opt = document.createElement('option');
-            opt.value = d.id;
-            opt.textContent = d.name;
-            if (selectedId && d.id === selectedId) opt.selected = true;
+            opt.value = r.id_rol;
+            opt.textContent = r.nombre;
             select.appendChild(opt);
         });
     } catch (err) {
-        select.innerHTML = '<option value="">Sin departamentos disponibles</option>';
         console.error(err);
     }
 }
@@ -230,10 +232,10 @@ async function loadUsers() {
     const empty = document.getElementById('users-empty');
     const params = new URLSearchParams();
     const name = document.getElementById('filter-name').value.trim();
-    const code = document.getElementById('filter-code').value.trim();
+    const role = document.getElementById('filter-role').value;
     const isActive = document.getElementById('filter-active').value;
     if (name) params.append('name', name);
-    if (code) params.append('code', code);
+    if (role) params.append('role_id', role);
     if (isActive !== '') params.append('is_active', isActive);
 
     try {
@@ -246,20 +248,23 @@ async function loadUsers() {
         const data = await res.json();
 
         if (data.items.length) {
-            tbody.innerHTML = data.items.map(u => `
+            tbody.innerHTML = data.items.map(u => {
+                const rol = u.rol ? u.rol.nombre : '-';
+                const activo = u.estado === 'Activo';
+                return `
                 <tr>
-                    <td>${u.code}</td>
-                    <td>${u.name} ${u.lastname}</td>
+                    <td>${u.id_usuario}</td>
+                    <td>${u.nombre_completo}</td>
                     <td>${u.username}</td>
-                    <td>${u.role ? u.role.name : '-'}</td>
-                    <td>${u.department ? u.department.name : '-'}</td>
-                    <td><span class="badge ${u.is_active ? 'bg-success' : 'bg-secondary'}">${u.is_active ? 'Activo' : 'Inactivo'}</span></td>
+                    <td>${rol}</td>
+                    <td><span class="badge ${activo ? 'bg-success' : 'bg-secondary'}">${activo ? 'Activo' : 'Inactivo'}</span></td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" onclick="editUser(${u.id})" title="Editar"><i class="bi bi-pencil"></i></button>
-                        ${u.is_active ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateUser(${u.id})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
+                        <button class="btn btn-sm btn-outline-primary" onclick="editUser(${u.id_usuario})" title="Editar"><i class="bi bi-pencil"></i></button>
+                        ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateUser(${u.id_usuario})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
             tbody.closest('.table-responsive').classList.remove('d-none');
             if (empty) empty.classList.add('d-none');
         } else {
@@ -318,14 +323,14 @@ async function resetUserForm() {
     baseSaveText = 'Guardar';
     const text = document.getElementById('btn-save-text');
     if (text) text.textContent = baseSaveText;
-    await Promise.all([loadRoles(), loadDepartments()]);
+    await Promise.all([loadRoles(), loadRoleFilter()]);
 }
 
 function openCreateModal() {
     resetUserForm().then(() => {
         const modal = getModal('user-modal');
         if (modal) modal.show();
-        const nameInput = document.getElementById('name');
+        const nameInput = document.getElementById('nombre_completo');
         setTimeout(() => nameInput && nameInput.focus(), 350);
     });
 }
@@ -340,19 +345,18 @@ async function editUser(userId) {
             return;
         }
         const u = await res.json();
-        document.getElementById('user-id').value = u.id;
-        document.getElementById('name').value = u.name;
-        document.getElementById('lastname').value = u.lastname;
-        document.getElementById('code').value = u.code;
+        document.getElementById('user-id').value = u.id_usuario;
+        document.getElementById('nombre_completo').value = u.nombre_completo;
         document.getElementById('username').value = u.username;
         document.getElementById('password').value = '';
         document.getElementById('password').required = false;
-        document.getElementById('is_active').checked = u.is_active;
+        const estadoSel = document.getElementById('estado');
+        if (estadoSel) estadoSel.value = u.estado === 'Activo' ? 'Activo' : 'Inactivo';
         document.getElementById('user-modal-title').textContent = 'Editar Usuario';
         baseSaveText = 'Actualizar';
         const text = document.getElementById('btn-save-text');
         if (text) text.textContent = baseSaveText;
-        await Promise.all([loadRoles(u.role_id), loadDepartments(u.department_id)]);
+        await Promise.all([loadRoles(u.id_rol), loadRoleFilter()]);
         const modal = getModal('user-modal');
         if (modal) modal.show();
     } catch (err) {
@@ -367,26 +371,24 @@ async function saveUser(event) {
     setSaving(true);
 
     const id = document.getElementById('user-id').value;
-    const roleId = parseInt(document.getElementById('role_id').value, 10);
-    const departmentId = parseInt(document.getElementById('department_id').value, 10);
     const password = document.getElementById('password').value;
+    const estadoSel = document.getElementById('estado');
 
-    // .trim() defensivo para evitar espacios vacíos accidentales
+    // Payload con las claves exactas de Pydantic (UsuarioCreate / UsuarioUpdate).
+    // `estado` solo se envía si el usuario eligió una opción (evita sobrescribir
+    // el valor por defecto y no dispara el dirty check con el placeholder vacío).
     const payload = {
+        nombre_completo: document.getElementById('nombre_completo').value.trim(),
         username: document.getElementById('username').value.trim(),
-        name: document.getElementById('name').value.trim(),
-        lastname: document.getElementById('lastname').value.trim(),
-        code: document.getElementById('code').value.trim(),
-        role_id: roleId,
-        department_id: departmentId,
+        id_rol: parseInt(document.getElementById('id_rol').value, 10),
     };
+    if (estadoSel && estadoSel.value) payload.estado = estadoSel.value;
 
     if (id) {
+        // En edición se omite la contraseña si va en blanco (no se sobrescribe).
         if (password) payload.password = password;
-        payload.is_active = document.getElementById('is_active').checked;
     } else {
         payload.password = password;
-        payload.is_active = true;
     }
 
     const url = id ? `${USERS_API}/${id}` : USERS_API;
@@ -459,7 +461,7 @@ window.addEventListener('beforeunload', (event) => {
 // ---------------------------------------------------------------------------
 
 window.showUsersModule = async function () {
-    await loadUsers();
+    await Promise.all([loadUsers(), loadRoleFilter()]);
 };
 
 window.goToDashboard = function () {

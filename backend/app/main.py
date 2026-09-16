@@ -3,7 +3,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from app.api import auth, cash_register, categories, departments, products, roles, users
+from app.api import auth, cash_register, catalogos, categories, departments, products, roles, users
 from app.db.database import engine, Base
 import logging
 import os
@@ -54,6 +54,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(cash_register.router, prefix="/api/caja", tags=["caja"])
 app.include_router(categories.router, prefix="/api/categorias", tags=["categorias"])
 app.include_router(products.router, prefix="/api/productos", tags=["productos"])
+app.include_router(catalogos.router, prefix="/api/catalogos", tags=["catalogos"])
 app.include_router(roles.router, prefix="/api/roles", tags=["roles"])
 app.include_router(departments.router, prefix="/api/departamentos", tags=["departamentos"])
 app.include_router(users.router, prefix="/api/usuarios", tags=["usuarios"])

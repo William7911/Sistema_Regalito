@@ -4,13 +4,16 @@
 //   - Validación inline con Bootstrap + traducción de errores 422.
 //   - Integración SPA (hash routing) + Auth Guard + Unload Guard.
 //   - Cero alert()/confirm() nativos: se reutilizan showToast() y confirmModal().
-// Nota: los ids de los campos coinciden con el schema de Pydantic (name, sku,
-// barcode, category_id, price, current_stock, min_stock, description). Como
-// algunos se repiten entre formularios (p. ej. `name`), el acceso a campos se
-// hace SIEMPRE con ámbito de formulario (inputFor/feedbackFor) para evitar
-// colisiones de ids.
+// Migrado a la arquitectura relacional del DERCAS: la creación/edición envía un
+// payload anidado Producto -> VarianteProducto -> InventarioSucursal en una sola
+// petición (POST/PUT /api/productos). Los ids de los campos coinciden con el
+// schema de Pydantic (nombre, descripcion, id_subcategoria, id_unidad, variante.*,
+// inventario.*) para que la traducción 422 se inyecte inline. El acceso a campos
+// se hace SIEMPRE con ámbito de formulario (inputFor/feedbackFor) para evitar
+// colisiones de ids repetidos entre formularios.
 const CATEGORIES_API = '/api/categorias';
 const PRODUCTS_API = '/api/productos';
+const CATALOGOS_API = '/api/catalogos';
 
 let baseSaveTextProduct = 'Guardar';
 let baseSaveTextCategory = 'Guardar';
@@ -144,34 +147,82 @@ window.addEventListener('beforeunload', (event) => {
 });
 
 // ---------------------------------------------------------------------------
-// Carga de catálogos (Categorías para selects)
+// Carga de catálogos de apoyo (dropdowns) desde la BD (cero datos quemados)
 // ---------------------------------------------------------------------------
 
-async function populateCategorySelect(selectId, selectedId = null, placeholder) {
+async function populateFromApi(selectId, url, valueKey, textFn, placeholder, selectedId = null) {
     const select = document.getElementById(selectId);
     if (!select) return;
     select.innerHTML = '<option value="">Cargando...</option>';
     try {
-        const res = await fetch(CATEGORIES_API, { headers: authHeaders() });
+        const res = await fetch(url, { headers: authHeaders() });
         if (!res.ok) {
             const errData = await res.json().catch(() => null);
-            showToast((errData && errData.detail) || 'No se pudieron cargar las categorías', 'danger');
+            showToast((errData && errData.detail) || 'No se pudieron cargar los datos', 'danger');
+            select.innerHTML = placeholder ? `<option value="">${placeholder}</option>` : '<option value=""></option>';
             return;
         }
-        const categories = await res.json();
+        const items = await res.json();
         select.innerHTML = placeholder ? `<option value="">${placeholder}</option>` : '<option value=""></option>';
-        categories.forEach((c) => {
-            if (!c.is_active) return;
+        items.forEach((it) => {
             const opt = document.createElement('option');
-            opt.value = c.id;
-            opt.textContent = c.name;
-            if (selectedId && c.id === selectedId) opt.selected = true;
+            opt.value = it[valueKey];
+            opt.textContent = textFn(it);
+            if (selectedId && String(it[valueKey]) === String(selectedId)) opt.selected = true;
             select.appendChild(opt);
         });
     } catch (err) {
-        select.innerHTML = '<option value="">Sin categorías disponibles</option>';
+        select.innerHTML = '<option value=""></option>';
         console.error(err);
     }
+}
+
+async function populateSubcategorias(selectId, selectedId = null, placeholder) {
+    await populateFromApi(
+        selectId,
+        `${CATALOGOS_API}/subcategorias`,
+        'id_subcategoria',
+        (s) => (s.categoria ? `${s.categoria.nombre} — ${s.nombre}` : s.nombre),
+        placeholder,
+        selectedId
+    );
+}
+
+async function populateUnidades(selectId, selectedId = null, placeholder) {
+    await populateFromApi(
+        selectId,
+        `${CATALOGOS_API}/unidades`,
+        'id_unidad',
+        (u) => `${u.descripcion} (${u.codigo})`,
+        placeholder,
+        selectedId
+    );
+}
+
+async function populateSucursales(selectId, selectedId = null, placeholder) {
+    await populateFromApi(
+        selectId,
+        `${CATALOGOS_API}/sucursales`,
+        'id_sucursal',
+        (s) => s.nombre,
+        placeholder,
+        selectedId
+    );
+}
+
+async function populateAreas(selectId, sucursalId, selectedId = null) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    select.innerHTML = '<option value="">Sin área</option>';
+    if (!sucursalId) return;
+    await populateFromApi(
+        selectId,
+        `${CATALOGOS_API}/areas?sucursal_id=${sucursalId}`,
+        'id_area',
+        (a) => a.nombre_area,
+        'Sin área',
+        selectedId
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -181,23 +232,29 @@ async function populateCategorySelect(selectId, selectedId = null, placeholder) 
 async function loadCategoriesTable() {
     const tbody = document.getElementById('categories-table-body');
     const empty = document.getElementById('categories-empty');
+    const nameFilter = document.getElementById('filter-category-name').value.trim();
     try {
-        const res = await fetch(`${CATEGORIES_API}?include_inactive=true`, { headers: authHeaders() });
+        const params = new URLSearchParams();
+        params.append('include_inactive', 'true');
+        const res = await fetch(`${CATEGORIES_API}?${params.toString()}`, { headers: authHeaders() });
         if (!res.ok) {
             const errData = await res.json().catch(() => null);
             showToast((errData && errData.detail) || 'No se pudieron cargar las categorías', 'danger');
             return;
         }
         const items = await res.json();
-        if (items.length) {
-            tbody.innerHTML = items.map((c) => `
+        const filtered = nameFilter
+            ? items.filter((c) => (c.nombre || '').toLowerCase().includes(nameFilter.toLowerCase()))
+            : items;
+        if (filtered.length) {
+            tbody.innerHTML = filtered.map((c) => `
                 <tr>
-                    <td>${c.name}</td>
-                    <td>${c.description || '-'}</td>
-                    <td><span class="badge ${c.is_active ? 'bg-success' : 'bg-secondary'}">${c.is_active ? 'Activo' : 'Inactivo'}</span></td>
+                    <td>${c.nombre}</td>
+                    <td>-</td>
+                    <td><span class="badge ${c.estado === 'Activo' ? 'bg-success' : 'bg-secondary'}">${c.estado === 'Activo' ? 'Activo' : 'Inactivo'}</span></td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" onclick="editCategory(${c.id})" title="Editar"><i class="bi bi-pencil"></i></button>
-                        ${c.is_active ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateCategory(${c.id})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
+                        <button class="btn btn-sm btn-outline-rosado" onclick="editCategory(${c.id_categoria})" title="Editar"><i class="bi bi-pencil"></i></button>
+                        ${c.estado === 'Activo' ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateCategory(${c.id_categoria})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
                     </td>
                 </tr>
             `).join('');
@@ -222,11 +279,11 @@ async function loadProducts() {
     const empty = document.getElementById('products-empty');
     const params = new URLSearchParams();
     const name = document.getElementById('filter-product-name').value.trim();
-    const sku = document.getElementById('filter-product-sku').value.trim();
-    const cat = document.getElementById('filter-product-category').value;
+    const barcode = document.getElementById('filter-product-barcode').value.trim();
+    const subcat = document.getElementById('filter-product-subcategoria').value;
     if (name) params.append('name', name);
-    if (sku) params.append('sku', sku);
-    if (cat) params.append('category_id', cat);
+    if (barcode) params.append('barcode', barcode);
+    if (subcat) params.append('subcategoria_id', subcat);
     try {
         const res = await fetch(`${PRODUCTS_API}?${params.toString()}`, { headers: authHeaders() });
         if (!res.ok) {
@@ -237,20 +294,31 @@ async function loadProducts() {
         const data = await res.json();
         const items = data.items || [];
         if (items.length) {
-            tbody.innerHTML = items.map((p) => `
+            tbody.innerHTML = items.map((p) => {
+                const variante = p.variantes && p.variantes[0] ? p.variantes[0] : null;
+                const inventario = variante && variante.inventarios && variante.inventarios[0]
+                    ? variante.inventarios[0] : null;
+                const sub = p.subcategoria
+                    ? (p.subcategoria.categoria ? `${p.subcategoria.categoria.nombre} / ${p.subcategoria.nombre}` : p.subcategoria.nombre)
+                    : '-';
+                const precio = variante ? Number(variante.precio_detalle).toFixed(2) : '0.00';
+                const stock = inventario ? Number(inventario.stock_actual) : 0;
+                const minStock = inventario ? Number(inventario.stock_minimo) : 0;
+                const activo = p.estado === 'Activo';
+                return `
                 <tr>
-                    <td>${p.sku || '-'}</td>
-                    <td>${p.name}</td>
-                    <td>${p.category ? p.category.name : '-'}</td>
-                    <td>Q ${Number(p.price).toFixed(2)}</td>
-                    <td><span class="badge ${p.current_stock <= p.min_stock ? 'bg-danger' : 'bg-success'}">${p.current_stock}</span></td>
-                    <td><span class="badge ${p.is_active ? 'bg-success' : 'bg-secondary'}">${p.is_active ? 'Activo' : 'Inactivo'}</span></td>
+                    <td>${p.nombre}</td>
+                    <td>${sub}</td>
+                    <td>Q ${precio}</td>
+                    <td><span class="badge ${stock <= minStock ? 'bg-danger' : 'bg-success'}">${stock}</span></td>
+                    <td><span class="badge ${activo ? 'bg-success' : 'bg-secondary'}">${activo ? 'Activo' : 'Inactivo'}</span></td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" onclick="editProduct(${p.id})" title="Editar"><i class="bi bi-pencil"></i></button>
-                        ${p.is_active ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateProduct(${p.id})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
+                        <button class="btn btn-sm btn-outline-rosado" onclick="editProduct(${p.id_producto})" title="Editar"><i class="bi bi-pencil"></i></button>
+                        ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateProduct(${p.id_producto})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
             tbody.closest('.table-responsive').classList.remove('d-none');
             if (empty) empty.classList.add('d-none');
         } else {
@@ -272,18 +340,25 @@ async function resetProductForm() {
     const form = document.getElementById('product-form');
     if (form) form.reset();
     inputFor('product-form', 'product-id').value = '';
+    inputFor('product-form', 'variante-id').value = '';
+    inputFor('product-form', 'inventario-id').value = '';
     document.getElementById('product-modal-title').textContent = 'Nuevo Producto';
     baseSaveTextProduct = 'Guardar';
     const text = document.getElementById('btn-save-product-text');
     if (text) text.textContent = baseSaveTextProduct;
-    await populateCategorySelect('category_id', null, '-- Seleccione categoría --');
+    await Promise.all([
+        populateSubcategorias('id_subcategoria', null, '-- Seleccione subcategoría --'),
+        populateUnidades('id_unidad', null, '-- Seleccione unidad --'),
+        populateSucursales('id_sucursal', null, '-- Seleccione sucursal --'),
+    ]);
+    populateAreas('id_area', null);
 }
 
 function openCreateProductModal() {
     resetProductForm().then(() => {
         const modal = getModal('product-modal');
         if (modal) modal.show();
-        const nameInput = inputFor('product-form', 'name');
+        const nameInput = inputFor('product-form', 'nombre');
         setTimeout(() => nameInput && nameInput.focus(), 350);
     });
 }
@@ -298,19 +373,38 @@ async function editProduct(productId) {
             return;
         }
         const p = await res.json();
-        inputFor('product-form', 'product-id').value = p.id;
-        inputFor('product-form', 'name').value = p.name;
-        inputFor('product-form', 'sku').value = p.sku || '';
-        inputFor('product-form', 'barcode').value = p.barcode;
-        inputFor('product-form', 'price').value = p.price;
-        inputFor('product-form', 'current_stock').value = p.current_stock;
-        inputFor('product-form', 'min_stock').value = p.min_stock;
-        inputFor('product-form', 'product_is_active').checked = p.is_active;
+        const variante = p.variantes && p.variantes[0] ? p.variantes[0] : null;
+        const inventario = variante && variante.inventarios && variante.inventarios[0]
+            ? variante.inventarios[0] : null;
+
+        inputFor('product-form', 'product-id').value = p.id_producto;
+        inputFor('product-form', 'variante-id').value = variante ? variante.id_variante : '';
+        inputFor('product-form', 'inventario-id').value = inventario ? inventario.id_inventario : '';
+        inputFor('product-form', 'nombre').value = p.nombre;
+        inputFor('product-form', 'descripcion').value = p.descripcion || '';
+        inputFor('product-form', 'codigo_barras').value = variante ? (variante.codigo_barras || '') : '';
+        inputFor('product-form', 'talla').value = variante ? (variante.talla || '') : '';
+        inputFor('product-form', 'color').value = variante ? (variante.color || '') : '';
+        inputFor('product-form', 'precio_detalle').value = variante ? variante.precio_detalle : '';
+        inputFor('product-form', 'precio_mayoreo').value = variante ? variante.precio_mayoreo : '';
+        inputFor('product-form', 'costo_promedio').value = variante ? variante.costo_promedio : '';
+        inputFor('product-form', 'stock_actual').value = inventario ? inventario.stock_actual : '';
+        inputFor('product-form', 'stock_minimo').value = inventario ? inventario.stock_minimo : '';
+        inputFor('product-form', 'product_is_active').checked = p.estado === 'Activo';
+
         document.getElementById('product-modal-title').textContent = 'Editar Producto';
         baseSaveTextProduct = 'Actualizar';
         const text = document.getElementById('btn-save-product-text');
         if (text) text.textContent = baseSaveTextProduct;
-        await populateCategorySelect('category_id', p.category_id, '-- Seleccione categoría --');
+
+        const sucursalId = inventario ? inventario.id_sucursal : null;
+        await Promise.all([
+            populateSubcategorias('id_subcategoria', p.id_subcategoria, '-- Seleccione subcategoría --'),
+            populateUnidades('id_unidad', p.id_unidad, '-- Seleccione unidad --'),
+            populateSucursales('id_sucursal', sucursalId, '-- Seleccione sucursal --'),
+        ]);
+        await populateAreas('id_area', sucursalId, inventario ? inventario.id_area : null);
+
         const modal = getModal('product-modal');
         if (modal) modal.show();
     } catch (err) {
@@ -335,15 +429,26 @@ async function saveProduct(event) {
 
     const id = inputFor('product-form', 'product-id').value;
     const payload = {
-        name: inputFor('product-form', 'name').value.trim(),
-        sku: inputFor('product-form', 'sku').value.trim() || null,
-        barcode: inputFor('product-form', 'barcode').value.trim(),
-        category_id: parseInt(inputFor('product-form', 'category_id').value, 10),
-        price: parseFloat(inputFor('product-form', 'price').value),
-        current_stock: parseInt(inputFor('product-form', 'current_stock').value || '0', 10),
-        min_stock: parseInt(inputFor('product-form', 'min_stock').value || '5', 10),
+        id_subcategoria: parseInt(inputFor('product-form', 'id_subcategoria').value, 10),
+        id_unidad: parseInt(inputFor('product-form', 'id_unidad').value, 10),
+        nombre: inputFor('product-form', 'nombre').value.trim(),
+        descripcion: inputFor('product-form', 'descripcion').value.trim() || null,
+        variante: {
+            codigo_barras: inputFor('product-form', 'codigo_barras').value.trim() || null,
+            talla: inputFor('product-form', 'talla').value.trim() || null,
+            color: inputFor('product-form', 'color').value.trim() || null,
+            precio_detalle: parseFloat(inputFor('product-form', 'precio_detalle').value),
+            precio_mayoreo: parseFloat(inputFor('product-form', 'precio_mayoreo').value),
+            costo_promedio: parseFloat(inputFor('product-form', 'costo_promedio').value || '0'),
+        },
+        inventario: {
+            id_sucursal: parseInt(inputFor('product-form', 'id_sucursal').value, 10),
+            id_area: parseInt(inputFor('product-form', 'id_area').value, 10) || null,
+            stock_actual: parseInt(inputFor('product-form', 'stock_actual').value || '0', 10),
+            stock_minimo: parseInt(inputFor('product-form', 'stock_minimo').value || '0', 10),
+        },
     };
-    if (id) payload.is_active = inputFor('product-form', 'product_is_active').checked;
+    if (id) payload.estado = inputFor('product-form', 'product_is_active').checked ? 'Activo' : 'Inactivo';
 
     const url = id ? `${PRODUCTS_API}/${id}` : PRODUCTS_API;
     const method = id ? 'PUT' : 'POST';
@@ -416,10 +521,10 @@ async function editCategory(categoryId) {
             return;
         }
         const c = await res.json();
-        inputFor('category-form', 'category-id').value = c.id;
-        inputFor('category-form', 'name').value = c.name;
-        inputFor('category-form', 'description').value = c.description || '';
-        inputFor('category-form', 'category_is_active').checked = c.is_active;
+        inputFor('category-form', 'category-id').value = c.id_categoria;
+        inputFor('category-form', 'name').value = c.nombre;
+        inputFor('category-form', 'description').value = '';
+        inputFor('category-form', 'category_is_active').checked = c.estado === 'Activo';
         document.getElementById('category-modal-title').textContent = 'Editar Categoría';
         baseSaveTextCategory = 'Actualizar';
         const text = document.getElementById('btn-save-category-text');
@@ -448,10 +553,9 @@ async function saveCategory(event) {
 
     const id = inputFor('category-form', 'category-id').value;
     const payload = {
-        name: inputFor('category-form', 'name').value.trim(),
-        description: inputFor('category-form', 'description').value.trim() || null,
+        nombre: inputFor('category-form', 'name').value.trim(),
     };
-    if (id) payload.is_active = inputFor('category-form', 'category_is_active').checked;
+    if (id) payload.estado = inputFor('category-form', 'category_is_active').checked ? 'Activo' : 'Inactivo';
 
     const url = id ? `${CATEGORIES_API}/${id}` : CATEGORIES_API;
     const method = id ? 'PUT' : 'POST';
@@ -465,7 +569,7 @@ async function saveCategory(event) {
         const modal = getModal('category-modal');
         if (modal) modal.hide();
         showToast(id ? 'Categoría actualizada correctamente.' : 'Categoría creada correctamente.', 'success');
-        await Promise.all([loadCategoriesTable(), populateCategorySelect('filter-product-category', null, 'Todas las categorías')]);
+        await Promise.all([loadCategoriesTable(), populateSubcategorias('filter-product-subcategoria', null, 'Todas las subcategorías')]);
     } catch (err) {
         showToast(err.message, 'danger');
     } finally {
@@ -484,7 +588,7 @@ async function deactivateCategory(categoryId) {
             return;
         }
         showToast('Categoría desactivada correctamente.', 'success');
-        await Promise.all([loadCategoriesTable(), populateCategorySelect('filter-product-category', null, 'Todas las categorías')]);
+        await Promise.all([loadCategoriesTable(), populateSubcategorias('filter-product-subcategoria', null, 'Todas las subcategorías')]);
     } catch (err) {
         showToast(err.message, 'danger');
     }
@@ -498,7 +602,7 @@ window.showCatalogModule = async function () {
     await Promise.all([
         loadProducts(),
         loadCategoriesTable(),
-        populateCategorySelect('filter-product-category', null, 'Todas las categorías'),
+        populateSubcategorias('filter-product-subcategoria', null, 'Todas las subcategorías'),
     ]);
 };
 
@@ -528,6 +632,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#category-modal [data-bs-close-modal]').forEach((btn) => {
         btn.addEventListener('click', () => safeCloseCatalogModal('category-form', 'category-modal'));
     });
+
+    // El área de bodega depende de la sucursal seleccionada.
+    const sucursalSelect = document.getElementById('id_sucursal');
+    if (sucursalSelect) {
+        sucursalSelect.addEventListener('change', () => {
+            clearCatalogFieldError('product-form', sucursalSelect);
+            populateAreas('id_area', sucursalSelect.value);
+        });
+    }
 
     const btnNewProduct = document.getElementById('btn-new-product');
     if (btnNewProduct) btnNewProduct.addEventListener('click', openCreateProductModal);

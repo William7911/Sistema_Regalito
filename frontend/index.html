@@ -374,8 +374,10 @@
                 <!-- Filtros -->
                 <div class="card border-0 shadow-sm rounded-4 mb-4">
                     <div class="card-body d-flex gap-2 flex-wrap">
-                        <input type="text" id="filter-name" class="form-control" style="max-width: 220px;" placeholder="Nombre / Apellido">
-                        <input type="text" id="filter-code" class="form-control" style="max-width: 160px;" placeholder="Código">
+                        <input type="text" id="filter-name" class="form-control" style="max-width: 220px;" placeholder="Nombre">
+                        <select id="filter-role" class="form-select" style="max-width: 180px;">
+                            <option value="">Todos los roles</option>
+                        </select>
                         <select id="filter-active" class="form-select" style="max-width: 160px;">
                             <option value="">Estado</option>
                             <option value="true">Activo</option>
@@ -392,11 +394,10 @@
                             <table class="table align-middle mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Código</th>
+                                        <th>ID</th>
                                         <th>Nombre</th>
                                         <th>Usuario</th>
                                         <th>Rol</th>
-                                        <th>Departamento</th>
                                         <th>Estado</th>
                                         <th></th>
                                     </tr>
@@ -443,7 +444,7 @@
                                 <p class="text-muted small mb-0">Inventario de la tienda</p>
                             </div>
                             <div>
-                                <button id="btn-new-product" class="btn btn-teal"><i class="bi bi-plus-lg"></i> Nuevo Producto</button>
+                                <button id="btn-new-product" class="btn btn-verde"><i class="bi bi-plus-lg"></i> Nuevo Producto</button>
                             </div>
                         </div>
 
@@ -451,11 +452,11 @@
                         <div class="card border-0 shadow-sm rounded-4 mb-4">
                             <div class="card-body d-flex gap-2 flex-wrap">
                                 <input type="text" id="filter-product-name" class="form-control" style="max-width: 220px;" placeholder="Nombre">
-                                <input type="text" id="filter-product-sku" class="form-control" style="max-width: 160px;" placeholder="SKU">
-                                <select id="filter-product-category" class="form-select" style="max-width: 200px;">
-                                    <option value="">Todas las categorías</option>
+                                <input type="text" id="filter-product-barcode" class="form-control" style="max-width: 180px;" placeholder="Código de barras">
+                                <select id="filter-product-subcategoria" class="form-select" style="max-width: 220px;">
+                                    <option value="">Todas las subcategorías</option>
                                 </select>
-                                <button id="btn-filter-products" class="btn btn-teal"><i class="bi bi-funnel"></i> Filtrar</button>
+                                <button id="btn-filter-products" class="btn btn-celeste"><i class="bi bi-funnel"></i> Filtrar</button>
                             </div>
                         </div>
 
@@ -464,12 +465,11 @@
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table align-middle mb-0">
-                                        <thead>
+                                        <thead class="thead-catalog">
                                             <tr>
-                                                <th>SKU</th>
                                                 <th>Nombre</th>
-                                                <th>Categoría</th>
-                                                <th>Precio</th>
+                                                <th>Subcategoría</th>
+                                                <th>Precio Detalle</th>
                                                 <th>Stock</th>
                                                 <th>Estado</th>
                                                 <th></th>
@@ -494,7 +494,7 @@
                                 <p class="text-muted small mb-0">Clasificación de productos</p>
                             </div>
                             <div>
-                                <button id="btn-new-category" class="btn btn-teal"><i class="bi bi-plus-lg"></i> Nueva Categoría</button>
+                                <button id="btn-new-category" class="btn btn-verde"><i class="bi bi-plus-lg"></i> Nueva Categoría</button>
                             </div>
                         </div>
 
@@ -502,7 +502,7 @@
                         <div class="card border-0 shadow-sm rounded-4 mb-4">
                             <div class="card-body d-flex gap-2 flex-wrap">
                                 <input type="text" id="filter-category-name" class="form-control" style="max-width: 220px;" placeholder="Nombre">
-                                <button id="btn-filter-categories" class="btn btn-teal"><i class="bi bi-funnel"></i> Filtrar</button>
+                                <button id="btn-filter-categories" class="btn btn-celeste"><i class="bi bi-funnel"></i> Filtrar</button>
                             </div>
                         </div>
 
@@ -511,7 +511,7 @@
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table align-middle mb-0">
-                                        <thead>
+                                        <thead class="thead-catalog">
                                             <tr>
                                                 <th>Nombre</th>
                                                 <th>Descripción</th>
@@ -552,22 +552,10 @@
                     <div class="modal-body">
                         <input type="hidden" id="user-id">
                         <div id="user-form-alert" class="alert alert-danger d-none py-2 small"></div>
-                        <div class="row g-2 mb-2">
-                            <div class="col">
-                                <label class="form-label small">Nombre</label>
-                                <input type="text" id="name" class="form-control" autocomplete="off" required>
-                                <div class="invalid-feedback" id="error-name"></div>
-                            </div>
-                            <div class="col">
-                                <label class="form-label small">Apellido</label>
-                                <input type="text" id="lastname" class="form-control" autocomplete="off" required>
-                                <div class="invalid-feedback" id="error-lastname"></div>
-                            </div>
-                        </div>
                         <div class="mb-2">
-                            <label class="form-label small">Código</label>
-                            <input type="text" id="code" class="form-control" autocomplete="off" required>
-                            <div class="invalid-feedback" id="error-code"></div>
+                            <label class="form-label small">Nombre Completo</label>
+                            <input type="text" id="nombre_completo" class="form-control" autocomplete="off" required>
+                            <div class="invalid-feedback" id="error-nombre_completo"></div>
                         </div>
                         <div class="mb-2">
                             <label class="form-label small">Nombre de Usuario</label>
@@ -582,22 +570,20 @@
                         <div class="row g-2 mb-2">
                             <div class="col">
                                 <label class="form-label small">Rol</label>
-                                <select id="role_id" class="form-select" required>
+                                <select id="id_rol" class="form-select" required>
                                     <option value="">Cargando...</option>
                                 </select>
-                                <div class="invalid-feedback" id="error-role_id"></div>
+                                <div class="invalid-feedback" id="error-id_rol"></div>
                             </div>
                             <div class="col">
-                                <label class="form-label small">Departamento</label>
-                                <select id="department_id" class="form-select" required>
-                                    <option value="">Cargando...</option>
+                                <label class="form-label small">Estado</label>
+                                <select id="estado" class="form-select">
+                                    <option value="" selected>-- Estado --</option>
+                                    <option value="Activo">Activo</option>
+                                    <option value="Inactivo">Inactivo</option>
                                 </select>
-                                <div class="invalid-feedback" id="error-department_id"></div>
+                                <div class="invalid-feedback" id="error-estado"></div>
                             </div>
-                        </div>
-                        <div class="form-check mb-0">
-                            <input type="checkbox" class="form-check-input" id="is_active" checked>
-                            <label class="form-check-label small" for="is_active">Activo</label>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -614,7 +600,7 @@
 
     <!-- Modal: Formulario de Producto -->
     <div class="modal fade" id="product-modal" tabindex="-1" aria-labelledby="product-modal-title" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form id="product-form" novalidate>
                     <div class="modal-header">
@@ -623,46 +609,107 @@
                     </div>
                     <div class="modal-body">
                         <input type="hidden" id="product-id">
+                        <input type="hidden" id="variante-id">
+                        <input type="hidden" id="inventario-id">
                         <div id="product-form-alert" class="alert alert-danger d-none py-2 small"></div>
+
+                        <!-- Matriz del producto -->
+                        <h6 class="text-uppercase fw-bold text-celeste mb-2"><i class="bi bi-box-seam me-1"></i>Matriz</h6>
                         <div class="row g-2 mb-2">
-                            <div class="col">
-                                <label class="form-label small">Nombre</label>
-                                <input type="text" id="name" class="form-control" autocomplete="off" required>
-                                <div class="invalid-feedback" id="error-name"></div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Subcategoría</label>
+                                <select id="id_subcategoria" class="form-select" required>
+                                    <option value="">Cargando...</option>
+                                </select>
+                                <div class="invalid-feedback" id="error-id_subcategoria"></div>
                             </div>
-                            <div class="col">
-                                <label class="form-label small">SKU <small class="text-muted">(opcional)</small></label>
-                                <input type="text" id="sku" class="form-control" autocomplete="off">
-                                <div class="invalid-feedback" id="error-sku"></div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Unidad de medida</label>
+                                <select id="id_unidad" class="form-select" required>
+                                    <option value="">Cargando...</option>
+                                </select>
+                                <div class="invalid-feedback" id="error-id_unidad"></div>
                             </div>
                         </div>
                         <div class="mb-2">
-                            <label class="form-label small">Código de Barras</label>
-                            <input type="text" id="barcode" class="form-control" autocomplete="off" required>
-                            <div class="invalid-feedback" id="error-barcode"></div>
+                            <label class="form-label small">Nombre</label>
+                            <input type="text" id="nombre" class="form-control" autocomplete="off" required>
+                            <div class="invalid-feedback" id="error-nombre"></div>
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label small">Categoría</label>
-                            <select id="category_id" class="form-select" required>
-                                <option value="">Cargando...</option>
-                            </select>
-                            <div class="invalid-feedback" id="error-category_id"></div>
+                        <div class="mb-3">
+                            <label class="form-label small">Descripción</label>
+                            <textarea id="descripcion" class="form-control" rows="2"></textarea>
+                            <div class="invalid-feedback" id="error-descripcion"></div>
+                        </div>
+
+                        <!-- Variante -->
+                        <h6 class="text-uppercase fw-bold text-rosado mb-2"><i class="bi bi-tags me-1"></i>Variante</h6>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label small">Código de barras</label>
+                                <input type="text" id="codigo_barras" class="form-control" autocomplete="off">
+                                <div class="invalid-feedback" id="error-codigo_barras"></div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Talla</label>
+                                <input type="text" id="talla" class="form-control" autocomplete="off">
+                                <div class="invalid-feedback" id="error-talla"></div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Color</label>
+                                <input type="text" id="color" class="form-control" autocomplete="off">
+                                <div class="invalid-feedback" id="error-color"></div>
+                            </div>
+                        </div>
+
+                        <!-- Precios (RF05: detalle y mayoreo obligatorios) -->
+                        <h6 class="text-uppercase fw-bold text-verde mb-2"><i class="bi bi-currency-dollar me-1"></i>Precios</h6>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label small">Precio Detalle (Q)</label>
+                                <input type="number" id="precio_detalle" class="form-control" step="0.01" min="0.01" autocomplete="off" required>
+                                <div class="invalid-feedback" id="error-precio_detalle"></div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Precio Mayoreo (Q)</label>
+                                <input type="number" id="precio_mayoreo" class="form-control" step="0.01" min="0.01" autocomplete="off" required>
+                                <div class="invalid-feedback" id="error-precio_mayoreo"></div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Costo promedio (Q)</label>
+                                <input type="number" id="costo_promedio" class="form-control" step="0.01" min="0" autocomplete="off">
+                                <div class="invalid-feedback" id="error-costo_promedio"></div>
+                            </div>
+                        </div>
+
+                        <!-- Inventario (RF09: alertas por stock mínimo) -->
+                        <h6 class="text-uppercase fw-bold text-celeste mb-2"><i class="bi bi-boxes me-1"></i>Inventario</h6>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-6">
+                                <label class="form-label small">Sucursal</label>
+                                <select id="id_sucursal" class="form-select" required>
+                                    <option value="">Cargando...</option>
+                                </select>
+                                <div class="invalid-feedback" id="error-id_sucursal"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Área de bodega</label>
+                                <select id="id_area" class="form-select">
+                                    <option value="">Sin área</option>
+                                </select>
+                                <div class="invalid-feedback" id="error-id_area"></div>
+                            </div>
                         </div>
                         <div class="row g-2 mb-2">
-                            <div class="col">
-                                <label class="form-label small">Precio (Q)</label>
-                                <input type="number" id="price" class="form-control" step="0.01" min="0.01" autocomplete="off" required>
-                                <div class="invalid-feedback" id="error-price"></div>
-                            </div>
-                            <div class="col">
+                            <div class="col-md-6">
                                 <label class="form-label small">Stock actual</label>
-                                <input type="number" id="current_stock" class="form-control" step="1" min="0" autocomplete="off">
-                                <div class="invalid-feedback" id="error-current_stock"></div>
+                                <input type="number" id="stock_actual" class="form-control" step="1" min="0" autocomplete="off" required>
+                                <div class="invalid-feedback" id="error-stock_actual"></div>
                             </div>
-                            <div class="col">
+                            <div class="col-md-6">
                                 <label class="form-label small">Stock mínimo</label>
-                                <input type="number" id="min_stock" class="form-control" step="1" min="0" autocomplete="off">
-                                <div class="invalid-feedback" id="error-min_stock"></div>
+                                <input type="number" id="stock_minimo" class="form-control" step="1" min="0" autocomplete="off" required>
+                                <div class="invalid-feedback" id="error-stock_minimo"></div>
                             </div>
                         </div>
                         <div class="form-check mb-0">
@@ -672,7 +719,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-close-modal>Cancelar</button>
-                        <button type="submit" id="btn-save-product" class="btn btn-teal">
+                        <button type="submit" id="btn-save-product" class="btn btn-verde">
                             <span class="spinner-border spinner-border-sm d-none me-1" id="btn-save-product-spinner" aria-hidden="true"></span>
                             <span id="btn-save-product-text">Guardar</span>
                         </button>

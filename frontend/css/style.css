@@ -8,6 +8,17 @@
     --color-text-muted: #6B7280;
     --color-success: #10B981;
     --color-danger: #EF4444;
+
+    /* Paleta corporativa oficial (RNF24): celeste, rosado y verde */
+    --color-celeste: #38BDF8;
+    --color-celeste-dark: #0284C7;
+    --color-celeste-light: rgba(56, 189, 248, 0.12);
+    --color-rosado: #F472B6;
+    --color-rosado-dark: #DB2777;
+    --color-rosado-light: rgba(244, 114, 182, 0.12);
+    --color-verde: #34D399;
+    --color-verde-dark: #059669;
+    --color-verde-light: rgba(52, 211, 153, 0.12);
 }
 
 body {
@@ -34,6 +45,104 @@ body {
     background-color: var(--color-teal-dark);
     color: white;
     transform: translateY(-1px);
+}
+
+/* ---------------------------------------------------------------------------
+   Paleta corporativa (RNF24) — Módulo de Catálogos: celeste, rosado y verde
+--------------------------------------------------------------------------- */
+.btn-celeste {
+    background-color: var(--color-celeste);
+    color: #0F172A;
+    border: none;
+    transition: all 0.2s ease;
+}
+.btn-celeste:hover {
+    background-color: var(--color-celeste-dark);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-rosado {
+    background-color: var(--color-rosado);
+    color: #0F172A;
+    border: none;
+    transition: all 0.2s ease;
+}
+.btn-rosado:hover {
+    background-color: var(--color-rosado-dark);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-verde {
+    background-color: var(--color-verde);
+    color: #0F172A;
+    border: none;
+    transition: all 0.2s ease;
+}
+.btn-verde:hover {
+    background-color: var(--color-verde-dark);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-outline-celeste {
+    color: var(--color-celeste-dark);
+    border: 1px solid var(--color-celeste);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+.btn-outline-celeste:hover {
+    background-color: var(--color-celeste-light);
+    color: var(--color-celeste-dark);
+}
+
+.btn-outline-rosado {
+    color: var(--color-rosado-dark);
+    border: 1px solid var(--color-rosado);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+.btn-outline-rosado:hover {
+    background-color: var(--color-rosado-light);
+    color: var(--color-rosado-dark);
+}
+
+.btn-outline-verde {
+    color: var(--color-verde-dark);
+    border: 1px solid var(--color-verde);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+.btn-outline-verde:hover {
+    background-color: var(--color-verde-light);
+    color: var(--color-verde-dark);
+}
+
+/* Cabeceras de tabla del módulo de Catálogos (celeste) */
+.thead-catalog {
+    background: linear-gradient(135deg, var(--color-celeste), var(--color-celeste-dark));
+    color: white;
+}
+.thead-catalog th {
+    color: white;
+    font-weight: 600;
+    border-bottom: none;
+    white-space: nowrap;
+}
+
+/* Texto con la paleta corporativa */
+.text-celeste { color: var(--color-celeste-dark) !important; }
+.text-rosado { color: var(--color-rosado-dark) !important; }
+.text-verde { color: var(--color-verde-dark) !important; }
+
+/* ---------------------------------------------------------------------------
+   Diálogo de confirmación por encima de otros modales (p. ej. #user-modal).
+   Se conserva el centrado vertical/`modal-dialog-centered`; solo elevamos el
+   z-index para que quede por encima y completamente visible.
+--------------------------------------------------------------------------- */
+#confirm-modal.modal {
+    z-index: 2000;
 }
 
 /* Auth Module - Desert Background */

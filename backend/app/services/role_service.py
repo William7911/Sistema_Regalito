@@ -1,12 +1,12 @@
 from typing import Optional, List
 from fastapi import HTTPException
-from app.db.models import Role
+from app.db.models import Rol
 from app.interfaces.services import RoleService
 from app.schemas import schemas
 
 
 class ConcreteRoleService(RoleService):
-    """Lógica de negocio de Roles. Usa Unit of Work para la transacción."""
+    """Lógica de negocio de Roles (modelo Rol). Usa Unit of Work para la transacción."""
 
     def __init__(self, uow):
         self.uow = uow
@@ -22,11 +22,15 @@ class ConcreteRoleService(RoleService):
         return schemas.Role.model_validate(role)
 
     async def create_role(self, data: schemas.RoleCreate) -> schemas.Role:
-        existing = await self.uow.roles.get_by_name(data.name.strip())
+        existing = await self.uow.roles.get_by_name(data.nombre.strip())
         if existing:
             raise HTTPException(status_code=400, detail="Ya existe un rol con ese nombre")
-        role = Role(name=data.name.strip(), description=data.description)
-        created = await self.uow.roles.create(role)
+        rol = Rol(
+            nombre=data.nombre.strip(),
+            descripcion=data.descripcion.strip() if data.descripcion else None,
+            estado="Activo",
+        )
+        created = await self.uow.roles.create(rol)
         await self.uow.commit()
         return schemas.Role.model_validate(created)
 
@@ -35,16 +39,16 @@ class ConcreteRoleService(RoleService):
         if not role:
             raise HTTPException(status_code=404, detail="Rol no encontrado")
 
-        if data.name is not None:
-            name = data.name.strip()
-            duplicate = await self.uow.roles.get_by_name(name)
-            if duplicate and duplicate.id != role_id:
+        if data.nombre is not None:
+            nombre = data.nombre.strip()
+            duplicate = await self.uow.roles.get_by_name(nombre)
+            if duplicate and duplicate.id_rol != role_id:
                 raise HTTPException(status_code=400, detail="Ya existe un rol con ese nombre")
-            role.name = name
-        if data.description is not None:
-            role.description = data.description
-        if data.is_active is not None:
-            role.is_active = data.is_active
+            role.nombre = nombre
+        if data.descripcion is not None:
+            role.descripcion = data.descripcion.strip() if data.descripcion else None
+        if data.estado is not None:
+            role.estado = data.estado.strip()
 
         updated = await self.uow.roles.update(role)
         await self.uow.commit()
@@ -55,7 +59,7 @@ class ConcreteRoleService(RoleService):
         role = await self.uow.roles.get_by_id(role_id)
         if not role:
             raise HTTPException(status_code=404, detail="Rol no encontrado")
-        role.is_active = False
+        role.estado = "Inactivo"
         updated = await self.uow.roles.update(role)
         await self.uow.commit()
         return schemas.Role.model_validate(updated)

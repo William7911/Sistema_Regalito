@@ -18,95 +18,74 @@ class TokenData(BaseModel):
 # Roles
 # ---------------------------------------------------------------------------
 
-class RoleBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=50)
-    description: Optional[str] = Field(default=None, max_length=255)
+# ---------------------------------------------------------------------------
+# Roles (modelo relacional: Rol)
+# ---------------------------------------------------------------------------
 
-class RoleCreate(RoleBase):
-    pass
+class RoleCreate(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=50)
+    descripcion: Optional[str] = Field(default=None, max_length=150)
 
 class RoleUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=50)
-    description: Optional[str] = Field(default=None, max_length=255)
-    is_active: Optional[bool] = None
+    nombre: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    descripcion: Optional[str] = Field(default=None, max_length=150)
+    estado: Optional[str] = Field(default=None, max_length=20)
 
-class Role(RoleBase):
-    id: int
-    is_active: bool
-    created_at: datetime
+class Role(BaseModel):
+    id_rol: int
+    nombre: str
+    descripcion: Optional[str] = None
+    estado: str
 
     model_config = ConfigDict(from_attributes=True)
 
 # ---------------------------------------------------------------------------
-# Departamentos
+# Departamentos (modelo relacional: DepartamentoGeografico)
 # ---------------------------------------------------------------------------
 
-class DepartmentBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = Field(default=None, max_length=255)
-
-class DepartmentCreate(DepartmentBase):
-    pass
+class DepartmentCreate(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=50)
 
 class DepartmentUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    description: Optional[str] = Field(default=None, max_length=255)
-    is_active: Optional[bool] = None
+    nombre: Optional[str] = Field(default=None, min_length=1, max_length=50)
 
-class Department(DepartmentBase):
-    id: int
-    is_active: bool
-    created_at: datetime
+class Department(BaseModel):
+    id_departamento: int
+    nombre: str
 
     model_config = ConfigDict(from_attributes=True)
 
 # ---------------------------------------------------------------------------
-# Usuarios
+# Usuarios (modelo relacional: Usuario)
 # ---------------------------------------------------------------------------
 
 class UserCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    lastname: str = Field(..., min_length=1, max_length=100)
-    code: str = Field(..., min_length=1, max_length=30)
+    nombre_completo: str = Field(..., min_length=1, max_length=100)
     username: str = Field(..., min_length=1, max_length=50)
     password: str = Field(..., min_length=6, max_length=128)
-    role_id: int
-    department_id: int
+    id_rol: int
 
 class UserUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    lastname: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    code: Optional[str] = Field(default=None, min_length=1, max_length=30)
+    nombre_completo: Optional[str] = Field(default=None, min_length=1, max_length=100)
     username: Optional[str] = Field(default=None, min_length=1, max_length=50)
     password: Optional[str] = Field(default=None, min_length=6, max_length=128)
-    role_id: Optional[int] = None
-    department_id: Optional[int] = None
-    is_active: Optional[bool] = None
+    id_rol: Optional[int] = None
+    estado: Optional[str] = Field(default=None, max_length=20)
 
 class UserResponse(BaseModel):
-    id: int
-    name: str
-    lastname: str
-    code: str
+    id_usuario: int
+    id_rol: int
+    nombre_completo: str
     username: str
-    role_id: int
-    department_id: int
-    is_active: bool
-    created_at: datetime
-    role: Optional[Role] = None
-    department: Optional[Department] = None
+    estado: str
+    rol: Optional[Role] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 class UserFilter(BaseModel):
     name: Optional[str] = None
-    lastname: Optional[str] = None
-    code: Optional[str] = None
     is_active: Optional[bool] = None
     role_id: Optional[int] = None
-    department_id: Optional[int] = None
-    created_from: Optional[str] = None
-    created_to: Optional[str] = None
     limit: int = Field(default=100, ge=1, le=1000)
     offset: int = Field(default=0, ge=0)
 
@@ -115,96 +94,166 @@ class UserList(BaseModel):
     items: List[UserResponse]
 
 # ---------------------------------------------------------------------------
-# Categorías
+# Catálogos de apoyo: Categorías / Subcategorías / Unidades / Sucursales / Áreas
 # ---------------------------------------------------------------------------
 
-class CategoryBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = Field(default=None, max_length=255)
+class CategoriaOut(BaseModel):
+    id_categoria: int
+    nombre: str
+    estado: str
 
-class CategoryCreate(CategoryBase):
-    pass
+    model_config = ConfigDict(from_attributes=True)
 
-class CategoryUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    description: Optional[str] = Field(default=None, max_length=255)
-    is_active: Optional[bool] = None
+class CategoriaCreate(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=50)
 
-class Category(CategoryBase):
-    id: int
-    is_active: bool
-    created_at: datetime
+class CategoriaUpdate(BaseModel):
+    nombre: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    estado: Optional[str] = Field(default=None, max_length=20)
+
+class SubcategoriaOut(BaseModel):
+    id_subcategoria: int
+    id_categoria: int
+    nombre: str
+    categoria: Optional[CategoriaOut] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class UnidadMedidaOut(BaseModel):
+    id_unidad: int
+    codigo: str
+    descripcion: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class SucursalOut(BaseModel):
+    id_sucursal: int
+    nombre: str
+    estado: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AreaBodegaOut(BaseModel):
+    id_area: int
+    id_sucursal: int
+    nombre_area: str
 
     model_config = ConfigDict(from_attributes=True)
 
 # ---------------------------------------------------------------------------
-# Productos
+# Productos (estructura relacional: Producto -> VarianteProducto -> Inventario)
 # ---------------------------------------------------------------------------
 
-class ProductBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=150)
-    sku: Optional[str] = Field(default=None, max_length=50)
-    barcode: str = Field(..., max_length=100)
-    category_id: int
-    price: Decimal = Field(..., max_digits=10, decimal_places=2, gt=0)
-    current_stock: int = Field(default=0, ge=0)
-    min_stock: int = Field(default=5, ge=0)
+class VarianteCreate(BaseModel):
+    codigo_barras: Optional[str] = Field(default=None, max_length=50)
+    talla: Optional[str] = Field(default=None, max_length=20)
+    color: Optional[str] = Field(default=None, max_length=30)
+    precio_detalle: Decimal = Field(..., max_digits=10, decimal_places=2, gt=0)
+    precio_mayoreo: Decimal = Field(..., max_digits=10, decimal_places=2, gt=0)
+    costo_promedio: Decimal = Field(default=0, max_digits=10, decimal_places=2, ge=0)
 
-class ProductCreate(ProductBase):
-    pass
+class InventarioCreate(BaseModel):
+    id_sucursal: int
+    id_area: Optional[int] = None
+    stock_actual: int = Field(default=0, ge=0)
+    stock_minimo: int = Field(default=0, ge=0)
 
-class ProductUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=150)
-    sku: Optional[str] = Field(default=None, max_length=50)
-    barcode: Optional[str] = Field(default=None, max_length=100)
-    category_id: Optional[int] = None
-    price: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2, gt=0)
-    current_stock: Optional[int] = Field(default=None, ge=0)
-    min_stock: Optional[int] = Field(default=None, ge=0)
-    is_active: Optional[bool] = None
+class ProductoCreate(BaseModel):
+    id_subcategoria: int
+    id_unidad: int
+    nombre: str = Field(..., min_length=1, max_length=100)
+    descripcion: Optional[str] = Field(default=None, max_length=255)
+    variante: VarianteCreate
+    inventario: InventarioCreate
 
-class ProductFilter(BaseModel):
+class VarianteUpdate(BaseModel):
+    codigo_barras: Optional[str] = Field(default=None, max_length=50)
+    talla: Optional[str] = Field(default=None, max_length=20)
+    color: Optional[str] = Field(default=None, max_length=30)
+    precio_detalle: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2, gt=0)
+    precio_mayoreo: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2, gt=0)
+    costo_promedio: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2, ge=0)
+
+class InventarioUpdate(BaseModel):
+    id_sucursal: Optional[int] = None
+    id_area: Optional[int] = None
+    stock_actual: Optional[int] = Field(default=None, ge=0)
+    stock_minimo: Optional[int] = Field(default=None, ge=0)
+
+class ProductoUpdate(BaseModel):
+    id_subcategoria: Optional[int] = None
+    id_unidad: Optional[int] = None
+    nombre: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    descripcion: Optional[str] = Field(default=None, max_length=255)
+    estado: Optional[str] = Field(default=None, max_length=20)
+    variante: Optional[VarianteUpdate] = None
+    inventario: Optional[InventarioUpdate] = None
+
+class InventarioOut(BaseModel):
+    id_inventario: int
+    id_variante: int
+    id_sucursal: int
+    id_area: Optional[int] = None
+    stock_actual: int
+    stock_minimo: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+class VarianteOut(BaseModel):
+    id_variante: int
+    codigo_barras: Optional[str] = None
+    talla: Optional[str] = None
+    color: Optional[str] = None
+    precio_detalle: Decimal
+    precio_mayoreo: Decimal
+    costo_promedio: Decimal
+    inventarios: List[InventarioOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ProductoOut(BaseModel):
+    id_producto: int
+    id_subcategoria: int
+    id_unidad: int
+    nombre: str
+    descripcion: Optional[str] = None
+    estado: str
+    subcategoria: Optional[SubcategoriaOut] = None
+    unidad: Optional[UnidadMedidaOut] = None
+    variantes: List[VarianteOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ProductoFilter(BaseModel):
     name: Optional[str] = None
-    sku: Optional[str] = None
     barcode: Optional[str] = None
     is_active: Optional[bool] = None
-    category_id: Optional[int] = None
-    created_from: Optional[str] = None
-    created_to: Optional[str] = None
+    subcategoria_id: Optional[int] = None
     limit: int = Field(default=100, ge=1, le=1000)
     offset: int = Field(default=0, ge=0)
 
-class Product(ProductBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-    category: Optional[Category] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-class ProductList(BaseModel):
+class ProductoList(BaseModel):
     total: int
-    items: List[Product]
+    items: List[ProductoOut]
 
 # ---------------------------------------------------------------------------
-# Caja registradora
+# Caja / Turno de caja (modelos relacionales: Caja, TurnoCaja)
 # ---------------------------------------------------------------------------
 
-class CashRegisterOpen(BaseModel):
-    opening_amount: Decimal = Field(..., max_digits=10, decimal_places=2, ge=0)
-    petty_cash: Decimal = Field(default=0, max_digits=10, decimal_places=2, ge=0)
+class TurnoApertura(BaseModel):
+    id_caja: int
+    monto_apertura: Decimal = Field(..., max_digits=10, decimal_places=2, ge=0)
 
-class CashRegisterClose(BaseModel):
-    blind_closing_amount: Decimal = Field(..., max_digits=10, decimal_places=2, ge=0)
+class TurnoCierre(BaseModel):
+    monto_cierre: Decimal = Field(..., max_digits=10, decimal_places=2, ge=0)
 
-class CashRegisterResponse(BaseModel):
-    id: int
-    user_id: int
-    opening_time: datetime
-    opening_amount: Decimal
-    petty_cash: Decimal
-    status: str
-    closing_time: Optional[datetime] = None
-    blind_closing_amount: Optional[Decimal] = None
+class TurnoResponse(BaseModel):
+    id_turno: int
+    id_caja: int
+    id_usuario: int
+    monto_apertura: Decimal
+    fecha_apertura: datetime
+    fecha_cierre: Optional[datetime] = None
+    estado: str
 
     model_config = ConfigDict(from_attributes=True)
