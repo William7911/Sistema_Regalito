@@ -5,6 +5,211 @@ Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `
 
 ---
 
+## [2026-09-15] Fix de UX — falso positivo al cerrar el formulario de Usuario y posición del diálogo de confirmación
+
+### Contexto
+Dos problemas de comportamiento/diseño en el módulo de Usuarios:
+1. **Falso positivo en el dirty check:** al abrir "Nuevo Usuario" y pulsar la X o "Cancelar" sin escribir nada, se mostraba "¿Tienes datos sin guardar..." en lugar de cerrar de inmediato.
+2. **Posición del diálogo de confirmación:** el modal de confirmación se superponía tapando los campos y quedaba desfasado/cortado respecto al modal de fondo.
+
+### Causa raíz
+1. `formHasData()` considera como "datos" cualquier `select` con valor no vacío. En `resetUserForm()` se forzaba `estado = 'Activo'` al abrir el formulario, por lo que el select de estado no estaba vacío y el dirty check creía que había información.
+2. `#confirm-modal` compartía el mismo `z-index` (1055) que `#user-modal` abierto; su backdrop (1040) quedaba por debajo del modal de usuario (1055), sin oscurecerlo y superponiendo el diálogo sobre los campos.
+
+### Solución aplicada
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | El select `#estado` ahora tiene como valor por defecto un placeholder vacío (`-- Estado --`, value `""`); al abrir un formulario nuevo todos los campos quedan vacíos → se cierra de inmediato. |
+| `frontend/js/users.js` | `resetUserForm()` ya no fuerza `estado='Activo'` (depende del `reset()` al placeholder vacío). `saveUser()` solo incluye `estado` en el payload si el usuario eligió una opción (`if (estadoSel.value)`), evitando sobrescribir el valor en edición. `confirmModal()` eleva el `z-index` del diálogo (`2000`) y de su último backdrop (`1990`) para mostrarse centrado, completo y sobre cualquier modal abierto. |
+| `frontend/css/style.css` | Regla `#confirm-modal.modal { z-index: 2000; }` como respaldo; se conserva el centrado nativo `modal-dialog-centered`. |
+
+### Verificación
+- `node --check frontend/js/users.js`: OK.
+- Prueba manual: abrir "Nuevo Usuario" y pulsar X/Cancelar sin escribir → cierra directamente (sin confirmación). Escribir un dato y pulsar X → muestra la confirmación centrada, por encima del modal, completamente visible.
+
+---
+
+### Contexto
+Dos incidencias derivadas de la migración Database First (DERCAS):
+1. Al aplicar `init.sql` mediante PowerShell, los acentos y eñes de los catálogos semilla se corrompieron (p. ej. `Cristalería` → `Cristaler??a`). Diagnóstico en BD: los caracteres acentuados quedaron como dos bytes `0x3F` (`??`).
+2. El backend ya expone el nuevo esquema `Usuario` (`id_usuario`, `id_rol`, `nombre_completo`, `username`, `estado`), pero el frontend de Usuarios seguía esperando los atributos obsoletos (`name`, `lastname`, `code`, `department_id`, `is_active`), lo que pintaba `undefined` y badges incorrectos.
+
+### Incidencia 1 — Caracteres corruptos en BD
+Se creó `database/fix_encoding.sql` con los `UPDATE` de los catálogos semilla (`categoria`, `subcategoria`, `producto`) hacia los textos UTF-8 correctos. Se aplicó y verificó contra el contenedor `regalito_db` (resultado: `Cristalería`, `Ropa Bebé`, `Muñecas`, `Vestido de Niña 2T`, `Muñeca de Trapo Artesanal`).
+
+Comando de aplicación (evita el re-corrimiento por el pipe de PowerShell usando `docker cp`, que copia los bytes tal cual):
+```powershell
+docker cp .\database\fix_encoding.sql regalito_db:/tmp/fix_encoding.sql
+docker exec -e PGPASSWORD=Regalito_2026 regalito_db psql -U regalito_admin -d regalito_pos -v ON_ERROR_STOP=1 -f /tmp/fix_encoding.sql
+```
+Alternativa vía pipe (forzando UTF-8 en PowerShell):
+```powershell
+$OutputEncoding = New-Object System.Text.UTF8Encoding $false
+Get-Content -Raw -Encoding UTF8 .\database\fix_encoding.sql | docker exec -i -e PGPASSWORD=Regalito_2026 regalito_db psql -U regalito_admin -d regalito_pos -v ON_ERROR_STOP=1
+```
+
+### Incidencia 2 — Migración del módulo de Usuarios (frontend)
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | Tabla de usuarios: columnas **ID / Nombre / Usuario / Rol / Estado** (se elimina la columna Departamento). Filtros: **Nombre / Rol** (dropdown desde `/api/roles`) **/ Estado**. `#user-modal`: campos `nombre_completo`, `username`, `password`, `id_rol` (dropdown) y `estado` (Activo/Inactivo); se eliminó el select de Departamento y el checkbox `is_active`. |
+| `frontend/js/users.js` | `loadUsers` mapea `id_usuario`, `nombre_completo`, `username`, `rol.nombre`, y badge con `estado === 'Activo'`. `loadRoles` usa `id_rol`/`nombre`. Nuevo `loadRoleFilter` para el filtro de la tabla. `saveUser` envía claves exactas de `UsuarioCreate`/`UsuarioUpdate` (`nombre_completo`, `username`, `id_rol`, `estado`, y `password` solo en creación o si cambia en edición). `editUser`/`resetUserForm` adaptados. Se eliminaron `DEPARTMENTS_API` y `loadDepartments`. |
+
+Se conservaron intactos los estándares defensivos: `safeCloseUserModal()`, `formHasData()`, listener `beforeunload`, `setSaving` con spinner, toasts Bootstrap, modal de confirmación no nativo y traducción inline de errores 422 con `translateValidation()`.
+
+### Verificación
+- `node --check frontend/js/users.js`: OK.
+- `grep` en `index.html`: sin IDs obsoletos (`filter-code`, `lastname`, `code`, `role_id`, `department_id`, `is_active`).
+- `docker exec ... psql` (SELECT sobre `categoria`, `subcategoria`, `producto`): textos correctos (sin `??`).
+
+---
+
+### Contexto
+El login fallaba con "Credenciales incorrectas o usuario inactivo" usando `admin` / `admin123`. La lógica de autenticación (`auth.py`) ya era correcta (consulta por `Usuario.username`, valida `usuario.password_hash` y `usuario.estado == "Activo"`). La **causa raíz** era que el hash bcrypt sembrado en `database/init.sql` **no correspondía a `admin123`** (se verificó que `security.verify_password("admin123", hash_antiguo)` → `False`).
+
+### Componentes modificados
+| Archivo | Cambio |
+|---------|--------|
+| `database/init.sql` | Hash de los 3 usuarios semilla (`admin`, `cajera`, `bodega`) reemplazado por un hash bcrypt válido de `admin123`. |
+
+### Detalle
+- Hash antiguo (no coincide con `admin123`): `$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW`
+- Hash nuevo (válido para `admin123`): `$2b$12$igeDz03pyYibOqQO3WJCY.a/XKMHvAAZ2sfh13w.YT7hurdmKFlpG`
+- Generado con `security.get_password_hash("admin123")` y verificado con `security.verify_password("admin123", nuevo_hash)` → `True`.
+
+### Verificación
+- `python -m py_compile` sobre `backend/app`: OK.
+- `from app.main import app`: OK.
+
+### Nota de aplicación
+Para la BD actual (sin recrear el contenedor) aplicar en la base de datos:
+```sql
+UPDATE usuario
+SET password_hash = '$2b$12$igeDz03pyYibOqQO3WJCY.a/XKMHvAAZ2sfh13w.YT7hurdmKFlpG'
+WHERE username IN ('admin', 'cajera', 'bodega');
+```
+
+---
+
+### Contexto
+Se eliminaron las referencias obsoletas que impedían a Uvicorn arrancar. Los módulos restantes (Usuarios, Roles, Departamentos y Caja) ahora apuntan a los modelos relacionales de `backend/app/db/models.py` (Database First). `import app.main` ya no lanza excepciones y el OpenAPI se construye (18 rutas).
+
+### Componentes modificados
+| Archivo | Cambio |
+|---------|--------|
+| `backend/app/schemas/schemas.py` | `Role` → `Rol` (`id_rol`, `nombre`, `descripcion`, `estado`); `Department` → `DepartamentoGeografico` (`id_departamento`, `nombre`); `User*` → `Usuario` (`id_usuario`, `id_rol`, `nombre_completo`, `username`, `estado`); caja → `TurnoApertura`/`TurnoCierre`/`TurnoResponse`. |
+| `backend/app/interfaces/repositories.py` | Contratos `RoleRepository`→`Rol`, `DepartmentRepository`→`DepartamentoGeografico`, `UserRepository`→`Usuario` (se quita `get_by_code`; filtros simplificados a `name`/`is_active`/`role_id`). |
+| `backend/app/repositories/role_repository.py` | Consultas sobre `Rol` (`id_rol`, `nombre`, `estado`). |
+| `backend/app/repositories/department_repository.py` | Consultas sobre `DepartamentoGeografico`. |
+| `backend/app/repositories/user_repository.py` | Consultas sobre `Usuario` (`id_usuario`, `nombre_completo`, `id_rol`, `estado`) con `selectinload(Usuario.rol)` (evita `MissingGreenlet`). |
+| `backend/app/services/role_service.py` | CRUD sobre `Rol` (soft delete vía `estado="Inactivo"`). |
+| `backend/app/services/department_service.py` | CRUD sobre `DepartamentoGeografico`; sin soft delete (el modelo no tiene `estado`). |
+| `backend/app/services/user_service.py` | CRUD sobre `Usuario`; valida `id_rol` contra la BD; hashea `password_hash`; soft delete vía `estado`. |
+| `backend/app/api/users.py`, `roles.py`, `departments.py` | Import y anotación `Usuario` en `get_current_user`. |
+| `backend/app/api/cash_register.py` | Apertura/cierre sobre `TurnoCaja` (`id_caja`, `id_usuario`, `monto_apertura`, `fecha_apertura`, `fecha_cierre`, `estado`); valida existencia de `Caja`. |
+
+### Notas
+- `auth.py` y `deps.get_current_user` ya operaban sobre `Usuario` (ajuste previo del módulo de Catálogos).
+- `DepartamentoGeografico` no tiene `estado`, por lo que el endpoint de desactivación de departamentos es un no-op (se devuelve el registro).
+- El frontend del módulo Usuarios (`frontend/js/users.js`) aún usa la estructura antigua (`name`, `lastname`, `code`, `department_id`, `is_active`); queda pendiente su migración al nuevo `Usuario` en una iteración posterior.
+
+### Verificación
+- `python -m py_compile` en todo `backend/app`: OK.
+- `python -c "from app.main import app"` / `import app.main`: OK (sin excepciones).
+- `app.openapi()`: OK (18 paths).
+
+---
+
+### Contexto
+El **Frontend del Módulo de Catálogos** (Productos y Categorías) se refactorizó quirúrgicamente para conectarse a la base de datos relacional reconstruida en Database First. La creación/edición de un producto ahora inserta de forma **anidada y atómica** `Producto -> VarianteProducto -> InventarioSucursal` en una sola petición. Además se **estableció la paleta de colores corporativa oficial** (celeste, rosado y verde — RNF24) para los botones y cabeceras de tabla del módulo.
+
+> Reglas quirúrgicas respetadas: se conservaron intactos el `data-bs-backdrop="static"` de los modales, el Auth Guard y el listener `beforeunload`.
+
+### Componentes modificados (backend)
+| Archivo | Cambio |
+|---------|--------|
+| `backend/app/schemas/schemas.py` | Esquemas anidados `ProductoCreate` (con `variante` y `inventario`), `ProductoUpdate`, `ProductoOut`, `ProductoFilter`, `ProductoList`; catálogos `CategoriaOut`, `SubcategoriaOut`, `UnidadMedidaOut`, `SucursalOut`, `AreaBodegaOut`. Se reemplazaron los antiguos `Product`/`Category`. |
+| `backend/app/api/products.py` | `POST /api/productos` recibe el payload anidado; `PUT`/`GET`/`DELETE` y filtros (`name`, `barcode`, `subcategoria_id`, `is_active`) adaptados al nuevo esquema. |
+| `backend/app/api/categories.py` | CRUD de Categorías con modelo `Categoria` (`id_categoria`, `nombre`, `estado`). |
+| `backend/app/api/catalogos.py` | **Nuevo router** `GET /api/catalogos/{subcategorias,unidades,sucursales,areas}` para poblar los dropdowns (cero datos quemados). |
+| `backend/app/services/product_service.py` | Inserción anidada atómica (valida subcategoría, unidad, sucursal y área contra la BD; unicidad de código de barras). |
+| `backend/app/services/catalogo_service.py` | **Nuevo** servicio para los catálogos de apoyo. |
+| `backend/app/services/category_service.py` | Adaptado al modelo `Categoria`. |
+| `backend/app/repositories/product_repository.py` | Repositorio de `Producto`/`VarianteProducto`/`InventarioSucursal` con `selectinload` (evita `MissingGreenlet`) y `add_*` + `commit()` para atomicidad. |
+| `backend/app/repositories/category_repository.py` | Adaptado a `Categoria`. |
+| `backend/app/interfaces/services.py`, `repositories.py` | Contratos actualizados (incluye nuevo `CatalogoService`). |
+| `backend/app/api/deps.py` | `get_product_service` sin inyectar categorías; nuevo `get_catalogo_service`; `get_current_user` sobre `Usuario`. |
+| `backend/app/api/auth.py` | Login sobre `Usuario` (`rol`, `estado`). |
+| `backend/app/main.py` | Registro del router `catalogos`. |
+
+### Componentes modificados (frontend)
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | `#product-modal` rediseñado en secciones **Matriz** (subcategoría, unidad, nombre, descripción), **Variante** (código de barras, talla, color), **Precios** (detalle y mayoreo obligatorios RF05, costo promedio) e **Inventario** (sucursal, área, stock actual y mínimo para alertas RF09). Botones y cabeceras de tabla del módulo con paleta RNF24 (`btn-verde`, `btn-celeste`, `thead-catalog`, acciones `btn-outline-rosado`). |
+| `frontend/css/style.css` | Design tokens oficiales: `--color-celeste` `#38BDF8`, `--color-rosado` `#F472B6`, `--color-verde` `#34D399` + clases `.btn-celeste/.btn-rosado/.btn-verde`, `.btn-outline-*` y `.thead-catalog`. |
+| `frontend/js/catalog.js` | Payload anidado `ProductoCreate` en una sola petición; población de dropdowns desde `/api/catalogos/*`; área dependiente de la sucursal; listado con la estructura relacional; se mantiene la traducción amigable de errores 422 y el dirty check / beforeunload / SPA. |
+
+### Detalle de la inserción anidada
+El payload de creación es un único objeto JSON:
+```json
+{
+  "id_subcategoria": 1, "id_unidad": 1, "nombre": "...", "descripcion": "...",
+  "variante": { "codigo_barras": "...", "talla": "...", "color": "...",
+                "precio_detalle": 85.00, "precio_mayoreo": 75.00, "costo_promedio": 52.00 },
+  "inventario": { "id_sucursal": 1, "id_area": 1, "stock_actual": 24, "stock_minimo": 8 }
+}
+```
+En el backend, `ProductoCreate` valida con Pydantic (errores 422 inline) y el servicio inserta producto → variante → inventario dentro de la misma transacción (`commit()` atómico).
+
+### Verificación
+- `python -m py_compile` sobre todos los archivos backend modificados: OK.
+- `node --check frontend/js/catalog.js`: sin errores de sintaxis.
+
+### Pendiente / notas (fuera del alcance de esta tarea)
+- El módulo **Catálogos** queda completo y consistente con el esquema DERCAS. Sin embargo, la **app aún no importa** porque los módulos de **Roles/Departamentos/Usuarios y Caja (`cash_register.py`)** siguen referenciando los modelos antiguos (`Role`, `Department`, `User`, `CashRegister`) eliminados en la migración Database First. Esa migración de servicios/repositorios de esos módulos queda para una iteración posterior (como ya estaba documentado).
+- La pestaña de Categorías quedó sobre `Categoria` (`nombre`, `estado`); el modelo relacional no tiene `description`, por lo que la columna "Descripción" se muestra como `-`.
+
+---
+
+### Contexto
+Aplicación del enfoque **Database First** a partir del Diccionario de Datos oficial del DERCAS. Se reconstruyó por completo el esquema de la base de datos (7 módulos, 42 tablas, 214 campos) y se mapeó a modelos SQLAlchemy asíncronos. Solo backend; no se tocaron Frontend ni Controladores.
+
+### Componentes modificados
+| Archivo | Cambio |
+|---------|--------|
+| `database/init.sql` | Esquema completo (43 tablas DDL) + datos semilla contextualizados al negocio (Cristalería, Ropa, Juguetes, Hogar) |
+| `backend/app/db/models.py` | Mapeo de los 43 modelos SQLAlchemy con relaciones (`relationship`) y claves foráneas explícitas |
+
+### 1. Esquema DDL (`database/init.sql`)
+- **43 tablas** organizadas en 7 módulos: Seguridad y Auditoría, Sucursales/Ubicación/Clientes, Catálogo e Inventario, Movimientos y Mermas, Caja/Turnos/Tesorería, Ventas/Cobros/Facturación, Compras y Proveedores.
+- Tipos de datos exactos (`INT`, `VARCHAR(n)`, `DECIMAL(n,2)`, `DATE`, `TIMESTAMP`), PK y FK respetando el diccionario. Tablas asociativas con PK compuesta (`rol_permiso`).
+- **Datos semilla** contextualizados:
+  - Roles (Administradora, Cajero, Bodeguero), usuarios iniciales (`admin`/`cajera`/`bodega`, password `admin123`), permisos y `rol_permiso`.
+  - Categorías reales: **Cristalería, Ropa, Juguetes, Hogar** (+ subcategorías Vasos, Floreros, Ropa Bebé, Muñecas, Deco Hogar). Unidades de medida (UND, PAR, DOC, CJ).
+  - 2+ productos con variantes e inventario: **Juego de Vasos de Cristal**, **Vestido de Niña 2T**, **Muñeca de Trapo Artesanal**, cada uno con `variante_producto` e `inventario_sucursal`.
+  - Catálogos de apoyo: sucursal, áreas de bodega, departamentos/municipios, tipos de cliente, proveedores, métodos de pago, denominaciones de efectivo, motivos de merma y tipos de movimiento de caja.
+
+### 2. Modelos SQLAlchemy (`backend/app/db/models.py`)
+- Mapeo de los **43 modelos** con `Column` tipado y `ForeignKey` (se mantiene el estilo declarativo del proyecto).
+- **Relaciones** bidireccionales clave: `Producto -> VarianteProducto -> InventarioSucursal -> AlertaStock`, `Categoria -> Subcategoria -> Producto`, etc.
+- Relaciones con doble FK resueltas explícitamente con `foreign_keys=[...]` (`TrasladoInventario`, `CierreCajaCiegas`).
+- Las relaciones se cargan de forma perezosa; el eager loading con `selectinload` (para evitar `MissingGreenlet`) se aplica a nivel de repositorio, igual que el patrón ya usado en `user_repository.py`.
+
+### Verificación
+- `configure_mappers()` de SQLAlchemy: **43 modelos** mapeados sin errores.
+- `init.sql` con DDL + seeds referencialmente consistentes (FK hacia datos semilla insertados).
+
+### Comando para aplicar la nueva base de datos (limpiar volumen)
+```
+docker compose down -v
+docker compose up -d db
+```
+> `down -v` borra el volumen `postgres_data` y fuerza a re-ejecutar `database/init.sql` desde cero.
+
+### Pendiente / notas
+- Los controladores y repositorios actuales referencian el modelo anterior (`User`, `Role`, `Product`, etc.). Este paso es únicamente DDL+models; la migración de servicios/repositorios a los nuevos nombres (id_*, tablas en snake_case) queda para una iteración posterior, según lo indicado en la tarea.
+
+---
+
 ## [2026-09-15] Módulo de Catálogos (Productos y Categorías) — construido sobre la plantilla de Usuarios
 
 ### Contexto
