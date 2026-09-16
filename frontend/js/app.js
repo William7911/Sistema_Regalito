@@ -65,7 +65,7 @@ window.switchView = function(viewId) {
 // del menú lateral + persistencia de la vista activa en la URL (sin recarga).
 // ---------------------------------------------------------------------------
 
-const mainViews = ['dashboard', 'users', 'catalog'];
+const mainViews = ['dashboard', 'users', 'catalog', 'cash'];
 
 let currentView = null;
 
@@ -106,6 +106,9 @@ function renderView(viewKey) {
     if (viewKey === 'catalog' && typeof window.showCatalogModule === 'function') {
         window.showCatalogModule();
     }
+    if (viewKey === 'cash' && typeof window.showCashModule === 'function') {
+        window.showCashModule();
+    }
 }
 
 // Navega a un módulo actualizando el hash de la URL sin recargar la página.
@@ -141,6 +144,7 @@ const moduleLabels = {
     inventario: 'Inventario / Bodega',
     compras: 'Compras',
     caja: 'Caja',
+    cash: 'Caja',
     users: 'Usuarios / Personal',
     catalog: 'Catálogos',
     reportes: 'Reportes',
@@ -150,6 +154,7 @@ const moduleLabels = {
 // Abre un módulo desde el dashboard: navega si ya existe; avisa con un toast si
 // está en construcción (evita pantallas en blanco o interfaz congelada).
 window.openModule = function(moduleKey) {
+    if (moduleKey === 'caja') moduleKey = 'cash';
     if (mainViews.includes(moduleKey)) {
         navigateTo(moduleKey);
         return;

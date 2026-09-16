@@ -22,6 +22,10 @@ class ConcreteProductService(ProductService):
             barcode=filters.barcode,
             is_active=filters.is_active,
             subcategoria_id=filters.subcategoria_id,
+            created_from=filters.created_from,
+            created_to=filters.created_to,
+            sort_by=filters.sort_by,
+            sort_dir=filters.sort_dir or "asc",
             limit=filters.limit,
             offset=filters.offset,
         )
@@ -33,6 +37,8 @@ class ConcreteProductService(ProductService):
             barcode=filters.barcode,
             is_active=filters.is_active,
             subcategoria_id=filters.subcategoria_id,
+            created_from=filters.created_from,
+            created_to=filters.created_to,
         )
 
     async def get_product(self, product_id: int) -> schemas.ProductoOut:

@@ -78,6 +78,7 @@ class UserResponse(BaseModel):
     nombre_completo: str
     username: str
     estado: str
+    fecha_creacion: Optional[datetime] = None
     rol: Optional[Role] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -86,6 +87,10 @@ class UserFilter(BaseModel):
     name: Optional[str] = None
     is_active: Optional[bool] = None
     role_id: Optional[int] = None
+    created_from: Optional[datetime] = None
+    created_to: Optional[datetime] = None
+    sort_by: Optional[str] = None
+    sort_dir: Optional[str] = Field(default=None, pattern="^(asc|desc)$")
     limit: int = Field(default=100, ge=1, le=1000)
     offset: int = Field(default=0, ge=0)
 
@@ -218,6 +223,7 @@ class ProductoOut(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
     estado: str
+    fecha_creacion: Optional[datetime] = None
     subcategoria: Optional[SubcategoriaOut] = None
     unidad: Optional[UnidadMedidaOut] = None
     variantes: List[VarianteOut] = []
@@ -229,6 +235,10 @@ class ProductoFilter(BaseModel):
     barcode: Optional[str] = None
     is_active: Optional[bool] = None
     subcategoria_id: Optional[int] = None
+    created_from: Optional[datetime] = None
+    created_to: Optional[datetime] = None
+    sort_by: Optional[str] = None
+    sort_dir: Optional[str] = Field(default=None, pattern="^(asc|desc)$")
     limit: int = Field(default=100, ge=1, le=1000)
     offset: int = Field(default=0, ge=0)
 
@@ -240,20 +250,60 @@ class ProductoList(BaseModel):
 # Caja / Turno de caja (modelos relacionales: Caja, TurnoCaja)
 # ---------------------------------------------------------------------------
 
+class CajaOut(BaseModel):
+    id_caja: int
+    id_sucursal: int
+    descripcion: str
+    estado: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TurnoUsuarioOut(BaseModel):
+    id_usuario: int
+    nombre_completo: str
+    username: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TurnoApertura(BaseModel):
     id_caja: int
     monto_apertura: Decimal = Field(..., max_digits=10, decimal_places=2, ge=0)
 
+
 class TurnoCierre(BaseModel):
     monto_cierre: Decimal = Field(..., max_digits=10, decimal_places=2, ge=0)
+    notas: Optional[str] = Field(default=None, max_length=255)
+
 
 class TurnoResponse(BaseModel):
     id_turno: int
     id_caja: int
     id_usuario: int
     monto_apertura: Decimal
+    monto_cierre: Optional[Decimal] = None
+    notas: Optional[str] = None
     fecha_apertura: datetime
     fecha_cierre: Optional[datetime] = None
     estado: str
+    caja: Optional[CajaOut] = None
+    usuario: Optional[TurnoUsuarioOut] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TurnoFilter(BaseModel):
+    fecha_desde: Optional[datetime] = None
+    fecha_hasta: Optional[datetime] = None
+    estado: Optional[str] = None
+    id_caja: Optional[int] = None
+    sort_by: Optional[str] = None
+    sort_dir: Optional[str] = Field(default="desc", pattern="^(asc|desc)$")
+    limit: int = Field(default=10, ge=1, le=1000)
+    offset: int = Field(default=0, ge=0)
+
+
+class TurnoList(BaseModel):
+    total: int
+    items: List[TurnoResponse]

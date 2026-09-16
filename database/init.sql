@@ -20,7 +20,8 @@ CREATE TABLE usuario (
     nombre_completo VARCHAR(100) NOT NULL,
     username VARCHAR(50) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    estado VARCHAR(20) NOT NULL
+    estado VARCHAR(20) NOT NULL,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE permiso (
@@ -139,7 +140,8 @@ CREATE TABLE producto (
     nombre VARCHAR(100) NOT NULL,
     descripcion VARCHAR(255),
     imagen_url VARCHAR(255),
-    estado VARCHAR(20) NOT NULL
+    estado VARCHAR(20) NOT NULL,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE variante_producto (
@@ -219,22 +221,28 @@ CREATE TABLE traslado_inventario (
 -- MÓDULO 5: CAJA, TURNOS Y TESORERÍA
 -- ============================================================================
 
+CREATE SEQUENCE IF NOT EXISTS caja_id_caja_seq;
 CREATE TABLE caja (
-    id_caja INT PRIMARY KEY,
+    id_caja INT PRIMARY KEY DEFAULT nextval('caja_id_caja_seq'),
     id_sucursal INT NOT NULL REFERENCES sucursal(id_sucursal),
     descripcion VARCHAR(50) NOT NULL,
     estado VARCHAR(20) NOT NULL
 );
+ALTER SEQUENCE caja_id_caja_seq OWNED BY caja.id_caja;
 
+CREATE SEQUENCE IF NOT EXISTS turno_caja_id_turno_seq;
 CREATE TABLE turno_caja (
-    id_turno INT PRIMARY KEY,
+    id_turno INT PRIMARY KEY DEFAULT nextval('turno_caja_id_turno_seq'),
     id_caja INT NOT NULL REFERENCES caja(id_caja),
     id_usuario INT NOT NULL REFERENCES usuario(id_usuario),
     monto_apertura DECIMAL(10,2) NOT NULL,
     fecha_apertura TIMESTAMP NOT NULL,
     fecha_cierre TIMESTAMP,
-    estado VARCHAR(20) NOT NULL
+    estado VARCHAR(20) NOT NULL,
+    monto_cierre DECIMAL(10,2),
+    notas VARCHAR(255)
 );
+ALTER SEQUENCE turno_caja_id_turno_seq OWNED BY turno_caja.id_turno;
 
 CREATE TABLE tipo_movimiento_caja (
     id_tipo_movimiento INT PRIMARY KEY,
@@ -496,7 +504,7 @@ INSERT INTO motivo_merma (id_motivo, descripcion) VALUES
 
 -- MÓDULO 5: Caja, Turnos y Tesorería ----------------------------------------
 INSERT INTO caja (id_caja, id_sucursal, descripcion, estado) VALUES
-(1, 1, 'Caja Principal Mostrador', 'Cerrada');
+(1, 1, 'Caja Principal Mostrador', 'Activa');
 
 INSERT INTO tipo_movimiento_caja (id_tipo_movimiento, nombre) VALUES
 (1, 'Ingreso Sencillo Extra'),

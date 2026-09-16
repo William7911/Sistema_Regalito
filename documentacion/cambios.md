@@ -5,6 +5,235 @@ Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `
 
 ---
 
+## [2026-09-16] Fix defensivo: lectura segura de filtros y paginación en Usuarios y Catálogos
+
+### Contexto
+Resolución del fallo que bloqueaba el renderizado de datos en las tablas de Usuarios y Catálogos (`loadUsers()` y `loadProducts()`), donde se lanzaba la excepción `Uncaught TypeError: Cannot read properties of null (reading 'value')`. La causa residía en lecturas directas del DOM (`document.getElementById('...').value`) sin comprobar la existencia previa del elemento en el HTML (filtros de fecha `#filter-from`, `#filter-to`, `#filter-product-from`, `#filter-product-to` y controles de paginación).
+
+### Solución aplicada
+
+#### 1. Frontend JavaScript (`frontend/js/users.js` y `frontend/js/catalog.js`)
+- **Lectura defensiva con encadenamiento opcional**: Se sustituyeron todas las lecturas directas por el patrón `document.getElementById('campo')?.value || ''`.
+- **Valores seguros por defecto en paginación**: Se implementó `parseInt(document.getElementById('per-page')?.value || String(state.pageSize || 10), 10) || 10` para garantizar que la construcción de query params (`limit`, `offset`, `page`) nunca reciba `NaN` o valores inválidos ante la ausencia temporal del elemento.
+- **Protección de renderizado**: Verificación `if (!tbody) return;` al inicio de `loadUsers()` y `loadProducts()` para prevenir errores en ciclos de renderizado desacoplados.
+
+#### 2. Frontend HTML (`frontend/index.html`)
+- **Filtros de rango de fechas sincronizados**:
+  - En Usuarios (`#users-view`): Se agregaron los input groups etiquetados con icono de calendario para `#filter-from` ("Desde") y `#filter-to` ("Hasta").
+  - En Catálogos (`#catalog-view`): Se agregaron los input groups para `#filter-product-from` ("Desde") y `#filter-product-to` ("Hasta").
+- **Barras de paginación reactiva**:
+  - Se añadieron los bloques `#users-pagination` (con `#users-page-size`, `#users-prev-page`, `#users-page-info`, `#users-next-page`) y `#products-pagination` (con `#products-page-size`, `#products-prev-page`, `#products-page-info`, `#products-next-page`).
+- **Modales de detalle**:
+  - Se agregaron los modales `#user-detail-modal` y `#product-detail-modal` con `data-bs-backdrop="static"` y `data-bs-keyboard="false"`.
+
+### Verificación
+- `node --check frontend/js/users.js`: OK.
+- `node --check frontend/js/catalog.js`: OK.
+- Inspección de IDs: Todos los elementos requeridos por los scripts existen idénticos en `frontend/index.html`.
+- Pruebas backend: `10 passed in 1.10s`.
+
+---
+
+## [2026-09-15] Corrección visual de cabeceras de tabla: contraste, fondos corporativos y homologación transversal
+
+### Contexto
+Corrección del problema de contraste y visibilidad en los títulos de columnas (`<thead>`, `<th>`) en las tablas de Usuarios, Catálogos (Productos y Categorías) y Caja. Las cabeceras aparecían con texto en blanco o transparente sobre fondo blanco debido al sombreado interno por defecto de Bootstrap 5 (`box-shadow: inset ...`) que cubría el fondo de los `<thead>`, sumado a la falta de asignación explícita de `background-color` y anulación de `box-shadow` a nivel de celda `<th>`.
+
+### Solución aplicada
+
+#### 1. Estilos CSS (`frontend/css/style.css`)
+- **Regla base de alto contraste para cabeceras (`table thead th`, `.table thead th`)**: Asigna `color: #1E293B !important` (texto oscuro) y `background-color: #F8FAFC !important` (gris claro suave) con `box-shadow: none !important`, garantizando legibilidad inmediata en cualquier tabla que no tenga clase corporativa.
+- **Cabeceras corporativas (`.thead-catalog`, `.thead-cash`, `.thead-users`)**:
+  - Asignación directa y explícita de `background-color` y gradiente corporativo RNF24 a `thead`, `tr` y a las celdas `th` (`#0284C7`/`#0369A1` para Catálogos, `#0D7377`/`#0A5C5E` para Caja y Usuarios).
+  - Eliminación del box-shadow nativo de Bootstrap con `box-shadow: none !important` en `th`.
+  - Color de texto blanco puro garantizado con `color: #FFFFFF !important` en `th`, enlaces `a`, `span` e iconos `i`.
+  - Esquinas suavemente redondeadas en los extremos (`th:first-child`, `th:last-child`).
+- **Interacción y ordenamiento (`th.sortable`)**:
+  - Efecto hover no destructivo mediante `filter: brightness(1.12)` y `color: #FFFFFF !important` con subrayado sutil en cabeceras corporativas (evita que el texto cambie a azul oscuro sobre fondo azul/verde).
+  - Iconos de ordenamiento (`.sort-icon`) con color blanco `#FFFFFF !important` en cabeceras corporativas y `#64748B` en cabeceras claras.
+
+#### 2. Homologación de plantillas (`frontend/index.html`)
+- **Módulo de Usuarios (`#users-view`)**: Se incorpora la clase corporativa `<thead class="thead-users">`, se homologa a 7 columnas (`ID`, `Nombre`, `Usuario`, `Rol`, `Estado`, `Fecha Reg.`, `Acciones`), con cabeceras ordenables (`th.sortable`, `data-sort`, `.sort-icon`).
+- **Módulo de Catálogos (`#catalog-view`)**: En la tabla de Productos se homologan las 8 cabeceras ordenables con sus atributos `data-sort` correspondientes (`ID`, `Nombre`, `Subcategoría`, `Precio Detalle`, `Stock`, `Estado`, `Fecha Reg.`, `Acciones`). En Categorías se agrega cabecera de `Acciones`.
+- **Módulo de Caja (`#cash-view`)**: Verificación y homologación del estilo visual `.thead-cash` sobre las 9 columnas de turnos.
+
+### Restricciones respetadas
+- Paleta corporativa RNF24 intacta.
+- Cero `alert()` o `confirm()` nativos.
+- Auth Guard, paginación reactiva y validaciones sin alteraciones.
+
+### Verificación
+- `node --check` sobre `app.js`, `users.js`, `catalog.js` y `cash_register.js`: OK.
+- `python -m pytest tests/test_cash_service.py -v`: 10 passed in 1.13s.
+- Verificación visual: Títulos de columnas perfectamente legibles, con contraste nítido, sin texto invisible ni blanco sobre blanco.
+
+---
+
+## [2026-09-15] Módulo de Caja: apertura, cierre de turnos, consulta de estado e historial SPA
+
+### Contexto
+Implementación integral de punta a punta del Módulo de Caja (apertura y cierre de turnos, consulta reactiva de estado e historial paginado de turnos) para el sistema POS *Tienda el Regalito*. Se adoptó la arquitectura empresarial DERCAS (Domain, Entities, Repositories, Use Cases, Adapters, Services) con Unit of Work asíncrono, eliminación de lazy loading con `selectinload`, controladores delgados sin lógica de negocio, y en frontend una vista SPA con Auth Guard, modales defensivos con backdrop estático, dirty check, 422 inline errors y paleta corporativa RNF24 (cero `alert()`/`confirm()` nativos).
+
+### Base de Datos y Migraciones
+| Componente | Detalle |
+|------------|---------|
+| `backend/app/db/models.py` | Enriquecimiento del modelo `TurnoCaja` con `monto_cierre` (`DECIMAL(10,2)`) y `notas` (`VARCHAR(255)`). Mantiene relaciones con `Caja` y `Usuario`. |
+| `backend/alembic/versions/0004_caja_y_turno_caja_mejoras.py` | Migración aditiva para añadir columnas `monto_cierre` y `notas` en `turno_caja`. Creación y vinculación de secuencias PostgreSQL (`turno_caja_id_turno_seq`, `caja_id_caja_seq`) para auto-incremento de IDs. |
+| `database/init.sql` | Actualización del DDL inicial con `monto_cierre`, `notas`, sequences para `id_caja` e `id_turno`, y estado por defecto de caja 1 en `'Activa'`. |
+
+### Backend (DERCAS & Unit of Work)
+| Archivo | Cambio |
+|---------|--------|
+| `backend/app/schemas/schemas.py` | Definición de esquemas Pydantic v2: `CajaOut`, `TurnoUsuarioOut`, `TurnoApertura`, `TurnoCierre`, `TurnoResponse`, `TurnoFilter` y `TurnoList` (con validaciones de montos > 0). |
+| `backend/app/interfaces/repositories.py` | Contratos abstractos `CajaRepository` (`get_by_id`, `list_active`, `save`) y `TurnoCajaRepository` (`get_by_id`, `get_active_by_user`, `get_active_by_caja`, `save`, `search`, `count_search`). |
+| `backend/app/interfaces/services.py` | Contrato abstracto `CashRegisterService` (`abrir_caja`, `cerrar_caja`, `get_estado_actual`, `list_turnos`, `list_cajas`). |
+| `backend/app/repositories/cash_repository.py` | Implementación de repositorios con SQLAlchemy 2.0 asíncrono. Uso de `_TURNO_LOADS = (selectinload(TurnoCaja.caja), selectinload(TurnoCaja.usuario))` para erradicar `MissingGreenletError`. Ordenamiento seguro por diccionario `_SORTABLE`. |
+| `backend/app/services/cash_service.py` | Lógica de negocio de caja: verificación de caja activa, prevención de apertura simultánea por el mismo usuario o en caja ocupada, cálculo de fecha y monto de cierre, consulta de estado actual, listado y conteo. |
+| `backend/app/api/deps.py` | Registro de `cajas: CajaRepository` y `turnos: TurnoCajaRepository` en `UnitOfWork` y `SqlAlchemyUnitOfWork`. Proveedor de dependencias `get_cash_service`. |
+| `backend/app/api/cash_register.py` | Router delgado (`/api/caja`) con endpoints `POST /apertura`, `POST /cierre`, `GET /estado-actual`, `GET /turnos`, `GET /cajas`. Sin lógica de negocio ni bloques try/except. |
+
+### Frontend (SPA, Reactividad y UX Defensiva)
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | Enlace de navegación Caja (`data-nav="cash"`); vista principal `#cash-view` (`data-main-view="cash"`); tarjeta visual de estado actual (badge ABIERTA / CERRADA, detalles de cajero, caja, fecha y monto, botones contextuales "Abrir Caja" y "Cerrar Caja"); filtros de rango de fechas con etiquetas "Desde" y "Hasta" e icono `bi-calendar-event`; tabla de historial con cabeceras ordenables (`th.sortable`); paginador reactivo `#cash-pagination`; modales `#open-cash-modal` y `#close-cash-modal` con `data-bs-backdrop="static"` y `data-bs-keyboard="false"`. Inclusión de `js/cash_register.js`. |
+| `frontend/css/style.css` | Clase de estilo `.thead-cash` con fondo `var(--rosa-fucsia-dark)` y texto blanco para la cabecera de la tabla de turnos. |
+| `frontend/js/app.js` | Registro de `'cash'` en `mainViews`; invocación de `showCashModule()` en `renderView`; soporte en `openModule` para mapear módulo `'caja'` a vista `'cash'`. |
+| `frontend/js/cash_register.js` | Módulo reactivo completo: carga de cajas activas y estado actual al iniciar; apertura/cierre de turnos mediante fetch JWT; dirty check (`cashFormHasData`) y cierre seguro con `confirmModal`; traducción de validaciones 422 a errores inline (`translateCashValidation`); renderizado y ordenamiento dinámico de historial con iconos asc/desc; paginación interactiva con selector de tamaño de página; protección `beforeunload`. |
+
+### Restricciones y Estándares Respetados
+- **Cero alertas nativas:** Todos los mensajes usan `showToast()` (éxito, advertencia, error) y los diálogos de confirmación usan `confirmModal()`.
+- **Auth Guard:** Integración total con `sessionStorage.getItem('token')` y redirección en 401.
+- **Paleta RNF24:** Botones en celeste `#38BDF8`, rosado `#F472B6`, verde `#34D399` y estilos visuales consistentes con el diseño del sistema.
+- **Modales Defensivos:** Cierre controlado por backdrop estático y confirmación en caso de datos no guardados.
+- **Prevención Greenlet:** Serialización Pydantic libre de lazy loading gracias a `selectinload`.
+
+### Verificación
+- `backend/tests/test_cash_service.py`: 10 pruebas unitarias asíncronas aprobadas (`10 passed in 0.98s`) validando apertura, cierre, excepciones por caja ocupada/usuario con turno activo, consulta de estado y paginación.
+- Verificación de compilación: `python -m py_compile` sin advertencias en todos los módulos backend.
+- Verificación de sintaxis JS: `node --check frontend/js/app.js` y `node --check frontend/js/cash_register.js` exitosos.
+- Integración real con base de datos PostgreSQL: validado ciclo de apertura (id 1, monto Q100.00), consulta de estado y cierre (monto Q325.50).
+- Inspección OpenAPI: Las 5 rutas de `/api/caja/*` registradas satisfactoriamente en FastAPI.
+
+---
+
+## [2026-09-15] Homologación transversal Usuarios y Catálogos: claridad de filtros de fecha, columna de fecha y ordenamiento por columnas relacionadas
+
+### Contexto
+Mejoras visuales y funcionales aplicadas de forma transversal a los Módulos de Usuarios y de Catálogos (Productos) para aumentar la claridad de los filtros de fecha, mostrar la fecha de registro en las tablas y completar el ordenamiento sobre columnas relacionadas. Se conservaron intactos el Auth Guard, el dirty check (`formHasData`/`catalogFormHasData`), el `beforeunload`, la paginación reactiva, los modales defensivos (backdrop estático), los toasts y la paleta corporativa RNF24 (cero `alert()`/`confirm()` nativos).
+
+### Frontend (`frontend/index.html`)
+| Cambio | Detalle |
+|--------|---------|
+| Filtros de fecha etiquetados | En Usuarios y Productos, los inputs `date` se envuelven en **input groups** con icono de calendario (`bi-calendar-event`) y etiqueta visible **"Desde"** / **"Hasta"** (`#filter-from`/`#filter-to`, `#filter-product-from`/`#filter-product-to`). |
+| Columna "Fecha Reg." | Se agrega la columna **"Fecha Reg."** antes de "Acciones" en las tablas de Usuarios y Productos, como cabecera ordenable (`th.sortable` con `data-sort="fecha_creacion"` y tooltip "Ordenar por fecha"). |
+| Cabecera Rol ordenable | En Usuarios, la cabecera "Rol" pasa a `th.sortable` con `data-sort="rol"`. |
+
+### Frontend (JS)
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/js/users.js` | Helper `formatDate()` (DD/MM/YYYY); renderiza la celda "Fecha Reg." por fila; `updateSortIndicators()` y el wiring de ordenamiento se acotan a `#users-view th.sortable` (evita colisiones con la tabla de productos). |
+| `frontend/js/catalog.js` | Helper `formatDate()` (DD/MM/YYYY, autocontenido); renderiza la celda "Fecha Reg." por fila. |
+
+### Backend (`backend/app/repositories/user_repository.py`)
+| Cambio | Detalle |
+|--------|---------|
+| Ordenamiento por Rol | `_SORTABLE` agrega `"rol": Rol.nombre`; `search()` hace `join(Usuario.rol)` solo cuando `sort_by == "rol"` (ordenamiento seguro vía diccionario de columnas permitidas, sin inyección). Se importa `Rol`. |
+
+### Restricciones respetadas
+- Auth Guard, SPA (`navigateTo`/`renderView`/`mainViews`), dirty check, `beforeunload`, paginación, modales defensivos y toasts intactos.
+- Paleta RNF24 y validación inline 422 conservadas. Sin `alert()`/`confirm()` nativos.
+
+### Verificación
+- `node --check frontend/js/users.js` y `frontend/js/catalog.js`: OK.
+- `python -m py_compile` sobre repositorios modificados: OK.
+- Prueba de repositorio (SQLite en memoria): ordenamiento por `rol` asc/desc en Usuarios y por `fecha_creacion`, `id_producto`, `stock`, `precio_detalle`, `subcategoria`, `nombre`, `estado` en Productos, sin errores SQL.
+- `from app.main import app` / `app.openapi()`: OK (18 rutas).
+
+---
+
+## [2026-09-15] Módulo de Catálogos: paginación reactiva, ordenamiento de columnas, filtro de fechas y modal de detalle
+
+### Contexto
+Homologación del Módulo de Catálogos (Productos) con las mejoras de reporte inteligente ya implementadas en Usuarios: paginación con `limit`/`offset`, ordenamiento asc/desc de columnas, filtros de fecha (`created_from`/`created_to`) y un modal informativo de solo lectura para consultar la ficha completa del producto. Se conservaron intactos el Auth Guard, el Hash Routing SPA (`mainViews`), el dirty check (`catalogFormHasData`), el `beforeunload`, los spinners de guardado y los toasts; se mantiene la paleta corporativa RNF24 (celeste, rosado, verde) y la validación inline de errores 422 (cero `alert()`/`confirm()` nativos).
+
+### Backend (habilitación de fecha, ordenamiento y columnas relacionadas)
+| Archivo | Cambio |
+|---------|--------|
+| `backend/app/db/models.py` | `Producto` gana la columna `fecha_creacion` (`DateTime`, `server_default=func.now()`, no nulo) para soportar los filtros de fecha. |
+| `database/init.sql` | `producto` ahora incluye `fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()`. |
+| `backend/alembic/versions/0003_agregar_fecha_creacion_a_producto.py` | **Nueva migración aditiva** que agrega `fecha_creacion` a `producto` (preserva datos); aplicable con `alembic upgrade head`. |
+| `backend/app/schemas/schemas.py` | `ProductoFilter` agrega `created_from`, `created_to` (`datetime`) y `sort_by`, `sort_dir` (`asc`/`desc`); `ProductoOut` expone `fecha_creacion`. |
+| `backend/app/repositories/product_repository.py` | `search`/`count_search` aplican filtros de rango sobre `fecha_creacion`; ordenamiento dinámico con `_SORTABLE` (diccionario permitido) y joins seguros (`_apply_order_joins`) para `subcategoria`, `precio_detalle` y `stock`. |
+| `backend/app/services/product_service.py` | `list_products`/`count_products` propagan los nuevos parámetros al repositorio. |
+| `backend/app/interfaces/repositories.py` | Contratos `search`/`count_search` actualizados con los nuevos parámetros. |
+
+### Frontend (lista interactiva + modal de detalle)
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | En la tabla de Productos: columna **ID**; cabeceras ordenables (`th.sortable` con `data-sort` para ID, Nombre, Subcategoría, Precio Detalle, Stock y Estado); dos inputs `type=date` (`#filter-product-from`, `#filter-product-to`); botón "Ver" (ojo) por fila; barra de paginación `#products-pagination` (prev/next, página actual y selector `#products-page-size` 5/10/20/50); **nuevo modal `#product-detail-modal`** de solo lectura con `data-bs-backdrop="static"` y `data-bs-keyboard="false"` (matriz, variante, precios e inventario por sucursal). |
+| `frontend/js/catalog.js` | Estado `productsState` (página, tamaño, total, sort); `loadProducts` envía `created_from`, `created_to`, `sort_by`, `sort_dir`, `limit`, `offset` y usa `data.total`; nuevas funciones `renderProductPagination()`, `goToProductPage()`, `toggleProductSort()`, `updateProductSortIndicators()` y `viewProductDetail()`; wiring de paginación, ordenamiento y filtro (resetea a página 1). |
+
+### Restricciones respetadas
+- Auth Guard / SPA (`navigateTo`/`renderView`/`mainViews`) intactos: solo se tocaron `loadProducts` y funciones nuevas.
+- Dirty check (`catalogFormHasData`/`safeCloseCatalogModal`), `beforeunload`, spinners (`setProductSaving`/`setCategorySaving`), toasts Bootstrap y `confirmModal` sin cambios.
+- Paleta RNF24 (`thead-catalog`, `btn-celeste`, `btn-verde`, `btn-outline-rosado`) y validación inline 422 (`translateValidation`/`renderCatalogFieldErrors`) conservadas.
+- `#product-detail-modal` usa **backdrop estático** (regla de modales del proyecto).
+- Sin `alert()`/`confirm()` nativos.
+
+### Verificación
+- `node --check frontend/js/catalog.js`: OK.
+- `python -m py_compile` sobre los archivos backend modificados: OK.
+- `from app.main import app` / `app.openapi()`: OK (18 rutas); `GET /api/productos` expone `created_from`, `created_to`, `sort_by`, `sort_dir`, `limit`, `offset`.
+- Prueba de repositorio contra SQLite en memoria: ordenamiento por `nombre`, `subcategoria`, `precio_detalle` y `stock` (asc/desc) y conteo con filtros, sin errores SQL.
+- Nota: `test_*_service.py` siguen apuntando a los modelos pre-DERCAS y fallan en colección; es un pendiente **anterior** a este cambio, no introducido aquí.
+
+### Nota de aplicación
+- Entorno nuevo: basta `docker compose up -d db` (usa `init.sql`).
+- Entorno con datos: `alembic upgrade head` (desde `backend/`) aplica la columna `fecha_creacion` de `producto`.
+
+---
+
+## [2026-09-15] Módulo de Usuarios: filtros de fecha, paginación reactiva, ordenamiento de columnas y modal de detalle
+
+### Contexto
+Mejora del listado de usuarios para manejo de grandes volúmenes de datos: filtros de rango de fecha, paginación con `limit`/`offset`, ordenamiento asc/desc por columnas y un modal informativo de solo lectura. Se conservaron intactos el Auth Guard, el dirty check, el `beforeunload`, el sistema de toasts y la confirmación no nativa (cero `alert()`/`confirm()`).
+
+### Backend (habilitación de filtros de fecha y ordenamiento)
+| Archivo | Cambio |
+|---------|--------|
+| `backend/app/db/models.py` | `Usuario` gana la columna `fecha_creacion` (`DateTime`, `server_default=func.now()`, no nulo) para soportar los filtros de fecha. |
+| `database/init.sql` | `usuario` ahora incluye `fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()`. |
+| `backend/alembic/versions/0002_agregar_fecha_creacion_a_usuario.py` | **Nueva migración aditiva** que agrega `fecha_creacion` a `usuario` (preserva datos); aplicable con `alembic upgrade head`. |
+| `backend/app/schemas/schemas.py` | `UserFilter` agrega `created_from`, `created_to` (`datetime`) y `sort_by`, `sort_dir` (`asc`/`desc`); `UserResponse` expone `fecha_creacion`. |
+| `backend/app/repositories/user_repository.py` | `search`/`count_search` aplican filtros de rango sobre `fecha_creacion` y ordenamiento dinámico sobre columnas permitidas (`id_usuario`, `nombre_completo`, `username`, `estado`, `fecha_creacion`). |
+| `backend/app/services/user_service.py` | `list_users`/`count_users` propagan los nuevos parámetros al repositorio. |
+| `backend/app/interfaces/repositories.py` | Contratos `search`/`count_search` actualizados con los nuevos parámetros. |
+
+### Frontend (lista interactiva + modal de detalle)
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | Dos inputs `type=date` (`#filter-from`, `#filter-to`) en la barra de filtros; cabeceras de tabla ordenables (`th.sortable` con `data-sort`); barra de paginación `#users-pagination` (prev/next, página actual y selector `#users-page-size`); botón "Ver" (ojo) por fila; **nuevo modal `#user-detail-modal`** de solo lectura con `data-bs-backdrop="static"` y `data-bs-keyboard="false"`. |
+| `frontend/css/style.css` | Estilos `th.sortable` (cursor puntero, hover y `.sort-icon` para indicadores asc/desc). |
+| `frontend/js/users.js` | Estado `usersState` (página, tamaño, total, sort); `loadUsers` envía `created_from`, `created_to`, `sort_by`, `sort_dir`, `limit`, `offset` y usa `data.total`; nuevas funciones `renderPagination()`, `goToPage()`, `toggleSort()`, `updateSortIndicators()` y `viewUserDetail()`; wiring de paginación, ordenamiento y filtro (resetea a página 1). |
+
+### Restricciones respetadas
+- Auth Guard / `navigateTo` intactos: solo se tocaron `loadUsers` y funciones nuevas.
+- Dirty check (`formHasData`/`safeCloseUserModal`), listener `beforeunload`, `setSaving` con spinner, toasts Bootstrap y `confirmModal` sin cambios.
+- `#user-detail-modal` usa **backdrop estático** (regla de modales del proyecto).
+- Sin `alert()`/`confirm()` nativos.
+
+### Verificación
+- `node --check frontend/js/users.js`: OK.
+- `python -m py_compile` sobre los archivos backend modificados: OK.
+- `from app.main import app` / `app.openapi()`: OK (18 rutas); `GET /api/usuarios` expone `created_from`, `created_to`, `sort_by`, `sort_dir`, `limit`, `offset`.
+- Nota: `test_user_service.py` (y demás `test_*_service.py`) siguen apuntando a los modelos pre-DERCAS (`Role`, `Department`, `UserCreate` antiguo) y fallan en colección; es un pendiente **anterior** a este cambio, no introducido aquí.
+
+### Nota de aplicación
+- Entorno nuevo: basta `docker compose up -d db` (usa `init.sql`).
+- Entorno con datos: `alembic upgrade head` (desde `backend/`) aplica la columna `fecha_creacion`.
+
+---
+
 ## [2026-09-15] Fix de UX — falso positivo al cerrar el formulario de Usuario y posición del diálogo de confirmación
 
 ### Contexto

@@ -18,6 +18,27 @@ const CATALOGOS_API = '/api/catalogos';
 let baseSaveTextProduct = 'Guardar';
 let baseSaveTextCategory = 'Guardar';
 
+// Formatea una fecha (ISO/UTC) a DD/MM/YYYY. Definida aquí para que el módulo
+// sea autocontenido (siempre se carga users.js antes, pero se evitan dependencias).
+function formatDate(value) {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '-';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+}
+
+// Estado de paginación y ordenamiento del listado de productos.
+let productsState = {
+    page: 1,
+    pageSize: 10,
+    total: 0,
+    sortBy: 'nombre',
+    sortDir: 'asc',
+};
+
 // ---------------------------------------------------------------------------
 // Acceso a campos con ámbito de formulario (evita colisiones de ids repetidos)
 // ---------------------------------------------------------------------------
@@ -232,7 +253,7 @@ async function populateAreas(selectId, sucursalId, selectedId = null) {
 async function loadCategoriesTable() {
     const tbody = document.getElementById('categories-table-body');
     const empty = document.getElementById('categories-empty');
-    const nameFilter = document.getElementById('filter-category-name').value.trim();
+    const nameFilter = (document.getElementById('filter-category-name')?.value || '').trim();
     try {
         const params = new URLSearchParams();
         params.append('include_inactive', 'true');
@@ -277,13 +298,29 @@ async function loadCategoriesTable() {
 async function loadProducts() {
     const tbody = document.getElementById('products-table-body');
     const empty = document.getElementById('products-empty');
+    if (!tbody) return;
+
     const params = new URLSearchParams();
-    const name = document.getElementById('filter-product-name').value.trim();
-    const barcode = document.getElementById('filter-product-barcode').value.trim();
-    const subcat = document.getElementById('filter-product-subcategoria').value;
+    const name = (document.getElementById('filter-product-name')?.value || '').trim();
+    const barcode = (document.getElementById('filter-product-barcode')?.value || '').trim();
+    const subcat = document.getElementById('filter-product-subcategoria')?.value || '';
+    const from = document.getElementById('filter-product-from')?.value || '';
+    const to = document.getElementById('filter-product-to')?.value || '';
+
     if (name) params.append('name', name);
     if (barcode) params.append('barcode', barcode);
     if (subcat) params.append('subcategoria_id', subcat);
+    if (from) params.append('created_from', from);
+    if (to) params.append('created_to', to);
+
+    const pageSize = parseInt(document.getElementById('products-page-size')?.value || String(productsState.pageSize || 10), 10) || 10;
+    productsState.pageSize = pageSize;
+    const page = productsState.page || 1;
+
+    params.append('sort_by', productsState.sortBy || 'nombre');
+    params.append('sort_dir', productsState.sortDir || 'asc');
+    params.append('limit', pageSize);
+    params.append('offset', (page - 1) * pageSize);
     try {
         const res = await fetch(`${PRODUCTS_API}?${params.toString()}`, { headers: authHeaders() });
         if (!res.ok) {
@@ -305,14 +342,18 @@ async function loadProducts() {
                 const stock = inventario ? Number(inventario.stock_actual) : 0;
                 const minStock = inventario ? Number(inventario.stock_minimo) : 0;
                 const activo = p.estado === 'Activo';
+                const fecha = p.fecha_creacion ? formatDate(p.fecha_creacion) : '-';
                 return `
                 <tr>
+                    <td>${p.id_producto}</td>
                     <td>${p.nombre}</td>
                     <td>${sub}</td>
                     <td>Q ${precio}</td>
                     <td><span class="badge ${stock <= minStock ? 'bg-danger' : 'bg-success'}">${stock}</span></td>
                     <td><span class="badge ${activo ? 'bg-success' : 'bg-secondary'}">${activo ? 'Activo' : 'Inactivo'}</span></td>
+                    <td>${fecha}</td>
                     <td class="text-end">
+                        <button class="btn btn-sm btn-outline-info" onclick="viewProductDetail(${p.id_producto})" title="Ver detalle"><i class="bi bi-eye"></i></button>
                         <button class="btn btn-sm btn-outline-rosado" onclick="editProduct(${p.id_producto})" title="Editar"><i class="bi bi-pencil"></i></button>
                         ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateProduct(${p.id_producto})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
                     </td>
@@ -326,6 +367,102 @@ async function loadProducts() {
             tbody.closest('.table-responsive').classList.add('d-none');
             if (empty) empty.classList.remove('d-none');
         }
+        productsState.total = data.total || 0;
+        renderProductPagination();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// Renderiza la barra de paginación de productos a partir del estado actual.
+function renderProductPagination() {
+    const pagination = document.getElementById('products-pagination');
+    if (!pagination) return;
+    const totalPages = Math.max(1, Math.ceil(productsState.total / productsState.pageSize));
+    if (productsState.page > totalPages) productsState.page = totalPages;
+    const info = document.getElementById('products-page-info');
+    const prev = document.getElementById('products-prev-page');
+    const next = document.getElementById('products-next-page');
+    if (info) info.textContent = `Página ${productsState.page} de ${totalPages}`;
+    if (prev) prev.disabled = productsState.page <= 1;
+    if (next) next.disabled = productsState.page >= totalPages;
+    pagination.classList.toggle('d-none', productsState.total === 0);
+}
+
+// Va a una página concreta y recarga el listado de productos.
+function goToProductPage(page) {
+    const totalPages = Math.max(1, Math.ceil(productsState.total / productsState.pageSize));
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    if (page === productsState.page) return;
+    productsState.page = page;
+    loadProducts();
+}
+
+// Alterna el orden (asc/desc) de una columna y recarga.
+function toggleProductSort(column) {
+    if (productsState.sortBy === column) {
+        productsState.sortDir = productsState.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        productsState.sortBy = column;
+        productsState.sortDir = 'asc';
+    }
+    productsState.page = 1;
+    updateProductSortIndicators();
+    loadProducts();
+}
+
+// Pinta los indicadores asc/desc en las cabeceras ordenables de productos.
+function updateProductSortIndicators() {
+    document.querySelectorAll('#tab-products th.sortable').forEach((th) => {
+        const col = th.getAttribute('data-sort');
+        const existing = th.querySelector('.sort-icon');
+        if (existing) th.removeChild(existing);
+        if (col === productsState.sortBy) {
+            const icon = document.createElement('span');
+            icon.className = 'sort-icon';
+            icon.textContent = productsState.sortDir === 'asc' ? '▲' : '▼';
+            th.appendChild(icon);
+        }
+    });
+}
+
+// Modal informativo de detalle de producto (solo lectura).
+async function viewProductDetail(productId) {
+    try {
+        const res = await fetch(`${PRODUCTS_API}/${productId}`, { headers: authHeaders() });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => null);
+            showToast((errData && errData.detail) || 'No se encontró el producto', 'danger');
+            return;
+        }
+        const p = await res.json();
+        const variante = p.variantes && p.variantes[0] ? p.variantes[0] : null;
+        const inventario = variante && variante.inventarios && variante.inventarios[0]
+            ? variante.inventarios[0] : null;
+        const sub = p.subcategoria
+            ? (p.subcategoria.categoria ? `${p.subcategoria.categoria.nombre} / ${p.subcategoria.nombre}` : p.subcategoria.nombre)
+            : '-';
+        document.getElementById('pdetail-id').textContent = p.id_producto;
+        document.getElementById('pdetail-nombre').textContent = p.nombre || '-';
+        document.getElementById('pdetail-descripcion').textContent = p.descripcion || '-';
+        document.getElementById('pdetail-subcategoria').textContent = sub;
+        document.getElementById('pdetail-unidad').textContent = (p.unidad && p.unidad.descripcion) ? p.unidad.descripcion : '-';
+        document.getElementById('pdetail-estado').textContent = p.estado || '-';
+        document.getElementById('pdetail-fecha').textContent = p.fecha_creacion
+            ? new Date(p.fecha_creacion).toLocaleString()
+            : '-';
+        document.getElementById('pdetail-barcode').textContent = variante ? (variante.codigo_barras || '-') : '-';
+        document.getElementById('pdetail-talla').textContent = variante ? (variante.talla || '-') : '-';
+        document.getElementById('pdetail-color').textContent = variante ? (variante.color || '-') : '-';
+        document.getElementById('pdetail-precio-detalle').textContent = variante ? `Q ${Number(variante.precio_detalle).toFixed(2)}` : '-';
+        document.getElementById('pdetail-precio-mayoreo').textContent = variante ? `Q ${Number(variante.precio_mayoreo).toFixed(2)}` : '-';
+        document.getElementById('pdetail-costo').textContent = variante ? `Q ${Number(variante.costo_promedio).toFixed(2)}` : '-';
+        document.getElementById('pdetail-sucursal').textContent = inventario ? inventario.id_sucursal : '-';
+        document.getElementById('pdetail-stock').textContent = inventario ? inventario.stock_actual : '-';
+        document.getElementById('pdetail-stock-min').textContent = inventario ? inventario.stock_minimo : '-';
+        const modal = getModal('product-detail-modal');
+        if (modal) modal.show();
     } catch (err) {
         showToast(err.message, 'danger');
     }
@@ -599,6 +736,7 @@ async function deactivateCategory(categoryId) {
 // ---------------------------------------------------------------------------
 
 window.showCatalogModule = async function () {
+    updateProductSortIndicators();
     await Promise.all([
         loadProducts(),
         loadCategoriesTable(),
@@ -608,6 +746,7 @@ window.showCatalogModule = async function () {
 
 window.editProduct = editProduct;
 window.editCategory = editCategory;
+window.viewProductDetail = viewProductDetail;
 
 document.addEventListener('DOMContentLoaded', () => {
     const productForm = document.getElementById('product-form');
@@ -647,7 +786,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnNewCategory = document.getElementById('btn-new-category');
     if (btnNewCategory) btnNewCategory.addEventListener('click', openCreateCategoryModal);
     const btnFilterProducts = document.getElementById('btn-filter-products');
-    if (btnFilterProducts) btnFilterProducts.addEventListener('click', loadProducts);
+    if (btnFilterProducts) btnFilterProducts.addEventListener('click', () => {
+        productsState.page = 1;
+        loadProducts();
+    });
     const btnFilterCategories = document.getElementById('btn-filter-categories');
     if (btnFilterCategories) btnFilterCategories.addEventListener('click', loadCategoriesTable);
+
+    // Paginación de productos
+    const pageSize = document.getElementById('products-page-size');
+    if (pageSize) pageSize.addEventListener('change', () => {
+        productsState.pageSize = parseInt(pageSize.value, 10);
+        productsState.page = 1;
+        loadProducts();
+    });
+    const prevBtn = document.getElementById('products-prev-page');
+    if (prevBtn) prevBtn.addEventListener('click', () => goToProductPage(productsState.page - 1));
+    const nextBtn = document.getElementById('products-next-page');
+    if (nextBtn) nextBtn.addEventListener('click', () => goToProductPage(productsState.page + 1));
+    // Ordenamiento de columnas de productos
+    document.querySelectorAll('#tab-products th.sortable').forEach((th) => {
+        th.addEventListener('click', () => toggleProductSort(th.getAttribute('data-sort')));
+    });
 });

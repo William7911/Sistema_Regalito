@@ -58,6 +58,8 @@ class ProductRepositoryImpl(ProductRepository):
         barcode: Optional[str],
         is_active: Optional[bool],
         subcategoria_id: Optional[int],
+        created_from=None,
+        created_to=None,
     ):
         conditions = []
         if name:
@@ -67,7 +69,35 @@ class ProductRepositoryImpl(ProductRepository):
             conditions.append(Producto.estado == estado)
         if subcategoria_id is not None:
             conditions.append(Producto.id_subcategoria == subcategoria_id)
+        if created_from is not None:
+            conditions.append(Producto.fecha_creacion >= created_from)
+        if created_to is not None:
+            conditions.append(Producto.fecha_creacion <= created_to)
         return conditions, barcode
+
+    _SORTABLE = {
+        "id_producto": Producto.id_producto,
+        "nombre": Producto.nombre,
+        "subcategoria": Subcategoria.nombre,
+        "precio_detalle": VarianteProducto.precio_detalle,
+        "stock": InventarioSucursal.stock_actual,
+        "estado": Producto.estado,
+        "fecha_creacion": Producto.fecha_creacion,
+    }
+
+    def _apply_order_joins(self, stmt, sort_by):
+        """Agrega los joins necesarios para ordenar por columnas de tablas relacionadas."""
+        if sort_by == "subcategoria":
+            stmt = stmt.outerjoin(Subcategoria, Producto.id_subcategoria == Subcategoria.id_subcategoria)
+        elif sort_by == "precio_detalle":
+            stmt = stmt.outerjoin(VarianteProducto, Producto.id_producto == VarianteProducto.id_producto)
+        elif sort_by == "stock":
+            stmt = (
+                stmt
+                .outerjoin(VarianteProducto, Producto.id_producto == VarianteProducto.id_producto)
+                .outerjoin(InventarioSucursal, VarianteProducto.id_variante == InventarioSucursal.id_variante)
+            )
+        return stmt
 
     async def search(
         self,
@@ -75,10 +105,16 @@ class ProductRepositoryImpl(ProductRepository):
         barcode: Optional[str] = None,
         is_active: Optional[bool] = None,
         subcategoria_id: Optional[int] = None,
+        created_from=None,
+        created_to=None,
+        sort_by: Optional[str] = None,
+        sort_dir: str = "asc",
         limit: int = 100,
         offset: int = 0,
     ) -> List[Producto]:
-        conditions, barcode = self._build_filters(name, barcode, is_active, subcategoria_id)
+        conditions, barcode = self._build_filters(
+            name, barcode, is_active, subcategoria_id, created_from, created_to
+        )
         stmt = select(Producto).options(*self._load_options())
         if barcode:
             stmt = stmt.join(VarianteProducto).where(
@@ -86,7 +122,11 @@ class ProductRepositoryImpl(ProductRepository):
             )
         if conditions:
             stmt = stmt.where(*conditions)
-        stmt = stmt.order_by(Producto.nombre).limit(limit).offset(offset)
+        column = self._SORTABLE.get(sort_by, Producto.nombre)
+        stmt = self._apply_order_joins(stmt, sort_by)
+        if sort_dir == "desc":
+            column = column.desc()
+        stmt = stmt.order_by(column).limit(limit).offset(offset)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
@@ -96,8 +136,12 @@ class ProductRepositoryImpl(ProductRepository):
         barcode: Optional[str] = None,
         is_active: Optional[bool] = None,
         subcategoria_id: Optional[int] = None,
+        created_from=None,
+        created_to=None,
     ) -> int:
-        conditions, barcode = self._build_filters(name, barcode, is_active, subcategoria_id)
+        conditions, barcode = self._build_filters(
+            name, barcode, is_active, subcategoria_id, created_from, created_to
+        )
         stmt = select(func.count()).select_from(Producto)
         if barcode:
             stmt = stmt.join(VarianteProducto).where(
