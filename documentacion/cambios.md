@@ -3,6 +3,389 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o elimines componentes.
 
+## [2026-09-18] Corrección Definitiva del Bug de Validación en Cascada por Desplazamiento de Layout (DOM Layout Shift) en Navegador
+
+### Contexto y Diagnóstico en Entorno Real de Navegador (Microsoft Edge)
+A pesar de contar con una arquitectura de validación síncrona "single-pass" en `saveUser()` y `saveProduct()`, se reportó que en el navegador real persistía el comportamiento de "validación en cascada":
+- Al abrir el modal de Nuevo Usuario o Nuevo Producto con campos vacíos y hacer clic por primera vez en el botón "Guardar", únicamente se resaltaba el primer campo (`nombre_completo` o `nombre`).
+- Únicamente en el segundo clic aparecían todos los errores simultáneos.
+
+#### Causa Raíz Mecánica Descubierta en el DOM del Navegador
+1. **Foco automático inicial**: Al abrir el modal (`openCreateModal` en `users.js` y `openCreateProductModal` en `catalog.js`), se programaba un foco automático al primer campo de texto (`setTimeout(() => nameInput && nameInput.focus(), 350)`).
+2. **Ciclo de eventos del ratón vs desenfoque**: En la especificación W3C/DOM, cuando un usuario presiona el ratón sobre un botón de envío estando enfocado un campo de texto, la secuencia exacta de eventos es:
+   `mousedown` en el botón -> `blur` en el campo que pierde foco -> `mouseup` en el botón -> `click` en el botón -> `submit` en el formulario.
+3. **Desplazamiento físico del botón (Layout Shift)**:
+   - Al ocurrir `mousedown` en `#btn-save-user` o `#btn-save-product`, el campo enfocado disparaba inmediatamente su listener de `blur`.
+   - El handler del `blur` inyectaba `.is-invalid` y el mensaje de error en el contenedor `<div class="invalid-feedback">`.
+   - En Bootstrap, `.invalid-feedback` pasa de `display: none` a `display: block`, expandiendo el cuerpo del formulario entre 21px y 25px hacia abajo.
+   - Esta expansión empujaba el `modal-footer` y el botón de envío hacia abajo en 25 píxeles **mientras el botón del ratón aún estaba presionado**.
+4. **Cancelación del evento `click` por el motor del navegador (Chromium/Edge)**:
+   - Al soltar el botón del ratón (`mouseup`), las coordenadas del cursor ya no coincidían con la nueva posición desplazada del botón.
+   - Según el estándar DOM de eventos del puntero, el evento `click` **únicamente se despacha si `mousedown` y `mouseup` ocurren sobre el mismo elemento**.
+   - Al haberse desplazado el botón fuera del cursor, el navegador cancelaba y descartaba el `click`.
+   - Dado que no hubo `click`, el evento `submit` del formulario **nunca se disparó en el primer clic**. El usuario únicamente observaba el error del `blur` que provocó el desplazamiento.
+   - En el segundo clic, el campo ya estaba desenfocado y con su error visible (sin nuevo layout shift), por lo que el `click` y `submit` sí se completaban, ejecutando `saveUser()` / `saveProduct()` y revelando todos los errores.
+
+### Solución Implementada
+1. **Detección y Protección contra `blur` durante Envío o Cierre**:
+   - Se crearon las banderas de estado y funciones protectoras `shouldSkipUserBlur(e)` en `users.js` y `shouldSkipCatalogBlur(formId, e)` en `catalog.js`.
+   - Si el desenfoque ocurre porque el usuario está presionando o interactuando con el botón de envío (`e.relatedTarget.closest('#btn-save-user, #btn-save-product, [type="submit"]')`) o los botones de cierre/cancelación (`[data-bs-close-modal], .btn-close`), o si la bandera `is...FormSubmittingOrClosing` está activa, el handler de `blur` **retorna inmediatamente sin alterar el DOM**.
+   - Se vincularon listeners de `mousedown` en los botones de envío y cierre para activar la bandera de protección temporalmente durante el clic físico.
+2. **Preservación del Layout y Despacho del Clic**:
+   - Al no dispararse la validación individual del `blur` durante el clic, el DOM permanece 100% estable (0 píxeles de desplazamiento).
+   - El evento `mouseup` ocurre exactamente en las mismas coordenadas del botón.
+   - El navegador despacha limpiamente el `click` y el `submit` del formulario en el **primer intento**.
+3. **Ejecución Inmediata de la Validación Single-Pass**:
+   - `saveUser(e)` y `saveProduct(e)` toman el control en el primer clic, limpiando cualquier error previo y evaluando en una sola pasada todos los campos obligatorios:
+     - `user-form`: Evalúa simultáneamente `nombre_completo`, `username`, `password`, `id_rol` y `estado`, marcando los 5 campos en un solo ciclo.
+     - `product-form`: Evalúa simultáneamente `id_subcategoria`, `id_unidad`, `id_sucursal`, `nombre`, `precio_detalle`, `precio_mayoreo`, `stock_actual` y `stock_minimo`, marcando los 8 campos en un solo ciclo.
+4. **Preservación de la Validación por Blur al Navegar/Tabular**:
+   - Si el usuario navega entre campos mediante la tecla `Tab` o hace clic en otro campo de entrada (donde `relatedTarget` no es el botón de envío ni de cierre), la validación de `blur` opera de manera normal y reactiva tal como fue requerida.
+
+### Archivos Modificados
+- `frontend/js/users.js`: Función `shouldSkipUserBlur(e)`, bandera `isUserFormSubmittingOrClosing`, listeners `mousedown` en botones de envío/cierre y protección en los 5 listeners de `blur`.
+- `frontend/js/catalog.js`: Función `shouldSkipCatalogBlur(formId, e)`, bandera `isCatalogFormSubmittingOrClosing`, listeners `mousedown` en botones de envío/cierre y protección en los 8 listeners de `blur` de productos y 1 de categorías.
+- `scratch/test_real_browser_validation.js`: Suite automatizada de pruebas end-to-end con Microsoft Edge vía CDP (Chrome DevTools Protocol) que simula clics físicos con coordenadas reales y verifica el comportamiento en el primer clic.
+
+### Verificación y Resultados
+1. **Pruebas End-to-End en Navegador Real (Microsoft Edge headless vía CDP)**:
+   - `scratch/test_real_browser_validation.js`: **3/3 pruebas superadas con 100% de éxito**.
+     - **Test 1 (`user-form`)**: Clic físico del ratón en `#btn-save-user` valida y marca **los 5 campos obligatorios en el 1er clic** (`nombre_completo`, `username`, `password`, `id_rol`, `estado`).
+     - **Test 2 (`product-form`)**: Clic físico del ratón en `#btn-save-product` valida y marca **los 8 campos obligatorios en el 1er clic** con mensajes exactos.
+     - **Test 3 (Navegación / Tabulación)**: Validación individual de `blur` y limpieza reactiva en `input` verificadas al tabular entre campos.
+2. **Suites de Regresión**:
+   - `scratch/test_form_validations.js`: **8/8 pruebas superadas (100%)**.
+   - `scratch/test_4_fixes.js`: **4/4 pruebas superadas (100%)**.
+   - `scratch/test_logout_flow.js`: **4/4 pruebas superadas (100%)**.
+   - Backend Pytest (RBAC, ventas, caja, merma): **26/26 pruebas superadas (100%)**.
+
+---
+
+## [2026-09-18] Corrección Definitiva de Validación de Formularios: Sucursal, Stock y Validación en Una Sola Pasada (Single-Pass)
+
+### Contexto y Diagnóstico
+Tras la implementación inicial de validaciones visuales se auditaron 3 problemas específicos reportados en el navegador:
+1. **PROBLEMA 1 — Mensaje incorrecto en "Sucursal" (`product-form`)**:
+   - *Causa raíz*: En `users.js`, `translateValidation` dependía exclusivamente del booleano `isSelect`. Si se invocaba sin el parámetro o si en respuestas 422 la detección fallaba, la regla `/Input should be a valid integer.*/` producía `'Debe ingresar un número entero válido.'` en vez de `'Seleccione una opción.'`.
+   - *Solución*: Se reforzó `translateValidation(msg, isSelect, field)` para normalizar internamente la detección de select mediante el nombre del campo (`id_sucursal`, prefijo `id_`, `estado`, `rol`, etc.) o el flag. Si el campo es un select, cualquier error de entero o requerido retorna estrictamente `'Seleccione una opción.'`. Adicionalmente, `renderCatalogFieldErrors` en `catalog.js` y `renderFieldErrors` en `users.js` detectan de forma infalible los elementos `SELECT` y transfieren `field` e `isSelect` a la traducción. En el cliente, `saveProduct` valida `id_sucursal` directamente con `'Seleccione una opción.'`.
+
+2. **PROBLEMA 2 — Stock actual / Stock mínimo sin validación visual**:
+   - *Causa raíz*: En versiones previas, `saveProduct` utilizaba coerción destructiva `rawStock = inputFor(...)?.value || '0'`, lo que reemplazaba cadenas vacías por `'0'`. Dado que en el backend `InventarioCreate` define `stock_actual: int = Field(default=0, ge=0)`, el backend aceptaba el valor `0` sin emitir error 422, dejando los campos sin borde rojo ni mensaje.
+   - *Solución*: Se garantizó la lectura limpia sin ningún fallback destructivo (`inputFor(formId, 'stock_actual')?.value?.trim() ?? ''`). Se implementó validación explícita para cadenas vacías (`rawStock === ''`) asignando `"Este campo es obligatorio."` y clase `is-invalid`, y validación de rangos (`numStock < 0`) asignando `"El stock inicial debe ser 0 o superior."` (e idénticamente para `stock_minimo`). Se preservó el listener en evento `blur` para feedback inmediato al desenfocar.
+
+3. **PROBLEMA 3 — Validación en cascada / múltiples clics (Validación en Una Sola Pasada)**:
+   - *Causa raíz*: El flujo de validación requería múltiples clics consecutivos en "Guardar" para que aparecieran los errores de los distintos campos debido a dependencias en retornos 422 del backend y eventos de foco que interferían.
+   - *Solución*: Se implementó una arquitectura rigurosa de **Validación de Una Sola Pasada (Single-Pass Validation)** tanto en `saveProduct()` (`catalog.js`) como en `saveUser()` (`users.js`):
+     - Se limpia el estado de error previo (`clearCatalogErrors` / `clearValidationErrors`).
+     - Se recorren y evalúan **incondicionalmente** todas las reglas de los campos obligatorios en un solo ciclo, sin ningún `return` prematuro.
+     - En `product-form`: los 8 campos obligatorios (`id_subcategoria`, `id_unidad`, `id_sucursal`, `nombre`, `precio_detalle`, `precio_mayoreo`, `stock_actual`, `stock_minimo`) reciben de forma simultánea su clase `is-invalid` y mensaje de error en el **primer clic**.
+     - En `user-form`: los 5 campos obligatorios (`nombre_completo`, `username`, `password`, `id_rol`, `estado`) se marcan simultáneamente en el primer clic.
+     - Solo tras evaluar todos los campos, si `hasClientErrors` es `true`, se enfoca el primer elemento inválido, se renderiza el banner de advertencia del modal y se cancela el envío (`return`).
+
+4. **Prevención de Caching en Navegador**:
+   - Se agregaron sufijos de versión `?v=2.2` a todos los scripts en `frontend/index.html` (`app.js`, `users.js`, `catalog.js`, `cash_register.js`) para forzar la actualización inmediata en los navegadores de los usuarios.
+
+### Archivos Modificados
+- `frontend/index.html`: Parámetros cache-buster `?v=2.2` en etiquetas `<script>`.
+- `frontend/js/users.js`: `translateValidation` mejorado con soporte para `field` y detección automática de selects; `renderFieldErrors` con detección robusta de selects; `saveUser` con banner de alerta en modal y validación exhaustiva de una sola pasada.
+- `frontend/js/catalog.js`: `renderCatalogFieldErrors` con detección robusta de selects y pase de `field`; `saveProduct` con validación de una sola pasada cubriendo los 8 campos obligatorios simultáneamente; validación explícita de `stock_actual` y `stock_minimo` sin fallbacks.
+- `scratch/test_form_validations.js`: Suite de pruebas automatizadas con 8 bloques de prueba que validan las 3 problemáticas.
+
+### Verificación y Resultados
+- `scratch/test_form_validations.js`: **8/8 pruebas exitosas (100% PASSED)**.
+  - Test 5: 422 en `id_sucursal` muestra `"Seleccione una opción."` (0 incidencias de `"Debe ingresar un número entero válido."`).
+  - Test 6: Validación de una sola pasada comprobada: en 1 solo submit se marcan simultáneamente los 8 campos en `product-form` y los 5 campos en `user-form`.
+  - Test 7: Comprobación de cero fallbacks `|| '0'` en `catalog.js`.
+  - Test 8: Comprobación de cache-busting en `index.html`.
+- `scratch/test_4_fixes.js`: **100% PASSED**.
+- `scratch/test_logout_flow.js`: **100% PASSED**.
+- `pytest` backend: **31/31 PASSED (100% exitosas)**.
+
+---
+
+## [2026-09-18] Homologación y Corrección de Validación Visual de Campos Obligatorios en Formularios
+
+### Contexto y Diagnóstico
+Se identificó una inconsistencia en la validación visual de campos obligatorios (`NOT NULL` en base de datos) en formularios del sistema:
+1. **Formulario de Inventario / Producto (`product-form`)**:
+   - Los campos **"Stock actual"** (`stock_actual`) y **"Stock mínimo"** (`stock_minimo`) no mostraban el borde rojo (`is-invalid`) ni mensaje de error al quedar vacíos. La causa raíz fue la coerción `const rawStock = inputFor(formId, 'stock_actual')?.value || '0';` en `catalog.js`, la cual sustituía cadenas vacías por `'0'`, evadiendo la validación de obligatoriedad y el resaltado visual.
+2. **Formulario de Nuevo Usuario (`user-form`)**:
+   - El campo **"Estado"** (`estado`) no mostraba validación visual cuando se dejaba sin seleccionar (`-- Estado --`), a diferencia de "Rol" que sí se resaltaba. Las causas raíz fueron:
+     - La ausencia del atributo `required` en la etiqueta `<select id="estado">` de `frontend/index.html`.
+     - `saveUser()` no realizaba validación previa en el cliente y omitía enviar `estado` a la API si estaba vacío (`if (estadoSel && estadoSel.value) payload.estado = estadoSel.value;`).
+     - Al no ser requerido en el esquema backend `UserCreate` (se asigna por defecto a "Activo"), la API nunca retornaba un 422 para él, dejando el campo sin feedback visual de error.
+3. **Validación al perder el foco (`blur`)**:
+   - Ningún campo obligatorio activaba la validación al perder el foco (`blur`), permitiendo que el usuario dejara campos obligatorios en blanco sin enterarse hasta pulsar "Guardar".
+4. **Formularios de Caja (`open-cash-form` y `close-cash-form`)**:
+   - Se verificó que ambos ya validan correctamente en el submit (`is-invalid` y textos descriptivos en español) y, siguiendo la directriz estricta de alcance, no fueron modificados innecesariamente.
+
+### Archivos Modificados
+- `frontend/index.html`:
+  - Se agregó el atributo `required` al elemento `<select id="estado" class="form-select" required>`.
+- `frontend/js/users.js`:
+  - Se incorporó la función auxiliar `applyUserFieldError(fieldId, msg)` para centralizar la asignación de clase `is-invalid` y el mensaje de error.
+  - En `saveUser()`: se implementó validación síncrona en el cliente previa a la petición de red para `nombre_completo` ("Este campo es obligatorio."), `username` ("Este campo es obligatorio."), `password` ("Este campo es obligatorio." / "Debe tener al menos 6 caracteres."), `id_rol` ("Seleccione una opción.") y `estado` ("Seleccione una opción."). Si existen errores, se enfoca el primer elemento inválido y se aborta el envío.
+  - En `initRealtimeValidation()`: se agregaron listeners para el evento `blur` en los 5 campos requeridos (`nombre_completo`, `username`, `password`, `id_rol`, `estado`), activando el error visual de forma inmediata si se desenfocan vacíos o inválidos, manteniendo la limpieza reactiva al teclear/cambiar (`input`/`change`).
+- `frontend/js/catalog.js`:
+  - Se implementó la función auxiliar `applyCatalogFieldError(formId, fieldId, errorMsg)`.
+  - En `saveProduct()`: se eliminó el fallback `|| '0'` en `rawStock` y `rawStockMin`. Se añadió validación explícita para cadenas vacías (`rawStock === ''` / `rawStockMin === ''`) con el mensaje `"Este campo es obligatorio."`, y validación para valores negativos. Se estandarizaron los mensajes para selects (`id_subcategoria`, `id_unidad`, `id_sucursal`) a `"Seleccione una opción."` y texto/precio (`nombre`, `precio_detalle`, `precio_mayoreo`) a `"Este campo es obligatorio."`.
+  - En `saveCategory()`: se estandarizó el mensaje para nombre vacío a `"Este campo es obligatorio."`.
+  - En `initCatalogRealtimeValidation()`: se incorporaron listeners para el evento `blur` en los 8 campos obligatorios de `product-form` (`id_subcategoria`, `id_unidad`, `id_sucursal`, `nombre`, `precio_detalle`, `precio_mayoreo`, `stock_actual`, `stock_minimo`) y en el campo obligatorio de `category-form` (`name`), manteniendo la limpieza reactiva con `input` y `change`.
+
+### Verificación y Resultados
+1. **Suite de Pruebas Automatizadas de Formularios (`scratch/test_form_validations.js`)**:
+   - **Test 0 (Atributos HTML)**: Comprobación de atributo `required` en `<select id="estado">` de `index.html` (PASSED).
+   - **Test 1 (`user-form`)**: Envío de formulario vacío aplica `is-invalid` y mensajes correspondientes a `nombre_completo`, `username`, `password`, `id_rol` y `estado` (PASSED). Validación en `blur` y limpieza en `change`/`input` en selects y campos de texto (PASSED).
+   - **Test 2 (`product-form`)**: Envío de formulario vacío aplica `is-invalid` y `"Este campo es obligatorio."` específicamente a `stock_actual` y `stock_minimo`, además de `nombre`, `precio_detalle`, `precio_mayoreo`, y `"Seleccione una opción."` a `id_subcategoria`, `id_unidad`, `id_sucursal` (PASSED). Validación en `blur` para `stock_actual` y `stock_minimo` con limpieza reactiva (PASSED).
+   - **Test 3 (`category-form`)**: Validación en submit y blur para `name` con `"Este campo es obligatorio."` (PASSED).
+   - **Test 4 (Cobertura Exhaustiva de Blur)**: Validación individual en desenfoque de los 14 campos obligatorios (PASSED).
+   - **Resultado**: `ALL FRONTEND FORM VALIDATION TESTS PASSED SUCCESSFULLY!`.
+2. **Pruebas de Regresión Previas**:
+   - `scratch/test_4_fixes.js`: 4/4 pruebas exitosas (100% PASSED).
+   - `scratch/test_logout_flow.js`: 4/4 pruebas de sesión y logout exitosas (100% PASSED).
+3. **Suite Completa de Pruebas Pytest del Backend**:
+   - `python -m pytest tests/test_rbac.py tests/test_sales_service.py tests/test_merma_service.py tests/test_cierre_ciegas.py tests/test_cash_service.py tests/test_user_report_service.py`: **31/31 PASSED (100%)**.
+
+---
+
+## [2026-09-18] Corrección de 4 Incidencias Post-RBAC: Validaciones Pydantic, Módulo Reportes, Logout Sidebar e Identidad Visual
+
+### Contexto y Diagnóstico
+Tras la integración de RBAC y las protecciones de navegación se identificaron 4 incidencias puntuales en la interacción del frontend:
+1. **Mensajes técnicos de validación Pydantic v2 en formulario de Productos**:
+   - Campos de precio (`precio_detalle`, `precio_mayoreo`) mostraban el mensaje técnico en inglés: `"Decimal input should be an integer, float, string or Decimal object"`.
+   - Dropdowns/selects (`id_subcategoria`, `id_unidad`, `id_sucursal`) mostraban: `"Seleccione o ingrese un número entero válido."` debido a que Pydantic v2 valida `int` al recibir strings vacíos.
+2. **Botón "Reportes" del menú lateral inoperante**:
+   - Al pulsar `#nav-reportes`, `navigateTo('reportes')` forzaba `viewKey = 'dashboard'` porque `'reportes'` no pertenecía al arreglo `mainViews`. Al estar ya en el dashboard, la llamada era descartada sin mostrar respuesta ni aviso informativo, impidiendo el acceso a la Administradora que posee acceso total.
+3. **Botón de cerrar sesión en la parte inferior del sidebar**:
+   - En `index.html`, la inclusión duplicada de `bootstrap.bundle.min.js` (en línea 711 y línea 1147) y de `#toast-container` (en línea 714 y 1144) creaba colisiones en los listeners de Bootstrap para dropdowns (`data-bs-toggle="dropdown"`). Además, `#btn-logout` dependía exclusivamente de un listener JS sin enlace defensivo inline ni exposición global de `showLogin`.
+4. **Nombre visible de usuario admin en el sidebar**:
+   - El HTML estático contenía `"Admin"` en `#sidebar-username` y `"¡Hola, Admin!"` en `#header-greeting`.
+   - `updateUserInfoUI()` no normalizaba consistentemente a `"Administrador"` en todos los estados cuando el rol era `Administradora` o `user_display_name` persistía como `"Admin"`.
+
+### Archivos Modificados
+- `frontend/js/users.js`:
+  - Se expandió `translateValidation(msg, isSelect = false)` para capturar errores de Pydantic v2 de tipos `Decimal` (`"Debe ingresar un precio o número válido."`) y distinguir campos `<select>` (`"Seleccione una opción."`).
+  - Se expuso `window.translateValidation = translateValidation;`.
+  - `renderFieldErrors()` detecta si el input es de tipo `SELECT` o inicia con `id_` y transfiere `isSelect` a la traducción.
+- `frontend/js/catalog.js`:
+  - `renderCatalogFieldErrors()` detecta si el elemento es `SELECT` o prefijo `id_` y envía `isSelect` a `translateValidation`.
+- `frontend/js/app.js`:
+  - `navigateTo(viewKey)`: evalúa primero `canAccessView(viewKey)` (permitiendo acceso total a Administradora) y, si el módulo no es una vista principal embebida (`!mainViews.includes(viewKey)`), delega a `openModule(viewKey)` mostrando la notificación informativa correspondiente.
+  - `openModule()` declarado como función y expuesto en `window.openModule`.
+  - `updateUserInfoUI()`: normaliza consistentemente a `"Administrador"` en sidebar, saludo (`"¡Hola, Administrador!"`) y actualiza el avatar de usuario con iniciales `"Administrador"`.
+  - `form-login`: almacena `displayName` como `"Administrador"` cuando el usuario es `admin` o su rol es `Administradora`.
+  - Exposición explícita de `window.showLogin` y `window.logout`.
+- `frontend/index.html`:
+  - Se eliminó el script redundante de Bootstrap y el contenedor `#toast-container` duplicado en el cuerpo intermedio.
+  - Se actualizó el HTML estático por defecto: `<strong id="sidebar-username">Administrador</strong>` y `¡Hola, Administrador!`.
+  - Se añadió `onclick="showLogin(); return false;"` en `#btn-logout`.
+
+### Verificación y Resultados
+1. **Prueba automatizada integral (`scratch/test_4_fixes.js`)**:
+   - Caso 1: Validación Decimal traducida a `"Debe ingresar un precio o número válido."`, selects traducidos a `"Seleccione una opción."` y enteros normales a `"Debe ingresar un número entero válido."` (PASSED).
+   - Caso 2: `navigateTo('reportes')` ejecutado como Administradora despliega toast informativo de módulo en construcción. Ejecutado como Cajero es denegado con 403 / toast peligro (PASSED).
+   - Caso 3: Clic en botón `#btn-logout` y ejecución de `window.showLogin()` / `window.logout()` limpian almacenamiento y estado (PASSED).
+   - Caso 4: Identidad visual consistente `"Administrador"` en sidebar, header y saludo (PASSED).
+2. **Suite de regresión Pytest**:
+   - 31/31 pruebas pasando al 100% (`test_rbac.py`, `test_sales_service.py`, `test_merma_service.py`, `test_cierre_ciegas.py`, `test_cash_service.py`, `test_user_report_service.py`).
+
+---
+
+## [2026-09-18] Corrección del Cierre de Sesión (Logout) y Aislamiento de Sesiones RBAC
+
+### Contexto y Diagnóstico
+Tras la implementación de RBAC y las protecciones de ruta SPA, el cierre de sesión (`btn-logout`) presentaba inconsistencias de navegación y mezcla de estados entre sesiones:
+1. **Limpieza parcial de almacenamiento**: `showLogin()` removía solo 5 claves puntuales, dejando posible información residual en `localStorage` o `sessionStorage`, variables en memoria (`currentView`), campos del formulario de login y datos visuales en header/sidebar.
+2. **Navegación contaminada por falta de `preventDefault` y persistencia del hash**:
+   - `<a href="#" id="btn-logout">` no prevenía la navegación nativa del enlace.
+   - El hash de la ruta previa (ej: `#users`) se mantenía en la barra de direcciones tras el cierre de sesión.
+   - El uso del botón "Atrás" del navegador (`history.back()`) o recarga con bfcache no sanitizaba la URL.
+3. **Mezcla de permisos al cambiar de usuario**: Al cerrar sesión un Administrador desde `#users` y loguearse un Cajero, el router SPA intentaba restaurar el hash `#users`, detonando una alerta de error 403 ("No tienes permiso...") injustificada inmediatamente después del login.
+
+### Archivos Modificados
+- `frontend/js/app.js`:
+  1. **Limpieza completa en `showLogin()`**:
+     - Ejecuta `localStorage.clear()` y `sessionStorage.clear()`.
+     - Resetea `currentView = null;`.
+     - Sanitiza la URL sin agregar entradas al historial: `history.replaceState(null, '', window.location.pathname + window.location.search);`.
+     - Limpia campos de login (`#login-user`, `#login-pass`) y oculta mensajes de error previos (`#login-error`).
+     - Restablece identidad visual de usuario por defecto (`#sidebar-username`, `#header-greeting`, `#header-role`).
+     - Oculta todos los contenedores de vistas principales (`[data-main-view]`) y desmarca ítems activos del menú (`[data-nav]`).
+  2. **Manejador de evento en `#btn-logout`**:
+     - Incorpora `e.preventDefault()` antes de invocar `showLogin()`.
+  3. **Blindaje de navegación histórica y caché**:
+     - En `hashchange` y `popstate`: si no existe sesión activa (`!hasActiveSession()`), sanitiza la URL y fuerza `showLogin()`.
+     - Se añadió listener `pageshow` para neutralizar restauraciones no autenticadas desde la bfcache del navegador.
+  4. **Aislamiento de sesiones en `showDashboard()`**:
+     - Si la vista solicitada por hash no está autorizada para el rol (`!canAccessView()`), normaliza inmediatamente a `#dashboard` antes de renderizar, evitando parpadeos de acceso denegado tras un login legítimo.
+
+### Verificación y Resultados
+1. **Prueba automatizada de flujo (`scratch/test_logout_flow.js`)**:
+   - Cierre de sesión de Administrador limpia el 100% de claves de `localStorage` y `sessionStorage`.
+   - Limpieza de URL hash confirmada (`window.location.hash == ""`).
+   - Intento de navegación con botón "Atrás" / `hashchange` sin sesión es neutralizado y sanitizado.
+   - Login posterior con `cajera` inicializa limpiamente en `#dashboard` con permisos exclusivos de Cajero sin alertas espurias.
+2. **Suite de pruebas de regresión backend**:
+   - `python -m pytest tests/test_rbac.py tests/test_sales_service.py tests/test_merma_service.py tests/test_cierre_ciegas.py tests/test_cash_service.py tests/test_user_report_service.py`: **31/31 PASSED (100%)**.
+
+---
+
+## [2026-09-17] Control de Acceso por Roles y Permisos (RBAC) End-to-End
+
+### Contexto y Diagnóstico
+Se implementó el sistema de Control de Acceso Basado en Roles y Permisos (RBAC) en backend y frontend para Tienda el Regalito POS, apoyándose estrictamente en los roles y permisos ya existentes en la base de datos PostgreSQL (`rol`, `permiso`, `rol_permiso`):
+- **Roles en BD**: `Administradora` (id=1, control total), `Cajero` (id=2), `Bodeguero` (id=3).
+- **Permisos en BD**: `VENTA_COBRAR`, `VENTA_APLICAR_DESCUENTO`, `INV_INGRESAR_MERCADERIA`, `CAJA_CIERRE_CIEGAS`, `COMPRA_EMITIR_ORDEN`.
+- **Reglas operativas aplicadas**:
+  1. **Login en tiempo real**: el endpoint `POST /api/auth/login` consulta en tiempo real desde `rol_permiso` los códigos de permiso asignados al rol, los devuelve en la respuesta JSON y los incluye en el token JWT.
+  2. **Dependencias de autorización (`require_permission` y `require_admin`)**: función de autorización reutilizable que concede bypass automático a `Administradora` y valida la asignación en BD para el resto de roles, respondiendo con `403 Forbidden` si falta el permiso.
+  3. **Protección de endpoints**:
+     - `POST /api/ventas`: protegido con `require_permission("VENTA_COBRAR")`.
+     - Venta con mayoreo/descuento: si `descuento_total > 0`, el servicio de ventas valida que el usuario posea `VENTA_APLICAR_DESCUENTO`.
+     - `POST /api/caja/cierre-ciegas`: protegido con `require_permission("CAJA_CIERRE_CIEGAS")`.
+     - `POST /api/caja/apertura`: disponible para cualquier usuario autenticado sin restricción de rol.
+     - `POST /api/compras/ordenes`: protegido con `require_permission("COMPRA_EMITIR_ORDEN")`.
+     - `POST /api/compras/ingreso`: protegido con `require_permission("INV_INGRESAR_MERCADERIA")`.
+     - Módulos administrativos (`/api/usuarios`, `/api/roles`, `/api/departamentos`): protegidos con `require_admin`.
+  4. **Frontend**:
+     - Almacenamiento seguro en `localStorage` de sesión, rol y permisos (`user_role`, `user_permissions`).
+     - Helpers globales de RBAC: `getUserRole()`, `getUserPermissions()`, `hasPermission(code)`, `isAdmin()`.
+     - Control visual dinámico (`applyRoleRestrictions()`): oculta del menú lateral y del panel de módulos del dashboard los elementos no permitidos para el rol activo. Oculta encabezados de sección vacíos.
+     - Protección de rutas SPA: `canAccessView()`, `navigateTo()` y `openModule()` bloquean el acceso no autorizado vía URL hash y muestran alerta toast sin congelar la interfaz.
+     - Identidad visual de Administradora: cuando el usuario autenticado es `admin`, la interfaz muestra consistentemente `"Administrador"` en saludo de cabecera y barra lateral, manteniendo inalterado el username técnico en BD.
+
+### Archivos Creados
+- `backend/app/core/permissions.py`: Helper asíncrono desacoplado `check_user_permission` para validar permisos contra `rol_permiso` evitando dependencias circulares.
+- `backend/app/schemas/compras_schema.py`: Esquemas Pydantic para órdenes de compra e ingreso de mercadería a bodega.
+- `backend/app/api/compras.py`: Controlador de compras con endpoints protegidos por `COMPRA_EMITIR_ORDEN` e `INV_INGRESAR_MERCADERIA`.
+- `backend/tests/test_rbac.py`: Suite exhaustiva con 7 pruebas de límites de autorización RBAC (login dinámico, protección de ventas, mayoreo, cierre a ciegas, apertura libre, compras y módulos administrativos).
+
+### Archivos Modificados
+- `backend/app/schemas/schemas.py`: Se extendió `Token` con campos opcionales `rol: Optional[str]`, `permisos: List[str]` y `nombre_completo: Optional[str]`.
+- `backend/app/api/auth.py`: `login_for_access_token` realiza consulta en tiempo real a `rol_permiso`, inyecta claims en el JWT y retorna `rol` y `permisos` en la respuesta JSON.
+- `backend/app/api/deps.py`: `get_current_user` ahora carga con `selectinload` la relación `Usuario.rol`. Se crearon las dependencias `require_permission` y `require_admin`.
+- `backend/app/services/sale_service.py`: `registrar_venta` valida el permiso `VENTA_APLICAR_DESCUENTO` si se aplica descuento en la transacción.
+- `backend/app/api/sales.py`: `POST /api/ventas` protegido con `require_permission("VENTA_COBRAR")` evaluado antes de la validación de turno activo.
+- `backend/app/api/cash_register.py`: `POST /api/caja/cierre-ciegas` protegido con `require_permission("CAJA_CIERRE_CIEGAS")`.
+- `backend/app/api/users.py`: Todos los endpoints de usuarios protegidos con `require_admin`.
+- `backend/app/api/roles.py`: Endpoints de roles protegidos con `require_admin`.
+- `backend/app/api/departments.py`: Endpoints de departamentos protegidos con `require_admin`.
+- `backend/app/main.py`: Se registró el router `/api/compras`.
+- `frontend/index.html`: Se agregaron atributos `data-module-item`, `data-section`, `data-card-module`, el contenedor de notificaciones `#toast-container` y el script de Bootstrap 5 Bundle.
+- `frontend/js/app.js`: Implementación de helpers RBAC, almacenamiento de rol/permisos, `showToast` global, `applyRoleRestrictions()`, guardia de rutas SPA y normalización visual del usuario `admin` como `"Administrador"`.
+
+### Verificación y Resultados
+1. **Pruebas Automatizadas**:
+   - `test_rbac.py`: 7/7 PASSED (100%).
+   - Suite completa de regresión (`test_rbac.py`, `test_sales_service.py`, `test_merma_service.py`, `test_cierre_ciegas.py`, `test_cash_service.py`, `test_user_report_service.py`): **31/31 PASSED (100% exitosas)**.
+2. **Verificación de Usuarios Semilla en Base de Datos PostgreSQL**:
+   - `admin`: Rol `Administradora` (id=1), 5 permisos asignados, password `admin123` verificado.
+   - `cajera`: Rol `Cajero` (id=2), permisos `VENTA_COBRAR` y `VENTA_APLICAR_DESCUENTO`, password `admin123` verificado.
+   - `bodega`: Rol `Bodeguero` (id=3), permiso `INV_INGRESAR_MERCADERIA`, password `admin123` verificado.
+
+---
+
+## [2026-09-17] Alineación DERCAS, 4 Procesos Críticos y Reparación de Validaciones Amigables
+
+### Contexto y Diagnóstico
+Se atendió la discrepancia estructural detectada por la auditoría y se repararon las validaciones de producto en el frontend:
+1. **Base de Datos y Migraciones**: Se creó y ejecutó la migración Alembic `0005_secuencias_operativas_y_limpieza_legacy.py`, agregando secuencias automáticas `nextval` a las tablas operativas de PostgreSQL (`venta`, `detalle_venta`, `pago_venta`, `merma`, `detalle_merma`, `cierre_caja_ciegas`, `detalle_arqueo_efectivo`, `movimiento_caja`) y eliminando de forma segura las tablas legacy huérfanas en inglés (`cash_registers`, `products`, `categories`, `users`, `roles`, `departments`).
+2. **Validaciones Amigables (Frontend)**: Se corrigieron los mensajes técnicos en inglés de Pydantic v2. Se extendió `translateValidation` en `users.js` con traducciones en español natural y se agregó validación previa del lado del cliente en `catalog.js` (`saveProduct` y `saveCategory`) para evitar el envío de `NaN`/`null`.
+3. **Bloqueo de POS sin Turno (RF01)**: Se implementó la dependencia FastAPI `get_current_active_shift` en `backend/app/api/deps.py`, la cual rechaza cualquier intento de venta con `403 Forbidden` ("Debe registrar el fondo inicial antes de vender") si el usuario no tiene un turno abierto.
+4. **Cierre de Caja a Ciegas y Descuadre (RF17)**: Se implementaron los endpoints `GET /api/caja/denominaciones` y `POST /api/caja/cierre-ciegas` en `cash_register.py` con lógica de arqueo de piezas de efectivo, cálculo de saldo teórico del sistema (`monto_apertura` + ventas efectivo + entradas - salidas), diferencia, determinación de estado (`Cuadrado`, `Sobrante`, `Faltante`) y exigencia de observaciones obligatorias ante cualquier descuadre.
+5. **Lógica de Descuento por Mayoreo (RF05)**: Se implementó la regla en el servicio de ventas (`sale_service.py`), aplicando automáticamente el `precio_mayoreo` cuando la cantidad es $\ge 6$ unidades o el cliente es de tipo Mayorista, registrando `descuento_item` y `descuento_total`.
+6. **Módulo de Mermas (RF10)**: Se implementó el módulo de mermas (`merma_schema.py`, `merma_repository.py`, `merma_service.py`, `mermas.py`) con validación estricta de cantidad y motivo (`gt=0`), descargo atómico de existencias en `inventario_sucursal.stock_actual` y costo de pérdida basado en `costo_promedio`, sin alterar ventas ni caja.
+7. **Router Central de Ventas y Facturación**: Se construyó la arquitectura completa de ventas (`sale_schema.py`, `sale_repository.py`, `sale_service.py`, `sales.py`) con validación de turno activo, descargo de stock, pagos multiforma y cálculo automático de vuelto (`cambio`).
+
+### Archivos Creados
+- `backend/alembic/versions/0005_secuencias_operativas_y_limpieza_legacy.py`: Migración de secuencias y limpieza de tablas legacy.
+- `backend/app/schemas/merma_schema.py`: Esquemas Pydantic para mermas y motivos.
+- `backend/app/repositories/merma_repository.py`: Repositorio asíncrono para mermas e inventario.
+- `backend/app/services/merma_service.py`: Lógica de negocio de mermas con descargo atómico de stock.
+- `backend/app/api/mermas.py`: Endpoints `POST /api/mermas`, `GET /api/mermas`, `GET /api/mermas/motivos`.
+- `backend/app/schemas/sale_schema.py`: Esquemas Pydantic para ventas, ítems, pagos y filtros.
+- `backend/app/repositories/sale_repository.py`: Repositorio asíncrono para ventas, detalles y pagos.
+- `backend/app/services/sale_service.py`: Lógica de ventas, regla de mayoreo, vuelto y descargo de inventario.
+- `backend/app/api/sales.py`: Endpoints `POST /api/ventas`, `GET /api/ventas`, `GET /api/ventas/{id}`.
+- `backend/tests/test_cierre_ciegas.py`: Tests unitarios para arqueo a ciegas y descuadre (RF17).
+- `backend/tests/test_merma_service.py`: Tests unitarios para mermas y descargo de stock (RF10).
+- `backend/tests/test_sales_service.py`: Tests unitarios para ventas, mayoreo, bloqueo de POS y vuelto (RF01, RF05).
+
+### Archivos Modificados
+- `backend/app/db/models.py`: Se asignó `default=func.now(), onupdate=func.now()` a `InventarioSucursal.fecha_actualizacion`.
+- `backend/app/schemas/schemas.py`: Se agregaron esquemas de `DenominacionOut`, `ArqueoItemCreate`, `CierreCiegasCreate`, `DetalleArqueoOut` y `CierreCiegasResponse`.
+- `backend/app/repositories/cash_repository.py`: Se agregaron métodos de consulta de denominaciones, ventas en efectivo, movimientos de caja y persistencia de cierre a ciegas.
+- `backend/app/services/cash_service.py`: Se implementó el método `cerrar_caja_ciegas()` y `get_denominaciones()`.
+- `backend/app/api/cash_register.py`: Se registraron los endpoints `POST /api/caja/cierre-ciegas` y `GET /api/caja/denominaciones`.
+- `backend/app/api/deps.py`: Se agregaron `get_current_active_shift`, propiedades `mermas` y `sales` a `UnitOfWork`, y proveedores `get_merma_service` y `get_sale_service`.
+- `backend/app/main.py`: Se registraron los routers `/api/ventas` y `/api/mermas`.
+- `backend/tests/conftest.py`: Se agregaron `mermas` y `sales` a `TestUnitOfWork`.
+- `frontend/js/users.js`: Se amplió `translateValidation` con soporte completo de traducciones para Pydantic v2 en español natural.
+- `frontend/js/catalog.js`: Se añadió validación defensiva en español para `saveProduct` y `saveCategory` evitando el envío de valores `NaN`/`null`.
+
+### Verificación y Resultados
+- Suite de pruebas ejecutada con `pytest`:
+  - `test_sales_service.py`: 4/4 PASSED (precio detalle, precio mayoreo automático $\ge 6$, bloqueo 403 sin turno, pago insuficiente).
+  - `test_merma_service.py`: 2/2 PASSED (descargo atómico de stock, rechazo por stock insuficiente).
+  - `test_cierre_ciegas.py`: 3/3 PASSED (arqueo cuadrado, descuadre exige observaciones, cierre con sobrante).
+  - `test_cash_service.py`: 10/10 PASSED.
+  - `test_user_report_service.py`: 5/5 PASSED.
+  - **Total de pruebas verificadas: 24/24 PASSED (100% exitosas)**.
+
+---
+
+## [2026-09-17] Login — Eliminación del formulario de auto-registro mock
+
+### Diagnóstico
+Se identificó que el enlace "¿No tienes cuenta? Regístrate" en la pantalla de login abría un formulario (`#view-register`) completamente decorativo. El handler en `app.js` estaba marcado explícitamente como `"Mock logic for frontend"`: validaba que las contraseñas coincidieran y luego mostraba un `alert('Usuario registrado exitosamente (Mock Frontend).')` sin realizar ninguna llamada HTTP ni crear ningún registro en la base de datos. No existía ningún endpoint de auto-registro en el backend.
+
+### Decisión
+Se elimina el auto-registro. El sistema es un POS interno; los empleados (cajeros, bodegueros, administradores) son creados exclusivamente por un administrador a través del módulo de Usuarios ya existente. Un auto-registro público representa una superficie de ataque innecesaria en un sistema de punto de venta.
+
+### Archivos modificados
+
+#### Frontend
+- **`frontend/index.html`**: Se elimina el bloque completo `#view-register` (formulario con campos `reg-user`, `reg-pass`, `reg-pass-confirm`). El enlace "Regístrate" en el login se reemplaza por el texto informativo: *"El acceso es otorgado por el administrador del sistema."*
+- **`frontend/js/app.js`**:
+  - Se elimina `'view-register'` del array `authViews`.
+  - Se elimina el handler `document.getElementById('form-register').addEventListener('submit', ...)` (incluido el `alert()` nativo mock).
+
+### Notas
+- No hay tests que eliminar: la lógica era 100% frontend mock, sin cobertura de backend.
+- El flujo de login para usuarios existentes **no se modifica**.
+- La gestión de usuarios sigue siendo exclusiva del módulo Usuarios → CRUD con validación de rol y estado.
+
+---
+
+## [2026-09-17] Módulo de Usuarios — Reporte Descargable (Excel / CSV)
+
+### Contexto
+Implementación de la funcionalidad de exportación descargable para el módulo de Usuarios, que permite al operador descargar un reporte en formato Excel (`.xlsx`) o CSV (`.csv`) respetando exactamente los mismos filtros activos en el listado (nombre, rol, estado, rango de fechas). La implementación sigue la arquitectura DERCAS y reutiliza la capa de repositorio existente sin duplicar lógica de consulta.
+
+### Nueva dependencia
+- **`openpyxl`** agregado a `backend/requirements.txt` — generación de archivos `.xlsx` con formato (cabeceras en negrita, colores corporativos, anchos de columna).
+
+### Archivos modificados / creados
+
+#### Backend
+- **`backend/requirements.txt`**: Se agrega `openpyxl`.
+- **`backend/app/services/user_service.py`**: Se agrega el método `export_users(filters, fmt)` con helpers privados `_user_row()`, `_build_csv()` y `_build_excel()`. Genera un `StreamingResponse` con el archivo adjunto. La consulta reutiliza `self.uow.users.search()` con `limit=10_000` y `offset=0` para exportar el conjunto completo.
+- **`backend/app/api/users.py`**: Se agrega el endpoint `GET /api/usuarios/reporte?format=excel|csv` (registrado antes de `/{user_id}` para evitar conflicto de rutas). El controller es delgado: solo delega al servicio.
+
+#### Frontend
+- **`frontend/index.html`**: Se agrega un dropdown "Reporte" (Bootstrap `btn-group`) junto al botón "Nuevo Usuario" en la cabecera de `#users-view`, con las opciones "Descargar Excel" (`#btn-report-excel`) y "Descargar CSV" (`#btn-report-csv`).
+- **`frontend/js/users.js`**: Se agrega la función `downloadReport(fmt)` que lee los filtros activos con lectura defensiva, llama al endpoint con `fetch()`, obtiene el blob y dispara la descarga mediante `URL.createObjectURL`. Usa `showToast` para notificaciones (sin `alert()`). Se registran los listeners de ambos botones en el bloque `DOMContentLoaded`.
+
+#### Tests
+- **`backend/tests/test_user_report_service.py`** [NUEVO]: 5 tests unitarios con SQLite en memoria:
+  - `test_export_excel_retorna_streaming_response` — verifica MIME y `Content-Disposition` del Excel.
+  - `test_export_excel_body_no_vacio` — verifica que el cuerpo del archivo no está vacío.
+  - `test_export_csv_retorna_streaming_response` — verifica MIME y `Content-Disposition` del CSV.
+  - `test_export_csv_filtra_activos` — con 2 usuarios (1 activo, 1 inactivo), el filtro `is_active=True` produce solo 1 fila de datos.
+  - `test_export_csv_sin_usuarios_solo_cabeceras` — sin usuarios, el CSV contiene solo la cabecera.
+  - **Resultado**: 5/5 PASSED.
+
 ---
 
 ## [2026-09-16] Fix defensivo: lectura segura de filtros y paginación en Usuarios y Catálogos

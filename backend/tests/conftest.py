@@ -7,6 +7,8 @@ from app.repositories.role_repository import RoleRepositoryImpl
 from app.repositories.department_repository import DepartmentRepositoryImpl
 from app.repositories.user_repository import UserRepositoryImpl
 from app.repositories.cash_repository import CajaRepositoryImpl, TurnoCajaRepositoryImpl
+from app.repositories.merma_repository import MermaRepositoryImpl
+from app.repositories.sale_repository import SaleRepositoryImpl
 
 
 class TestUnitOfWork:
@@ -19,6 +21,8 @@ class TestUnitOfWork:
         self.users = UserRepositoryImpl(db)
         self.cajas = CajaRepositoryImpl(db)
         self.turnos = TurnoCajaRepositoryImpl(db)
+        self.mermas = MermaRepositoryImpl(db)
+        self.sales = SaleRepositoryImpl(db)
 
     async def commit(self):
         await self.db.commit()

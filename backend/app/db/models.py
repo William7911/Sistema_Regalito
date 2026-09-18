@@ -248,7 +248,7 @@ class InventarioSucursal(Base):
     id_area = Column(Integer, ForeignKey("area_bodega.id_area"), nullable=True)
     stock_actual = Column(Integer, nullable=False)
     stock_minimo = Column(Integer, nullable=False)
-    fecha_actualizacion = Column(DateTime, nullable=False)
+    fecha_actualizacion = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
 
     variante = relationship("VarianteProducto", back_populates="inventarios")
     sucursal = relationship("Sucursal")

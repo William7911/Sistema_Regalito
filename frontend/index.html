@@ -56,34 +56,7 @@
                 
                 <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Ingresar al Sistema</button>
                 <div class="text-center">
-                    <span class="text-muted small">¿No tienes cuenta? <a href="#" class="text-teal fw-medium text-decoration-none" onclick="switchView('view-register')">Regístrate</a></span>
-                </div>
-            </form>
-        </div>
-
-        <!-- Register Form -->
-        <div id="view-register" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in d-none" style="width: 100%; max-width: 450px;">
-            <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">Registro</h3>
-                <p class="text-muted">Crea una cuenta nueva</p>
-            </div>
-            <form id="form-register">
-                <div class="mb-3">
-                    <label class="form-label text-dark fw-medium">Usuario</label>
-                    <input type="text" id="reg-user" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-dark fw-medium">Contraseña</label>
-                    <input type="password" id="reg-pass" class="form-control" required>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label text-dark fw-medium">Confirmar Contraseña</label>
-                    <input type="password" id="reg-pass-confirm" class="form-control" required>
-                </div>
-                <div class="alert alert-danger d-none small" id="reg-error"></div>
-                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Crear Cuenta</button>
-                <div class="text-center">
-                    <a href="#" class="text-teal small text-decoration-none fw-medium" onclick="switchView('view-login')">Volver al Login</a>
+                    <span class="text-muted small"><i class="bi bi-shield-lock me-1"></i>El acceso es otorgado por el administrador del sistema.</span>
                 </div>
             </form>
         </div>
@@ -162,50 +135,50 @@
                     </a>
                 </li>
                 
-                <li class="nav-item mt-3">
+                <li class="nav-item mt-3" data-section="operacion">
                     <span class="text-uppercase text-muted-teal small fw-bold px-3">— OPERACIÓN DIARIA —</span>
                 </li>
-                <li>
-                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                <li data-module-item="pos">
+                    <a href="#" id="nav-pos" class="nav-link text-white-50 sidebar-link" data-nav="pos" onclick="navigateTo('pos'); return false;">
                         <i class="bi bi-cart-fill me-2"></i> POS / Ventas
                     </a>
                 </li>
-                <li>
-                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                <li data-module-item="inventario">
+                    <a href="#" id="nav-inventario" class="nav-link text-white-50 sidebar-link" data-nav="inventario" onclick="navigateTo('inventario'); return false;">
                         <i class="bi bi-box-seam-fill me-2"></i> Inventario / Bodega
                     </a>
                 </li>
-                <li>
-                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                <li data-module-item="compras">
+                    <a href="#" id="nav-compras" class="nav-link text-white-50 sidebar-link" data-nav="compras" onclick="navigateTo('compras'); return false;">
                         <i class="bi bi-bag-check-fill me-2"></i> Compras
                     </a>
                 </li>
-                <li>
+                <li data-module-item="cash">
                     <a href="#" id="nav-cash" class="nav-link text-white-50 sidebar-link" data-nav="cash" onclick="navigateTo('cash'); return false;">
                         <i class="bi bi-cash-coin me-2"></i> Caja
                     </a>
                 </li>
 
-                <li class="nav-item mt-3">
+                <li class="nav-item mt-3" data-section="administracion">
                     <span class="text-uppercase text-muted-teal small fw-bold px-3">— ADMINISTRACIÓN —</span>
                 </li>
-                <li>
-                    <a href="#" class="nav-link text-white-50 sidebar-link" data-nav="users" onclick="navigateTo('users'); return false;">
+                <li data-module-item="users">
+                    <a href="#" id="nav-users" class="nav-link text-white-50 sidebar-link" data-nav="users" onclick="navigateTo('users'); return false;">
                         <i class="bi bi-people-fill me-2"></i> Usuarios / Personal
                     </a>
                 </li>
-                <li>
-                    <a href="#" class="nav-link text-white-50 sidebar-link" data-nav="catalog" onclick="navigateTo('catalog'); return false;">
+                <li data-module-item="catalog">
+                    <a href="#" id="nav-catalog" class="nav-link text-white-50 sidebar-link" data-nav="catalog" onclick="navigateTo('catalog'); return false;">
                         <i class="bi bi-journal-text me-2"></i> Catálogos
                     </a>
                 </li>
-                <li>
-                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                <li data-module-item="reportes">
+                    <a href="#" id="nav-reportes" class="nav-link text-white-50 sidebar-link" data-nav="reportes" onclick="navigateTo('reportes'); return false;">
                         <i class="bi bi-bar-chart-fill me-2"></i> Reportes
                     </a>
                 </li>
-                <li>
-                    <a href="#" class="nav-link text-white-50 sidebar-link">
+                <li data-module-item="configuracion">
+                    <a href="#" id="nav-configuracion" class="nav-link text-white-50 sidebar-link" data-nav="configuracion" onclick="navigateTo('configuracion'); return false;">
                         <i class="bi bi-gear-fill me-2"></i> Configuración
                     </a>
                 </li>
@@ -214,14 +187,14 @@
             <hr class="border-secondary">
             <div class="dropdown">
                 <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
-                    <img src="https://ui-avatars.com/api/?name=Admin&background=0A5C5E&color=fff" alt="" width="32" height="32" class="rounded-circle me-2">
-                    <strong id="sidebar-username">Admin</strong>
+                    <img src="https://ui-avatars.com/api/?name=Administrador&background=0A5C5E&color=fff" alt="" width="32" height="32" class="rounded-circle me-2">
+                    <strong id="sidebar-username">Administrador</strong>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser">
                     <li><a class="dropdown-item" href="#">Configuración</a></li>
                     <li><a class="dropdown-item" href="#">Perfil</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="#" id="btn-logout">Cerrar Sesión</a></li>
+                    <li><a class="dropdown-item text-danger" href="#" id="btn-logout" onclick="showLogin(); return false;">Cerrar Sesión</a></li>
                 </ul>
             </div>
         </aside>
@@ -231,7 +204,7 @@
             <!-- Header -->
             <header class="bg-white shadow-sm px-4 py-3 d-flex justify-content-between align-items-center border-bottom">
                 <div>
-                    <h5 class="mb-0 fw-bold text-dark" id="header-greeting">¡Hola, Admin!</h5>
+                    <h5 class="mb-0 fw-bold text-dark" id="header-greeting">¡Hola, Administrador!</h5>
                     <small class="text-muted" id="header-date">Septiembre 2026</small>
                 </div>
                 <div class="d-flex align-items-center gap-3">
@@ -304,49 +277,49 @@
                     <div class="card-body p-4">
                         <h5 class="fw-bold mb-4">Módulos del Sistema</h5>
                         <div class="row g-4 text-center">
-                            <div class="col-6 col-md-4 col-lg-3">
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="pos">
                                 <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="pos" onclick="openModule('pos')">
                                     <i class="bi bi-cart-fill fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">POS / Ventas</span>
                                 </button>
                             </div>
-                            <div class="col-6 col-md-4 col-lg-3">
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="inventario">
                                 <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="inventario" onclick="openModule('inventario')">
                                     <i class="bi bi-box-seam-fill fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">Inventario / Bodega</span>
                                 </button>
                             </div>
-                            <div class="col-6 col-md-4 col-lg-3">
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="compras">
                                 <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="compras" onclick="openModule('compras')">
                                     <i class="bi bi-bag-check-fill fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">Compras</span>
                                 </button>
                             </div>
-                            <div class="col-6 col-md-4 col-lg-3">
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="caja">
                                 <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="caja" onclick="openModule('caja')">
                                     <i class="bi bi-cash-coin fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">Caja</span>
                                 </button>
                             </div>
-                            <div class="col-6 col-md-4 col-lg-3">
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="users">
                                 <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="users" onclick="openModule('users')">
                                     <i class="bi bi-people-fill fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">Usuarios / Personal</span>
                                 </button>
                             </div>
-                            <div class="col-6 col-md-4 col-lg-3">
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="catalog">
                                 <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="catalog" onclick="openModule('catalog')">
                                     <i class="bi bi-journal-text fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">Catálogos</span>
                                 </button>
                             </div>
-                            <div class="col-6 col-md-4 col-lg-3">
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="reportes">
                                 <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="reportes" onclick="openModule('reportes')">
                                     <i class="bi bi-bar-chart-fill fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">Reportes</span>
                                 </button>
                             </div>
-                            <div class="col-6 col-md-4 col-lg-3">
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="configuracion">
                                 <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="configuracion" onclick="openModule('configuracion')">
                                     <i class="bi bi-gear-fill fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">Configuración</span>
@@ -365,9 +338,18 @@
                         <h4 class="fw-bold">Usuarios / Personal</h4>
                         <p class="text-muted">Administra el personal y sus accesos</p>
                     </div>
-                    <div>
-                        <button class="btn btn-outline-secondary me-2" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
                         <button id="btn-new-user" class="btn btn-teal"><i class="bi bi-plus-lg"></i> Nuevo Usuario</button>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-users">
+                                <i class="bi bi-download"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="javascript:void(0)" id="btn-report-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
+                                <li><a class="dropdown-item" href="javascript:void(0)" id="btn-report-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
@@ -725,11 +707,6 @@
         </main>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-    <!-- Notificaciones Toast (sin alert() nativos) -->
-    <div class="toast-container position-fixed top-0 end-0 p-3" id="toast-container"></div>
 
     <!-- Modal: Formulario de Usuario -->
     <div class="modal fade" id="user-modal" tabindex="-1" aria-labelledby="user-modal-title" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -768,7 +745,7 @@
                             </div>
                             <div class="col">
                                 <label class="form-label small">Estado</label>
-                                <select id="estado" class="form-select">
+                                <select id="estado" class="form-select" required>
                                     <option value="" selected>-- Estado --</option>
                                     <option value="Activo">Activo</option>
                                     <option value="Inactivo">Inactivo</option>
@@ -1158,10 +1135,16 @@
         </div>
     </div>
 
+    <!-- Toast Notification Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" style="z-index: 1090;"></div>
+
+    <!-- Bootstrap 5 Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <!-- App Logic -->
-    <script src="js/app.js"></script>
-    <script src="js/users.js"></script>
-    <script src="js/catalog.js"></script>
-    <script src="js/cash_register.js"></script>
+    <script src="js/app.js?v=2.3"></script>
+    <script src="js/users.js?v=2.3"></script>
+    <script src="js/catalog.js?v=2.3"></script>
+    <script src="js/cash_register.js?v=2.3"></script>
 </body>
 </html>

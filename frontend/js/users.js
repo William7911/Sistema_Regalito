@@ -98,28 +98,67 @@ function confirmModal(message) {
 // Traducción de errores Pydantic
 // ---------------------------------------------------------------------------
 
-function translateValidation(msg) {
-    if (msg === 'String should have at least 1 character') {
-        return 'Este campo es obligatorio.';
+function translateValidation(msg, isSelect = false, field = null) {
+    if (!msg || typeof msg !== 'string') return 'Valor no válido.';
+
+    // Normalización: si field o isSelect indican campo tipo select / dropdown
+    const isSelectField = isSelect === true ||
+        (typeof isSelect === 'string' && (isSelect.startsWith('id_') || isSelect === 'estado' || isSelect === 'rol' || isSelect.includes('sucursal') || isSelect.includes('subcategoria') || isSelect.includes('unidad'))) ||
+        (typeof field === 'string' && (field.startsWith('id_') || field === 'estado' || field === 'rol' || field.includes('sucursal') || field.includes('subcategoria') || field.includes('unidad')));
+
+    // Pydantic v2: Mensajes de números decimales y precios
+    if (/^Decimal input should be an integer, float, string or Decimal object/i.test(msg) ||
+        /^Input should be a valid decimal/i.test(msg)) {
+        return 'Debe ingresar un precio o número válido.';
     }
-    const atLeast = msg.match(/String should have at least (\d+) characters/);
-    if (atLeast) {
-        return `Debe tener al menos ${atLeast[1]} caracteres.`;
+
+    // Pydantic v2: Selects / Dropdowns
+    if (isSelectField) {
+        if (/Input should be a valid integer/i.test(msg) ||
+            /Input should be a valid number/i.test(msg) ||
+            /valid integer/i.test(msg) ||
+            /valid number/i.test(msg) ||
+            msg === 'Field required' ||
+            msg === 'String should have at least 1 character') {
+            return 'Seleccione una opción.';
+        }
     }
-    if (/Input should be a valid integer/.test(msg) || /valid integer/.test(msg)) {
-        return 'Seleccione una opción válida.';
-    }
+
+    // Traducciones directas comunes
+    if (msg === 'String should have at least 1 character') return isSelectField ? 'Seleccione una opción.' : 'Este campo es obligatorio.';
+    if (msg === 'Field required') return isSelectField ? 'Seleccione una opción.' : 'Este campo es obligatorio.';
+    if (msg === 'Input should be greater than 0') return 'Debe ingresar un valor mayor a 0.';
+    if (msg === 'Input should be greater than or equal to 0') return 'Debe ingresar un valor mayor o igual a 0.';
+    if (msg === 'Input should be a valid decimal') return 'Debe ingresar un precio o número válido.';
+    if (msg === 'Extra inputs are not permitted') return 'Campo no permitido.';
+    if (msg === 'Input should be a valid boolean') return 'Seleccione una opción válida.';
+
     const translations = [
-        { from: /String should have at most (\d+) characters/, to: 'No debe exceder $1 caracteres.' },
-        { from: /Field required/, to: 'Este campo es obligatorio.' },
+        { from: /Decimal input should be an integer, float, string or Decimal object.*/i, to: 'Debe ingresar un precio o número válido.' },
+        { from: /Input should be a valid decimal.*/i, to: 'Debe ingresar un precio o número válido.' },
+        { from: /String should have at least (\d+) characters?/, to: 'Debe tener al menos $1 caracteres.' },
+        { from: /String should have at most (\d+) characters?/, to: 'No debe exceder $1 caracteres.' },
+        { from: /Input should be greater than (\d+(?:\.\d+)?)/, to: 'Debe ser mayor a $1.' },
+        { from: /Input should be greater than or equal to (\d+(?:\.\d+)?)/, to: 'Debe ser mayor o igual a $1.' },
+        { from: /Input should be less than or equal to (\d+(?:\.\d+)?)/, to: 'No debe exceder $1.' },
+        { from: /Input should be less than (\d+(?:\.\d+)?)/, to: 'Debe ser menor a $1.' },
+        { from: /Decimal input should have no more than (\d+) decimal places?/, to: 'No debe tener más de $1 decimales.' },
+        { from: /Decimal input should have no more than (\d+) digits? in total/, to: 'No debe exceder $1 dígitos en total.' },
+        { from: /Input should be a valid integer.*/, to: isSelectField ? 'Seleccione una opción.' : 'Debe ingresar un número entero válido.' },
+        { from: /Input should be a valid number.*/, to: isSelectField ? 'Seleccione una opción.' : 'Debe ingresar un número válido.' },
+        { from: /Input should be a valid date.*/, to: 'Debe ingresar una fecha válida.' },
+        { from: /Input should be a valid datetime.*/, to: 'Debe ingresar una fecha y hora válidas.' },
         { from: /String should match pattern/, to: 'El formato no es válido.' },
         { from: /Value error, (.*)/, to: '$1' },
     ];
+
     for (const t of translations) {
         if (t.from.test(msg)) return msg.replace(t.from, t.to);
     }
     return msg;
 }
+
+window.translateValidation = translateValidation;
 
 // ---------------------------------------------------------------------------
 // Errores inline
@@ -157,8 +196,9 @@ function renderFieldErrors(detail) {
     if (!Array.isArray(detail)) return;
     detail.forEach((err) => {
         const field = err.loc && err.loc.length ? err.loc[err.loc.length - 1] : null;
-        const msg = translateValidation(err.msg || 'Valor inválido');
         const input = field ? document.getElementById(field) : null;
+        const isSelect = (input && input.tagName && input.tagName.toUpperCase() === 'SELECT') || (field && (field.startsWith('id_') || field === 'estado' || field === 'rol'));
+        const msg = translateValidation(err.msg || 'Valor inválido', isSelect, field);
         const feedback = field ? document.getElementById(`error-${field}`) : null;
         if (input && feedback) {
             input.classList.add('is-invalid');
@@ -169,7 +209,25 @@ function renderFieldErrors(detail) {
     });
 }
 
-// Limpieza de errores en tiempo real al teclear (micro-interacción).
+function applyUserFieldError(fieldId, msg) {
+    const input = document.getElementById(fieldId);
+    const feedback = document.getElementById(`error-${fieldId}`);
+    if (input) input.classList.add('is-invalid');
+    if (feedback) feedback.textContent = msg;
+}
+
+let isUserFormSubmittingOrClosing = false;
+
+function shouldSkipUserBlur(e) {
+    if (isUserFormSubmittingOrClosing) return true;
+    const rt = e && e.relatedTarget;
+    if (rt && rt.closest && rt.closest('#btn-save-user, [type="submit"], [data-bs-close-modal], .btn-close')) {
+        return true;
+    }
+    return false;
+}
+
+// Limpieza de errores en tiempo real al teclear y validación visual al desenfocar (blur).
 function initRealtimeValidation() {
     const form = document.getElementById('user-form');
     if (!form) return;
@@ -177,6 +235,78 @@ function initRealtimeValidation() {
         el.addEventListener('input', () => clearFieldError(el));
         el.addEventListener('change', () => clearFieldError(el));
     });
+
+    const saveBtn = document.getElementById('btn-save-user');
+    if (saveBtn) {
+        saveBtn.addEventListener('mousedown', () => {
+            isUserFormSubmittingOrClosing = true;
+            setTimeout(() => { isUserFormSubmittingOrClosing = false; }, 400);
+        });
+    }
+
+    const modal = document.getElementById('user-modal');
+    if (modal) {
+        modal.querySelectorAll('[data-bs-close-modal], .btn-close').forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                isUserFormSubmittingOrClosing = true;
+                setTimeout(() => { isUserFormSubmittingOrClosing = false; }, 400);
+            });
+        });
+    }
+
+    const nombreInput = document.getElementById('nombre_completo');
+    if (nombreInput) {
+        nombreInput.addEventListener('blur', (e) => {
+            if (shouldSkipUserBlur(e)) return;
+            if (!nombreInput.value.trim()) {
+                applyUserFieldError('nombre_completo', 'Este campo es obligatorio.');
+            }
+        });
+    }
+
+    const userInput = document.getElementById('username');
+    if (userInput) {
+        userInput.addEventListener('blur', (e) => {
+            if (shouldSkipUserBlur(e)) return;
+            if (!userInput.value.trim()) {
+                applyUserFieldError('username', 'Este campo es obligatorio.');
+            }
+        });
+    }
+
+    const passInput = document.getElementById('password');
+    if (passInput) {
+        passInput.addEventListener('blur', (e) => {
+            if (shouldSkipUserBlur(e)) return;
+            const isCreate = !document.getElementById('user-id')?.value;
+            const val = passInput.value;
+            if (isCreate && !val) {
+                applyUserFieldError('password', 'Este campo es obligatorio.');
+            } else if (val && val.length < 6) {
+                applyUserFieldError('password', 'Debe tener al menos 6 caracteres.');
+            }
+        });
+    }
+
+    const rolSelect = document.getElementById('id_rol');
+    if (rolSelect) {
+        rolSelect.addEventListener('blur', (e) => {
+            if (shouldSkipUserBlur(e)) return;
+            if (!rolSelect.value || isNaN(parseInt(rolSelect.value, 10))) {
+                applyUserFieldError('id_rol', 'Seleccione una opción.');
+            }
+        });
+    }
+
+    const estadoSelect = document.getElementById('estado');
+    if (estadoSelect) {
+        estadoSelect.addEventListener('blur', (e) => {
+            if (shouldSkipUserBlur(e)) return;
+            if (!estadoSelect.value) {
+                applyUserFieldError('estado', 'Seleccione una opción.');
+            }
+        });
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -490,22 +620,72 @@ async function viewUserDetail(userId) {
 // Guardar (crear o actualizar)
 async function saveUser(event) {
     event.preventDefault();
+    isUserFormSubmittingOrClosing = false;
     clearValidationErrors();
-    setSaving(true);
 
     const id = document.getElementById('user-id').value;
-    const password = document.getElementById('password').value;
+    const nombreCompleto = document.getElementById('nombre_completo')?.value?.trim() || '';
+    const username = document.getElementById('username')?.value?.trim() || '';
+    const password = document.getElementById('password')?.value || '';
+    const rolVal = document.getElementById('id_rol')?.value || '';
     const estadoSel = document.getElementById('estado');
+    const estadoVal = estadoSel ? estadoSel.value : '';
+
+    let hasClientErrors = false;
+    let firstInvalidEl = null;
+
+    function markInvalid(fieldId, errorMsg) {
+        applyUserFieldError(fieldId, errorMsg);
+        hasClientErrors = true;
+        if (!firstInvalidEl) {
+            firstInvalidEl = document.getElementById(fieldId);
+        }
+    }
+
+    if (!nombreCompleto) {
+        markInvalid('nombre_completo', 'Este campo es obligatorio.');
+    }
+
+    if (!username) {
+        markInvalid('username', 'Este campo es obligatorio.');
+    }
+
+    if (!id) {
+        if (!password) {
+            markInvalid('password', 'Este campo es obligatorio.');
+        } else if (password.length < 6) {
+            markInvalid('password', 'Debe tener al menos 6 caracteres.');
+        }
+    } else {
+        if (password && password.length < 6) {
+            markInvalid('password', 'Debe tener al menos 6 caracteres.');
+        }
+    }
+
+    const idRol = parseInt(rolVal, 10);
+    if (!rolVal || isNaN(idRol) || idRol <= 0) {
+        markInvalid('id_rol', 'Seleccione una opción.');
+    }
+
+    if (!estadoVal) {
+        markInvalid('estado', 'Seleccione una opción.');
+    }
+
+    if (hasClientErrors) {
+        if (firstInvalidEl) firstInvalidEl.focus();
+        showFormBanner('Por favor complete todos los campos obligatorios correctamente.', 'danger');
+        return;
+    }
+
+    setSaving(true);
 
     // Payload con las claves exactas de Pydantic (UsuarioCreate / UsuarioUpdate).
-    // `estado` solo se envía si el usuario eligió una opción (evita sobrescribir
-    // el valor por defecto y no dispara el dirty check con el placeholder vacío).
     const payload = {
-        nombre_completo: document.getElementById('nombre_completo').value.trim(),
-        username: document.getElementById('username').value.trim(),
-        id_rol: parseInt(document.getElementById('id_rol').value, 10),
+        nombre_completo: nombreCompleto,
+        username: username,
+        id_rol: idRol,
     };
-    if (estadoSel && estadoSel.value) payload.estado = estadoSel.value;
+    if (estadoVal) payload.estado = estadoVal;
 
     if (id) {
         // En edición se omite la contraseña si va en blanco (no se sobrescribe).
@@ -628,4 +808,77 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#users-view th.sortable').forEach((th) => {
         th.addEventListener('click', () => toggleSort(th.getAttribute('data-sort')));
     });
+    // Reporte descargable
+    const btnExcel = document.getElementById('btn-report-excel');
+    if (btnExcel) btnExcel.addEventListener('click', (e) => { e.preventDefault(); downloadReport('excel'); });
+    const btnCsv = document.getElementById('btn-report-csv');
+    if (btnCsv) btnCsv.addEventListener('click', (e) => { e.preventDefault(); downloadReport('csv'); });
 });
+
+// ---------------------------------------------------------------------------
+// Reporte descargable (Excel / CSV)
+// ---------------------------------------------------------------------------
+
+/**
+ * Genera y descarga un reporte de usuarios respetando los filtros activos.
+ * Usa XMLHttpRequest (no fetch) para evitar el interceptor global de app.js.
+ * @param {'excel'|'csv'} fmt
+ */
+function downloadReport(fmt) {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) {
+        showToast('Sesión no iniciada', 'danger');
+        return;
+    }
+
+    // Lee los mismos filtros que loadUsers() con lectura defensiva
+    const name     = document.getElementById('filter-name')?.value?.trim() || '';
+    const roleId   = document.getElementById('filter-role')?.value || '';
+    const isActive = document.getElementById('filter-active')?.value || '';
+    const dateFrom = document.getElementById('filter-from')?.value || '';
+    const dateTo   = document.getElementById('filter-to')?.value || '';
+
+    const params = new URLSearchParams({ format: fmt });
+    if (name)          params.set('name', name);
+    if (roleId)        params.set('role_id', roleId);
+    if (isActive !== '') params.set('is_active', isActive);
+    if (dateFrom)      params.set('created_from', dateFrom);
+    if (dateTo)        params.set('created_to', dateTo);
+
+    const btnLabel = fmt === 'excel' ? 'Excel' : 'CSV';
+    const ext      = fmt === 'excel' ? 'xlsx' : 'csv';
+    const fecha    = new Date().toISOString().slice(0, 10);
+    const filename = `reporte_usuarios_${fecha}.${ext}`;
+
+    showToast(`Generando reporte ${btnLabel}…`, 'info');
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', `${USERS_API}/reporte?${params.toString()}`, true);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.responseType = 'blob';
+
+    xhr.onload = function () {
+        if (xhr.status === 200) {
+            const blob = new Blob([xhr.response]);
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`Reporte ${btnLabel} descargado correctamente`, 'success');
+        } else if (xhr.status === 401) {
+            showToast('Sesión expirada, vuelve a iniciar sesión', 'danger');
+        } else {
+            showToast(`Error al generar el reporte ${btnLabel} (${xhr.status})`, 'danger');
+        }
+    };
+
+    xhr.onerror = function () {
+        showToast('Error de red al descargar el reporte', 'danger');
+    };
+
+    xhr.send();
+}

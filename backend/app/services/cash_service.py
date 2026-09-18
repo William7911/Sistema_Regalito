@@ -1,7 +1,8 @@
+from decimal import Decimal
 from typing import Optional, List
 from datetime import datetime
 from fastapi import HTTPException
-from app.db.models import TurnoCaja
+from app.db.models import TurnoCaja, CierreCajaCiegas, DetalleArqueoEfectivo
 from app.interfaces.services import CashRegisterService
 from app.schemas import schemas
 
@@ -119,3 +120,95 @@ class ConcreteCashService(CashRegisterService):
     async def list_cajas(self, include_inactive: bool = False) -> List[schemas.CajaOut]:
         cajas = await self.uow.cajas.list_all(include_inactive=include_inactive)
         return [schemas.CajaOut.model_validate(c) for c in cajas]
+
+    async def get_denominaciones(self) -> List[schemas.DenominacionOut]:
+        denoms = await self.uow.turnos.get_denominaciones()
+        return [schemas.DenominacionOut.model_validate(d) for d in denoms]
+
+    async def cerrar_caja_ciegas(
+        self, data: schemas.CierreCiegasCreate, user_id: int, supervisor_id: Optional[int] = None
+    ) -> schemas.CierreCiegasResponse:
+        # 1. Validar turno activo del usuario
+        active_turno = await self.uow.turnos.get_active_by_user(user_id)
+        if not active_turno:
+            raise HTTPException(
+                status_code=400,
+                detail="El usuario no tiene un turno de caja abierto",
+            )
+
+        # 2. Calcular total contado a ciegas sumando denominaciones
+        detalles_model: List[DetalleArqueoEfectivo] = []
+        total_contado = Decimal("0.00")
+
+        for item in data.detalles:
+            denom = await self.uow.turnos.get_denominacion_by_id(item.id_denominacion)
+            if not denom:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"La denominación con ID {item.id_denominacion} no existe",
+                )
+            subtotal = Decimal(str(denom.valor)) * Decimal(item.cantidad_piezas)
+            total_contado += subtotal
+
+            detalles_model.append(
+                DetalleArqueoEfectivo(
+                    id_denominacion=item.id_denominacion,
+                    cantidad_piezas=item.cantidad_piezas,
+                    subtotal=subtotal,
+                )
+            )
+
+        # 3. Calcular saldo teórico del sistema
+        monto_apertura = Decimal(str(active_turno.monto_apertura))
+        ventas_efectivo = await self.uow.turnos.get_efectivo_ventas_turno(active_turno.id_turno)
+        entradas, salidas = await self.uow.turnos.get_movimientos_caja_turno(active_turno.id_turno)
+        total_calculado_sistema = monto_apertura + ventas_efectivo + entradas - salidas
+
+        # 4. Calcular diferencia y determinar estado
+        diferencia = total_contado - total_calculado_sistema
+        if diferencia == 0:
+            estado_cierre = "Cuadrado"
+        elif diferencia > 0:
+            estado_cierre = "Sobrante"
+        else:
+            estado_cierre = "Faltante"
+
+        # 5. Regla RF17: Observaciones obligatorias si hay descuadre
+        obs_limpia = data.observaciones.strip() if data.observaciones else None
+        if diferencia != 0 and not obs_limpia:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Existe un descuadre ({estado_cierre} de Q{abs(diferencia):.2f}). Debe ingresar observaciones justificando la diferencia.",
+            )
+
+        # 6. Registrar CierreCajaCiegas y Detalles
+        cierre = CierreCajaCiegas(
+            id_turno=active_turno.id_turno,
+            id_usuario_cajero=user_id,
+            id_usuario_supervisor=supervisor_id or user_id,
+            total_contado_ciegas=total_contado,
+            total_calculado_sistema=total_calculado_sistema,
+            diferencia=diferencia,
+            observaciones=obs_limpia,
+            fecha_cierre=datetime.now(),
+        )
+
+        # 7. Actualizar y cerrar turno
+        active_turno.fecha_cierre = datetime.now()
+        active_turno.monto_cierre = total_contado
+        active_turno.estado = "Cerrado"
+        active_turno.notas = f"Cierre a ciegas: {estado_cierre} (Dif: Q{diferencia:.2f}). {obs_limpia or ''}".strip()
+
+        try:
+            created_cierre = await self.uow.turnos.create_cierre_ciegas(cierre, detalles_model)
+            await self.uow.turnos.update(active_turno)
+            await self.uow.commit()
+        except Exception:
+            await self.uow.rollback()
+            raise
+
+        fresh_cierre = await self.uow.turnos.get_cierre_ciegas_by_id(created_cierre.id_cierre)
+        resp = schemas.CierreCiegasResponse.model_validate(fresh_cierre)
+        resp.estado_cierre = estado_cierre
+        return resp
+
