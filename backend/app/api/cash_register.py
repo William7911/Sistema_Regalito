@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from typing import Optional, List
-from app.api.deps import get_cash_service, get_current_user
+from app.api.deps import get_cash_service, get_current_user, require_permission
 from app.db.models import Usuario
 from app.services.cash_service import ConcreteCashService
 from app.schemas import schemas
@@ -24,6 +24,25 @@ async def close_cash_register(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await service.cerrar_caja(turno_data, current_user.id_usuario)
+
+
+@router.get("/denominaciones", response_model=List[schemas.DenominacionOut])
+async def get_denominaciones(
+    service: ConcreteCashService = Depends(get_cash_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Retorna el catálogo de denominaciones de efectivo para realizar arqueos."""
+    return await service.get_denominaciones()
+
+
+@router.post("/cierre-ciegas", response_model=schemas.CierreCiegasResponse)
+async def close_cash_register_blind(
+    cierre_data: schemas.CierreCiegasCreate,
+    service: ConcreteCashService = Depends(get_cash_service),
+    current_user: Usuario = Depends(require_permission("CAJA_CIERRE_CIEGAS")),
+):
+    """Cierre de caja a ciegas (RF17): el cajero cuenta piezas de efectivo y el sistema determina diferencias."""
+    return await service.cerrar_caja_ciegas(cierre_data, current_user.id_usuario)
 
 
 @router.get("/estado-actual", response_model=Optional[schemas.TurnoResponse])

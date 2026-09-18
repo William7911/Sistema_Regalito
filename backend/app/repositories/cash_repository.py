@@ -1,9 +1,20 @@
-from typing import Optional, List
+from decimal import Decimal
+from typing import Optional, List, Tuple
 from datetime import datetime
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from app.db.models import Caja, TurnoCaja, Usuario
+from app.db.models import (
+    Caja,
+    TurnoCaja,
+    Usuario,
+    DenominacionEfectivo,
+    CierreCajaCiegas,
+    DetalleArqueoEfectivo,
+    Venta,
+    PagoVenta,
+    MovimientoCaja,
+)
 from app.interfaces.repositories import CajaRepository, TurnoCajaRepository
 
 _TURNO_LOADS = (
@@ -175,4 +186,73 @@ class TurnoCajaRepositoryImpl(TurnoCajaRepository):
         await self.db.flush()
         await self.db.refresh(turno)
         return turno
+
+    async def get_denominaciones(self) -> List[DenominacionEfectivo]:
+        stmt = select(DenominacionEfectivo).order_by(DenominacionEfectivo.valor.asc())
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_denominacion_by_id(self, id_denominacion: int) -> Optional[DenominacionEfectivo]:
+        stmt = select(DenominacionEfectivo).where(DenominacionEfectivo.id_denominacion == id_denominacion)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_efectivo_ventas_turno(self, id_turno: int) -> Decimal:
+        """Calcula el total neto en efectivo cobrado en las ventas del turno.
+        (monto_recibido - vuelto_entregado) para método de pago en efectivo (id=1)."""
+        stmt = (
+            select(func.coalesce(func.sum(PagoVenta.monto_recibido - PagoVenta.vuelto_entregado), 0))
+            .select_from(PagoVenta)
+            .join(Venta, PagoVenta.id_venta == Venta.id_venta)
+            .where(
+                Venta.id_turno == id_turno,
+                Venta.estado != "Anulada",
+                PagoVenta.id_metodo_pago == 1,
+            )
+        )
+        result = await self.db.execute(stmt)
+        return Decimal(str(result.scalar_one()))
+
+    async def get_movimientos_caja_turno(self, id_turno: int) -> Tuple[Decimal, Decimal]:
+        """Calcula (total_entradas, total_salidas) de movimientos de caja para el turno."""
+        # Suponiendo tipo_movimiento 1=Entrada, 2=Salida o según convención
+        stmt_in = (
+            select(func.coalesce(func.sum(MovimientoCaja.monto), 0))
+            .select_from(MovimientoCaja)
+            .where(MovimientoCaja.id_turno == id_turno, MovimientoCaja.id_tipo_movimiento == 1)
+        )
+        stmt_out = (
+            select(func.coalesce(func.sum(MovimientoCaja.monto), 0))
+            .select_from(MovimientoCaja)
+            .where(MovimientoCaja.id_turno == id_turno, MovimientoCaja.id_tipo_movimiento == 2)
+        )
+        res_in = await self.db.execute(stmt_in)
+        res_out = await self.db.execute(stmt_out)
+        return Decimal(str(res_in.scalar_one())), Decimal(str(res_out.scalar_one()))
+
+    async def create_cierre_ciegas(
+        self, cierre: CierreCajaCiegas, detalles: List[DetalleArqueoEfectivo]
+    ) -> CierreCajaCiegas:
+        self.db.add(cierre)
+        await self.db.flush()
+        await self.db.refresh(cierre)
+
+        for det in detalles:
+            det.id_cierre = cierre.id_cierre
+            self.db.add(det)
+
+        await self.db.flush()
+        return cierre
+
+    async def get_cierre_ciegas_by_id(self, id_cierre: int) -> Optional[CierreCajaCiegas]:
+        stmt = (
+            select(CierreCajaCiegas)
+            .options(
+                selectinload(CierreCajaCiegas.detalles_arqueo).selectinload(DetalleArqueoEfectivo.denominacion),
+                selectinload(CierreCajaCiegas.turno),
+            )
+            .where(CierreCajaCiegas.id_cierre == id_cierre)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 

@@ -10,6 +10,9 @@ from datetime import datetime
 class Token(BaseModel):
     access_token: str
     token_type: str
+    rol: Optional[str] = None
+    permisos: List[str] = []
+    nombre_completo: Optional[str] = None
 
 class TokenData(BaseModel):
     username: Optional[str] = None
@@ -307,3 +310,47 @@ class TurnoFilter(BaseModel):
 class TurnoList(BaseModel):
     total: int
     items: List[TurnoResponse]
+
+
+class DenominacionOut(BaseModel):
+    id_denominacion: int
+    valor: Decimal
+    tipo: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ArqueoItemCreate(BaseModel):
+    id_denominacion: int
+    cantidad_piezas: int = Field(..., ge=0)
+
+
+class CierreCiegasCreate(BaseModel):
+    detalles: List[ArqueoItemCreate] = Field(..., min_length=1)
+    observaciones: Optional[str] = Field(default=None, max_length=255)
+
+
+class DetalleArqueoOut(BaseModel):
+    id_detalle_arqueo: int
+    id_denominacion: int
+    cantidad_piezas: int
+    subtotal: Decimal
+    denominacion: Optional[DenominacionOut] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CierreCiegasResponse(BaseModel):
+    id_cierre: int
+    id_turno: int
+    id_usuario_cajero: int
+    id_usuario_supervisor: int
+    total_contado_ciegas: Decimal
+    total_calculado_sistema: Decimal
+    diferencia: Decimal
+    estado_cierre: Optional[str] = "Cuadrado"
+    observaciones: Optional[str] = None
+    fecha_cierre: datetime
+    detalles_arqueo: List[DetalleArqueoOut] = []
+
+    model_config = ConfigDict(from_attributes=True)

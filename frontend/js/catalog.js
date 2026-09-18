@@ -91,8 +91,12 @@ function renderCatalogFieldErrors(formId, detail) {
     if (!Array.isArray(detail)) return;
     detail.forEach((err) => {
         const field = err.loc && err.loc.length ? err.loc[err.loc.length - 1] : null;
-        const msg = translateValidation(err.msg || 'Valor inválido');
         const input = field ? inputFor(formId, field) : null;
+        const isSelect = (input && input.tagName && input.tagName.toUpperCase() === 'SELECT') ||
+            (field && (field.startsWith('id_') || field === 'estado' || field.includes('sucursal') || field.includes('subcategoria') || field.includes('unidad') || field.includes('rol')));
+        const msg = typeof translateValidation === 'function'
+            ? translateValidation(err.msg || 'Valor inválido', isSelect, field)
+            : (isSelect ? 'Seleccione una opción.' : (err.msg || 'Valor inválido'));
         const fb = field ? feedbackFor(formId, field) : null;
         if (input && fb) {
             input.classList.add('is-invalid');
@@ -115,7 +119,25 @@ async function handleCatalogApiError(res, formId) {
     }
 }
 
-// Limpieza en tiempo real (micro-interacción).
+function applyCatalogFieldError(formId, fieldId, errorMsg) {
+    const input = inputFor(formId, fieldId);
+    const fb = feedbackFor(formId, fieldId);
+    if (input) input.classList.add('is-invalid');
+    if (fb) fb.textContent = errorMsg;
+}
+
+let isCatalogFormSubmittingOrClosing = false;
+
+function shouldSkipCatalogBlur(formId, e) {
+    if (isCatalogFormSubmittingOrClosing) return true;
+    const rt = e && e.relatedTarget;
+    if (rt && rt.closest && rt.closest('#btn-save-product, #btn-save-category, [type="submit"], [data-bs-close-modal], .btn-close')) {
+        return true;
+    }
+    return false;
+}
+
+// Limpieza en tiempo real al teclear y validación visual al desenfocar (blur).
 function initCatalogRealtimeValidation(formId) {
     const form = document.getElementById(formId);
     if (!form) return;
@@ -123,6 +145,142 @@ function initCatalogRealtimeValidation(formId) {
         el.addEventListener('input', () => clearCatalogFieldError(formId, el));
         el.addEventListener('change', () => clearCatalogFieldError(formId, el));
     });
+
+    const submitBtn = (form.querySelector && form.querySelector('button[type="submit"]')) || document.getElementById('btn-save-product');
+    if (submitBtn && submitBtn.addEventListener) {
+        submitBtn.addEventListener('mousedown', () => {
+            isCatalogFormSubmittingOrClosing = true;
+            setTimeout(() => { isCatalogFormSubmittingOrClosing = false; }, 400);
+        });
+    }
+
+    const modal = (form.closest && form.closest('.modal')) || document.getElementById(formId.replace('-form', '-modal'));
+    if (modal && modal.querySelectorAll) {
+        modal.querySelectorAll('[data-bs-close-modal], .btn-close').forEach(btn => {
+            if (btn && btn.addEventListener) {
+                btn.addEventListener('mousedown', () => {
+                    isCatalogFormSubmittingOrClosing = true;
+                    setTimeout(() => { isCatalogFormSubmittingOrClosing = false; }, 400);
+                });
+            }
+        });
+    }
+
+    if (formId === 'product-form') {
+        const subcatInput = inputFor(formId, 'id_subcategoria');
+        if (subcatInput) {
+            subcatInput.addEventListener('blur', (e) => {
+                if (shouldSkipCatalogBlur(formId, e)) return;
+                if (!subcatInput.value) {
+                    applyCatalogFieldError(formId, 'id_subcategoria', 'Seleccione una opción.');
+                }
+            });
+        }
+
+        const unidadInput = inputFor(formId, 'id_unidad');
+        if (unidadInput) {
+            unidadInput.addEventListener('blur', (e) => {
+                if (shouldSkipCatalogBlur(formId, e)) return;
+                if (!unidadInput.value) {
+                    applyCatalogFieldError(formId, 'id_unidad', 'Seleccione una opción.');
+                }
+            });
+        }
+
+        const sucursalInput = inputFor(formId, 'id_sucursal');
+        if (sucursalInput) {
+            sucursalInput.addEventListener('blur', (e) => {
+                if (shouldSkipCatalogBlur(formId, e)) return;
+                if (!sucursalInput.value) {
+                    applyCatalogFieldError(formId, 'id_sucursal', 'Seleccione una opción.');
+                }
+            });
+        }
+
+        const nombreInput = inputFor(formId, 'nombre');
+        if (nombreInput) {
+            nombreInput.addEventListener('blur', (e) => {
+                if (shouldSkipCatalogBlur(formId, e)) return;
+                if (!nombreInput.value.trim()) {
+                    applyCatalogFieldError(formId, 'nombre', 'Este campo es obligatorio.');
+                }
+            });
+        }
+
+        const precioDetalleInput = inputFor(formId, 'precio_detalle');
+        if (precioDetalleInput) {
+            precioDetalleInput.addEventListener('blur', (e) => {
+                if (shouldSkipCatalogBlur(formId, e)) return;
+                const val = precioDetalleInput.value.trim();
+                if (!val) {
+                    applyCatalogFieldError(formId, 'precio_detalle', 'Este campo es obligatorio.');
+                } else {
+                    const num = parseFloat(val);
+                    if (isNaN(num) || num <= 0) {
+                        applyCatalogFieldError(formId, 'precio_detalle', 'Ingrese un precio de venta mayor a 0 (ej. 15.00).');
+                    }
+                }
+            });
+        }
+
+        const precioMayoreoInput = inputFor(formId, 'precio_mayoreo');
+        if (precioMayoreoInput) {
+            precioMayoreoInput.addEventListener('blur', (e) => {
+                if (shouldSkipCatalogBlur(formId, e)) return;
+                const val = precioMayoreoInput.value.trim();
+                if (!val) {
+                    applyCatalogFieldError(formId, 'precio_mayoreo', 'Este campo es obligatorio.');
+                } else {
+                    const num = parseFloat(val);
+                    if (isNaN(num) || num <= 0) {
+                        applyCatalogFieldError(formId, 'precio_mayoreo', 'Ingrese un precio mayorista mayor a 0 (ej. 12.00).');
+                    }
+                }
+            });
+        }
+
+        const stockActualInput = inputFor(formId, 'stock_actual');
+        if (stockActualInput) {
+            stockActualInput.addEventListener('blur', (e) => {
+                if (shouldSkipCatalogBlur(formId, e)) return;
+                const val = stockActualInput.value.trim();
+                if (val === '') {
+                    applyCatalogFieldError(formId, 'stock_actual', 'Este campo es obligatorio.');
+                } else {
+                    const num = parseInt(val, 10);
+                    if (isNaN(num) || num < 0) {
+                        applyCatalogFieldError(formId, 'stock_actual', 'El stock inicial debe ser 0 o superior.');
+                    }
+                }
+            });
+        }
+
+        const stockMinimoInput = inputFor(formId, 'stock_minimo');
+        if (stockMinimoInput) {
+            stockMinimoInput.addEventListener('blur', (e) => {
+                if (shouldSkipCatalogBlur(formId, e)) return;
+                const val = stockMinimoInput.value.trim();
+                if (val === '') {
+                    applyCatalogFieldError(formId, 'stock_minimo', 'Este campo es obligatorio.');
+                } else {
+                    const num = parseInt(val, 10);
+                    if (isNaN(num) || num < 0) {
+                        applyCatalogFieldError(formId, 'stock_minimo', 'El stock mínimo debe ser 0 o superior.');
+                    }
+                }
+            });
+        }
+    } else if (formId === 'category-form') {
+        const nameInput = inputFor(formId, 'name');
+        if (nameInput) {
+            nameInput.addEventListener('blur', (e) => {
+                if (shouldSkipCatalogBlur(formId, e)) return;
+                if (!nameInput.value.trim()) {
+                    applyCatalogFieldError(formId, 'name', 'Este campo es obligatorio.');
+                }
+            });
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -561,31 +719,129 @@ function setProductSaving(saving) {
 
 async function saveProduct(event) {
     event.preventDefault();
+    isCatalogFormSubmittingOrClosing = false;
     clearCatalogErrors('product-form');
+
+    const formId = 'product-form';
+    let hasClientErrors = false;
+
+    function applyFieldError(fieldId, errorMsg) {
+        const input = inputFor(formId, fieldId);
+        const fb = feedbackFor(formId, fieldId);
+        if (input) input.classList.add('is-invalid');
+        if (fb) fb.textContent = errorMsg;
+        hasClientErrors = true;
+    }
+
+    const id = inputFor(formId, 'product-id')?.value || '';
+    const rawSubcat = inputFor(formId, 'id_subcategoria')?.value || '';
+    const rawUnidad = inputFor(formId, 'id_unidad')?.value || '';
+    const rawSucursal = inputFor(formId, 'id_sucursal')?.value || '';
+    const rawNombre = inputFor(formId, 'nombre')?.value?.trim() || '';
+    const rawPrecioDetalle = inputFor(formId, 'precio_detalle')?.value || '';
+    const rawPrecioMayoreo = inputFor(formId, 'precio_mayoreo')?.value || '';
+    const rawCosto = inputFor(formId, 'costo_promedio')?.value || '0';
+    const rawStock = inputFor(formId, 'stock_actual')?.value?.trim() ?? '';
+    const rawStockMin = inputFor(formId, 'stock_minimo')?.value?.trim() ?? '';
+
+    // =========================================================================
+    // VALIDACIÓN DE UNA SOLA PASADA (Single-pass validation)
+    // Se evalúan TODOS los campos obligatorios simultáneamente en el primer clic.
+    // =========================================================================
+
+    // 1. Subcategoría (Select obligatorio)
+    if (!rawSubcat) {
+        applyFieldError('id_subcategoria', 'Seleccione una opción.');
+    }
+
+    // 2. Unidad de medida (Select obligatorio)
+    if (!rawUnidad) {
+        applyFieldError('id_unidad', 'Seleccione una opción.');
+    }
+
+    // 3. Sucursal (Select obligatorio - PROBLEMA 1)
+    if (!rawSucursal) {
+        applyFieldError('id_sucursal', 'Seleccione una opción.');
+    }
+
+    // 4. Nombre (Texto obligatorio)
+    if (!rawNombre) {
+        applyFieldError('nombre', 'Este campo es obligatorio.');
+    }
+
+    // 5. Precio Detalle (Numérico > 0 obligatorio)
+    const numPrecioDetalle = parseFloat(rawPrecioDetalle);
+    if (!rawPrecioDetalle) {
+        applyFieldError('precio_detalle', 'Este campo es obligatorio.');
+    } else if (isNaN(numPrecioDetalle) || numPrecioDetalle <= 0) {
+        applyFieldError('precio_detalle', 'Ingrese un precio de venta mayor a 0 (ej. 15.00).');
+    }
+
+    // 6. Precio Mayoreo (Numérico > 0 obligatorio)
+    const numPrecioMayoreo = parseFloat(rawPrecioMayoreo);
+    if (!rawPrecioMayoreo) {
+        applyFieldError('precio_mayoreo', 'Este campo es obligatorio.');
+    } else if (isNaN(numPrecioMayoreo) || numPrecioMayoreo <= 0) {
+        applyFieldError('precio_mayoreo', 'Ingrese un precio mayorista mayor a 0 (ej. 12.00).');
+    }
+
+    // 7. Costo Promedio (Numérico >= 0)
+    const numCosto = parseFloat(rawCosto || '0');
+    if (isNaN(numCosto) || numCosto < 0) {
+        applyFieldError('costo_promedio', 'El costo promedio no puede ser un número negativo.');
+    }
+
+    // 8. Stock Actual (PROBLEMA 2 - Cero fallback destructivo, obligatorio)
+    if (rawStock === '' || rawStock === null || rawStock === undefined) {
+        applyFieldError('stock_actual', 'Este campo es obligatorio.');
+    } else {
+        const numStock = parseInt(rawStock, 10);
+        if (isNaN(numStock) || numStock < 0) {
+            applyFieldError('stock_actual', 'El stock inicial debe ser 0 o superior.');
+        }
+    }
+
+    // 9. Stock Mínimo (PROBLEMA 2 - Cero fallback destructivo, obligatorio)
+    if (rawStockMin === '' || rawStockMin === null || rawStockMin === undefined) {
+        applyFieldError('stock_minimo', 'Este campo es obligatorio.');
+    } else {
+        const numStockMin = parseInt(rawStockMin, 10);
+        if (isNaN(numStockMin) || numStockMin < 0) {
+            applyFieldError('stock_minimo', 'El stock mínimo debe ser 0 o superior.');
+        }
+    }
+
+    // Si cualquier campo falló, enfocar el primer elemento inválido y detener envío
+    if (hasClientErrors) {
+        const firstInvalid = document.querySelector(`#${formId} .is-invalid`);
+        if (firstInvalid) firstInvalid.focus();
+        setCatalogBanner(`${formId}-alert`, 'Por favor complete todos los campos obligatorios correctamente.');
+        return;
+    }
+
     setProductSaving(true);
 
-    const id = inputFor('product-form', 'product-id').value;
     const payload = {
-        id_subcategoria: parseInt(inputFor('product-form', 'id_subcategoria').value, 10),
-        id_unidad: parseInt(inputFor('product-form', 'id_unidad').value, 10),
-        nombre: inputFor('product-form', 'nombre').value.trim(),
-        descripcion: inputFor('product-form', 'descripcion').value.trim() || null,
+        id_subcategoria: parseInt(rawSubcat, 10),
+        id_unidad: parseInt(rawUnidad, 10),
+        nombre: rawNombre,
+        descripcion: inputFor(formId, 'descripcion')?.value?.trim() || null,
         variante: {
-            codigo_barras: inputFor('product-form', 'codigo_barras').value.trim() || null,
-            talla: inputFor('product-form', 'talla').value.trim() || null,
-            color: inputFor('product-form', 'color').value.trim() || null,
-            precio_detalle: parseFloat(inputFor('product-form', 'precio_detalle').value),
-            precio_mayoreo: parseFloat(inputFor('product-form', 'precio_mayoreo').value),
-            costo_promedio: parseFloat(inputFor('product-form', 'costo_promedio').value || '0'),
+            codigo_barras: inputFor(formId, 'codigo_barras')?.value?.trim() || null,
+            talla: inputFor(formId, 'talla')?.value?.trim() || null,
+            color: inputFor(formId, 'color')?.value?.trim() || null,
+            precio_detalle: numPrecioDetalle,
+            precio_mayoreo: numPrecioMayoreo,
+            costo_promedio: numCosto,
         },
         inventario: {
-            id_sucursal: parseInt(inputFor('product-form', 'id_sucursal').value, 10),
-            id_area: parseInt(inputFor('product-form', 'id_area').value, 10) || null,
-            stock_actual: parseInt(inputFor('product-form', 'stock_actual').value || '0', 10),
-            stock_minimo: parseInt(inputFor('product-form', 'stock_minimo').value || '0', 10),
+            id_sucursal: parseInt(rawSucursal, 10),
+            id_area: parseInt(inputFor(formId, 'id_area')?.value, 10) || null,
+            stock_actual: numStock,
+            stock_minimo: numStockMin,
         },
     };
-    if (id) payload.estado = inputFor('product-form', 'product_is_active').checked ? 'Activo' : 'Inactivo';
+    if (id) payload.estado = inputFor(formId, 'product_is_active')?.checked ? 'Activo' : 'Inactivo';
 
     const url = id ? `${PRODUCTS_API}/${id}` : PRODUCTS_API;
     const method = id ? 'PUT' : 'POST';
@@ -593,7 +849,7 @@ async function saveProduct(event) {
     try {
         const res = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(payload) });
         if (!res.ok) {
-            await handleCatalogApiError(res, 'product-form');
+            await handleCatalogApiError(res, formId);
             return;
         }
         const modal = getModal('product-modal');
@@ -685,12 +941,27 @@ function setCategorySaving(saving) {
 
 async function saveCategory(event) {
     event.preventDefault();
+    isCatalogFormSubmittingOrClosing = false;
     clearCatalogErrors('category-form');
+
+    const nameVal = inputFor('category-form', 'name')?.value?.trim() || '';
+    if (!nameVal) {
+        const input = inputFor('category-form', 'name');
+        const fb = feedbackFor('category-form', 'name');
+        if (input) {
+            input.classList.add('is-invalid');
+            input.focus();
+        }
+        if (fb) fb.textContent = 'Este campo es obligatorio.';
+        setCatalogBanner('category-form-alert', 'Por favor ingrese el nombre de la categoría.');
+        return;
+    }
+
     setCategorySaving(true);
 
     const id = inputFor('category-form', 'category-id').value;
     const payload = {
-        nombre: inputFor('category-form', 'name').value.trim(),
+        nombre: nameVal,
     };
     if (id) payload.estado = inputFor('category-form', 'category_is_active').checked ? 'Activo' : 'Inactivo';
 
