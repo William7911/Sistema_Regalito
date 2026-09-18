@@ -87,53 +87,105 @@ class CategoryService(ABC):
     """Contrato de la lógica de negocio de Categorías."""
 
     @abstractmethod
-    async def list_categories(self, include_inactive: bool = False) -> List[schemas.Category]:
+    async def list_categories(self, include_inactive: bool = False) -> List[schemas.CategoriaOut]:
         ...
 
     @abstractmethod
-    async def get_category(self, category_id: int) -> schemas.Category:
+    async def get_category(self, category_id: int) -> schemas.CategoriaOut:
         ...
 
     @abstractmethod
-    async def create_category(self, data: schemas.CategoryCreate) -> schemas.Category:
+    async def create_category(self, data: schemas.CategoriaCreate) -> schemas.CategoriaOut:
         ...
 
     @abstractmethod
     async def update_category(
-        self, category_id: int, data: schemas.CategoryUpdate
-    ) -> schemas.Category:
+        self, category_id: int, data: schemas.CategoriaUpdate
+    ) -> schemas.CategoriaOut:
         ...
 
     @abstractmethod
-    async def deactivate_category(self, category_id: int) -> schemas.Category:
+    async def deactivate_category(self, category_id: int) -> schemas.CategoriaOut:
         ...
 
 
 class ProductService(ABC):
-    """Contrato de la lógica de negocio de Productos."""
+    """Contrato de la lógica de negocio de Productos (inserción anidada)."""
 
     @abstractmethod
-    async def list_products(self, filters: schemas.ProductFilter) -> List[schemas.Product]:
+    async def list_products(self, filters: schemas.ProductoFilter) -> List[schemas.ProductoOut]:
         ...
 
     @abstractmethod
-    async def get_product(self, product_id: int) -> schemas.Product:
+    async def count_products(self, filters: schemas.ProductoFilter) -> int:
         ...
 
     @abstractmethod
-    async def get_by_barcode(self, barcode: str) -> schemas.Product:
+    async def get_product(self, product_id: int) -> schemas.ProductoOut:
         ...
 
     @abstractmethod
-    async def create_product(self, data: schemas.ProductCreate) -> schemas.Product:
+    async def get_by_barcode(self, barcode: str) -> schemas.ProductoOut:
+        ...
+
+    @abstractmethod
+    async def create_product(self, data: schemas.ProductoCreate) -> schemas.ProductoOut:
         ...
 
     @abstractmethod
     async def update_product(
-        self, product_id: int, data: schemas.ProductUpdate
-    ) -> schemas.Product:
+        self, product_id: int, data: schemas.ProductoUpdate
+    ) -> schemas.ProductoOut:
         ...
 
     @abstractmethod
-    async def deactivate_product(self, product_id: int) -> schemas.Product:
+    async def deactivate_product(self, product_id: int) -> schemas.ProductoOut:
+        ...
+
+
+class CatalogoService(ABC):
+    """Contrato de la lógica de negocio de catálogos de apoyo (dropdowns)."""
+
+    @abstractmethod
+    async def list_subcategorias(self, include_inactive: bool = False) -> List[schemas.SubcategoriaOut]:
+        ...
+
+    @abstractmethod
+    async def list_unidades(self) -> List[schemas.UnidadMedidaOut]:
+        ...
+
+    @abstractmethod
+    async def list_sucursales(self, include_inactive: bool = False) -> List[schemas.SucursalOut]:
+        ...
+
+    @abstractmethod
+    async def list_areas(self, sucursal_id: Optional[int] = None) -> List[schemas.AreaBodegaOut]:
+        ...
+
+
+class CashRegisterService(ABC):
+    """Contrato de la lógica de negocio de Caja y Turnos."""
+
+    @abstractmethod
+    async def abrir_caja(self, data: schemas.TurnoApertura, user_id: int) -> schemas.TurnoResponse:
+        ...
+
+    @abstractmethod
+    async def cerrar_caja(self, data: schemas.TurnoCierre, user_id: int) -> schemas.TurnoResponse:
+        ...
+
+    @abstractmethod
+    async def get_estado_actual(self, user_id: int) -> Optional[schemas.TurnoResponse]:
+        ...
+
+    @abstractmethod
+    async def list_turnos(self, filters: schemas.TurnoFilter) -> List[schemas.TurnoResponse]:
+        ...
+
+    @abstractmethod
+    async def count_turnos(self, filters: schemas.TurnoFilter) -> int:
+        ...
+
+    @abstractmethod
+    async def list_cajas(self, include_inactive: bool = False) -> List[schemas.CajaOut]:
         ...

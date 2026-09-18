@@ -4,18 +4,21 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError, jwt
 from app.db.database import get_db
-from app.db.models import User
+from app.db.models import Usuario
 from app.core.config import settings
 from app.repositories.category_repository import CategoryRepositoryImpl
 from app.repositories.product_repository import ProductRepositoryImpl
 from app.repositories.role_repository import RoleRepositoryImpl
 from app.repositories.department_repository import DepartmentRepositoryImpl
 from app.repositories.user_repository import UserRepositoryImpl
+from app.repositories.cash_repository import CajaRepositoryImpl, TurnoCajaRepositoryImpl
 from app.services.category_service import ConcreteCategoryService
 from app.services.product_service import ConcreteProductService
+from app.services.catalogo_service import ConcreteCatalogoService
 from app.services.role_service import ConcreteRoleService
 from app.services.department_service import ConcreteDepartmentService
 from app.services.user_service import ConcreteUserService
+from app.services.cash_service import ConcreteCashService
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
@@ -48,11 +51,19 @@ class UnitOfWork:
     def users(self):
         return UserRepositoryImpl(self.db)
 
+    @property
+    def cajas(self):
+        return CajaRepositoryImpl(self.db)
+
+    @property
+    def turnos(self):
+        return TurnoCajaRepositoryImpl(self.db)
+
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
-) -> User:
+) -> Usuario:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -66,7 +77,7 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    result = await db.execute(select(User).where(User.username == username))
+    result = await db.execute(select(Usuario).where(Usuario.username == username))
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
@@ -80,8 +91,12 @@ def get_category_service(db: AsyncSession = Depends(get_db)) -> ConcreteCategory
 
 def get_product_service(db: AsyncSession = Depends(get_db)) -> ConcreteProductService:
     product_repository = ProductRepositoryImpl(db)
-    category_repository = CategoryRepositoryImpl(db)
-    return ConcreteProductService(product_repository, category_repository)
+    return ConcreteProductService(product_repository)
+
+
+def get_catalogo_service(db: AsyncSession = Depends(get_db)) -> ConcreteCatalogoService:
+    product_repository = ProductRepositoryImpl(db)
+    return ConcreteCatalogoService(db, product_repository)
 
 
 def get_role_service(db: AsyncSession = Depends(get_db)) -> ConcreteRoleService:
@@ -94,3 +109,7 @@ def get_department_service(db: AsyncSession = Depends(get_db)) -> ConcreteDepart
 
 def get_user_service(db: AsyncSession = Depends(get_db)) -> ConcreteUserService:
     return ConcreteUserService(UnitOfWork(db))
+
+
+def get_cash_service(db: AsyncSession = Depends(get_db)) -> ConcreteCashService:
+    return ConcreteCashService(UnitOfWork(db))

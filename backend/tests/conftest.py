@@ -6,6 +6,7 @@ from app.db import models  # noqa: F401  (registra las tablas en Base)
 from app.repositories.role_repository import RoleRepositoryImpl
 from app.repositories.department_repository import DepartmentRepositoryImpl
 from app.repositories.user_repository import UserRepositoryImpl
+from app.repositories.cash_repository import CajaRepositoryImpl, TurnoCajaRepositoryImpl
 
 
 class TestUnitOfWork:
@@ -16,6 +17,8 @@ class TestUnitOfWork:
         self.roles = RoleRepositoryImpl(db)
         self.departments = DepartmentRepositoryImpl(db)
         self.users = UserRepositoryImpl(db)
+        self.cajas = CajaRepositoryImpl(db)
+        self.turnos = TurnoCajaRepositoryImpl(db)
 
     async def commit(self):
         await self.db.commit()

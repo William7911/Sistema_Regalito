@@ -1,11 +1,20 @@
 // Módulo de Usuarios - Tienda el Regalito
-// Cero datos quemados: Roles y Departamentos se cargan desde la BD.
+// Migrado al esquema Usuario del DERCAS (id_usuario, id_rol, nombre_completo,
+// username, estado). Cero datos quemados: el Rol se carga desde la BD.
 // Validación visual inline con Bootstrap + notificaciones Toast (sin alert() nativos).
 const USERS_API = '/api/usuarios';
 const ROLES_API = '/api/roles';
-const DEPARTMENTS_API = '/api/departamentos';
 
 let baseSaveText = 'Guardar';
+
+// Estado de paginación y ordenamiento del listado.
+let usersState = {
+    page: 1,
+    pageSize: 10,
+    total: 0,
+    sortBy: 'nombre_completo',
+    sortDir: 'asc',
+};
 
 function authHeaders() {
     const token = localStorage.getItem('jwt_token');
@@ -13,6 +22,17 @@ function authHeaders() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
     };
+}
+
+// Formatea una fecha (ISO/UTC) a DD/MM/YYYY.
+function formatDate(value) {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '-';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
 }
 
 function getModal(id) {
@@ -54,6 +74,12 @@ function confirmModal(message) {
         const modal = new bootstrap.Modal(modalEl);
         msgEl.textContent = message;
         modal.show();
+        // El diálogo de confirmación se muestra sobre cualquier modal abierto
+        // (p. ej. #user-modal). Subimos su z-index y el de su backdrop para que
+        // quede centrado, completamente visible y oscurezca el fondo correctamente.
+        modalEl.style.zIndex = '2000';
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        if (backdrops.length) backdrops[backdrops.length - 1].style.zIndex = '1990';
 
         const cleanup = (val) => {
             modal.hide();
@@ -172,7 +198,8 @@ function setSaving(saving) {
 // ---------------------------------------------------------------------------
 
 async function loadRoles(selectedId = null) {
-    const select = document.getElementById('role_id');
+    const select = document.getElementById('id_rol');
+    if (!select) return;
     select.innerHTML = '<option value="">Cargando roles...</option>';
     try {
         const res = await fetch(ROLES_API, { headers: authHeaders() });
@@ -185,9 +212,9 @@ async function loadRoles(selectedId = null) {
         select.innerHTML = '<option value="">-- Seleccione rol --</option>';
         roles.forEach(r => {
             const opt = document.createElement('option');
-            opt.value = r.id;
-            opt.textContent = r.name;
-            if (selectedId && r.id === selectedId) opt.selected = true;
+            opt.value = r.id_rol;
+            opt.textContent = r.nombre;
+            if (selectedId && String(r.id_rol) === String(selectedId)) opt.selected = true;
             select.appendChild(opt);
         });
     } catch (err) {
@@ -196,27 +223,22 @@ async function loadRoles(selectedId = null) {
     }
 }
 
-async function loadDepartments(selectedId = null) {
-    const select = document.getElementById('department_id');
-    select.innerHTML = '<option value="">Cargando departamentos...</option>';
+// Select del filtro de la tabla (rol), independiente del del modal.
+async function loadRoleFilter() {
+    const select = document.getElementById('filter-role');
+    if (!select) return;
     try {
-        const res = await fetch(DEPARTMENTS_API, { headers: authHeaders() });
-        if (!res.ok) {
-            const errData = await res.json().catch(() => null);
-            showToast((errData && errData.detail) || 'No se pudieron cargar los departamentos', 'danger');
-            return;
-        }
-        const departments = await res.json();
-        select.innerHTML = '<option value="">-- Seleccione departamento --</option>';
-        departments.forEach(d => {
+        const res = await fetch(ROLES_API, { headers: authHeaders() });
+        if (!res.ok) return;
+        const roles = await res.json();
+        select.innerHTML = '<option value="">Todos los roles</option>';
+        roles.forEach(r => {
             const opt = document.createElement('option');
-            opt.value = d.id;
-            opt.textContent = d.name;
-            if (selectedId && d.id === selectedId) opt.selected = true;
+            opt.value = r.id_rol;
+            opt.textContent = r.nombre;
             select.appendChild(opt);
         });
     } catch (err) {
-        select.innerHTML = '<option value="">Sin departamentos disponibles</option>';
         console.error(err);
     }
 }
@@ -228,13 +250,29 @@ async function loadDepartments(selectedId = null) {
 async function loadUsers() {
     const tbody = document.getElementById('users-table-body');
     const empty = document.getElementById('users-empty');
+    if (!tbody) return;
+
     const params = new URLSearchParams();
-    const name = document.getElementById('filter-name').value.trim();
-    const code = document.getElementById('filter-code').value.trim();
-    const isActive = document.getElementById('filter-active').value;
+    const name = (document.getElementById('filter-name')?.value || '').trim();
+    const role = document.getElementById('filter-role')?.value || '';
+    const isActive = document.getElementById('filter-active')?.value ?? '';
+    const from = document.getElementById('filter-from')?.value || '';
+    const to = document.getElementById('filter-to')?.value || '';
+
     if (name) params.append('name', name);
-    if (code) params.append('code', code);
+    if (role) params.append('role_id', role);
     if (isActive !== '') params.append('is_active', isActive);
+    if (from) params.append('created_from', from);
+    if (to) params.append('created_to', to);
+
+    const pageSize = parseInt(document.getElementById('users-page-size')?.value || String(usersState.pageSize || 10), 10) || 10;
+    usersState.pageSize = pageSize;
+    const page = usersState.page || 1;
+
+    params.append('sort_by', usersState.sortBy || 'id_usuario');
+    params.append('sort_dir', usersState.sortDir || 'asc');
+    params.append('limit', pageSize);
+    params.append('offset', (page - 1) * pageSize);
 
     try {
         const res = await fetch(`${USERS_API}?${params.toString()}`, { headers: authHeaders() });
@@ -246,20 +284,26 @@ async function loadUsers() {
         const data = await res.json();
 
         if (data.items.length) {
-            tbody.innerHTML = data.items.map(u => `
+            tbody.innerHTML = data.items.map(u => {
+                const rol = u.rol ? u.rol.nombre : '-';
+                const activo = u.estado === 'Activo';
+                const fecha = u.fecha_creacion ? formatDate(u.fecha_creacion) : '-';
+                return `
                 <tr>
-                    <td>${u.code}</td>
-                    <td>${u.name} ${u.lastname}</td>
+                    <td>${u.id_usuario}</td>
+                    <td>${u.nombre_completo}</td>
                     <td>${u.username}</td>
-                    <td>${u.role ? u.role.name : '-'}</td>
-                    <td>${u.department ? u.department.name : '-'}</td>
-                    <td><span class="badge ${u.is_active ? 'bg-success' : 'bg-secondary'}">${u.is_active ? 'Activo' : 'Inactivo'}</span></td>
+                    <td>${rol}</td>
+                    <td><span class="badge ${activo ? 'bg-success' : 'bg-secondary'}">${activo ? 'Activo' : 'Inactivo'}</span></td>
+                    <td>${fecha}</td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" onclick="editUser(${u.id})" title="Editar"><i class="bi bi-pencil"></i></button>
-                        ${u.is_active ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateUser(${u.id})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
+                        <button class="btn btn-sm btn-outline-info" onclick="viewUserDetail(${u.id_usuario})" title="Ver detalle"><i class="bi bi-eye"></i></button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editUser(${u.id_usuario})" title="Editar"><i class="bi bi-pencil"></i></button>
+                        ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateUser(${u.id_usuario})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
             tbody.closest('.table-responsive').classList.remove('d-none');
             if (empty) empty.classList.add('d-none');
         } else {
@@ -267,9 +311,68 @@ async function loadUsers() {
             tbody.closest('.table-responsive').classList.add('d-none');
             if (empty) empty.classList.remove('d-none');
         }
+        usersState.total = data.total || 0;
+        renderPagination();
     } catch (err) {
         showToast(err.message, 'danger');
     }
+}
+
+// Renderiza la barra de paginación a partir del estado actual.
+function renderPagination() {
+    const pagination = document.getElementById('users-pagination');
+    if (!pagination) return;
+    const totalPages = Math.max(1, Math.ceil(usersState.total / usersState.pageSize));
+    if (usersState.page > totalPages) usersState.page = totalPages;
+    const info = document.getElementById('users-page-info');
+    const prev = document.getElementById('users-prev-page');
+    const next = document.getElementById('users-next-page');
+    if (info) info.textContent = `Página ${usersState.page} de ${totalPages}`;
+    if (prev) prev.disabled = usersState.page <= 1;
+    if (next) next.disabled = usersState.page >= totalPages;
+    if (usersState.total === 0) {
+        pagination.classList.add('d-none');
+    } else {
+        pagination.classList.remove('d-none');
+    }
+}
+
+// Va a una página concreta y recarga el listado.
+function goToPage(page) {
+    const totalPages = Math.max(1, Math.ceil(usersState.total / usersState.pageSize));
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    if (page === usersState.page) return;
+    usersState.page = page;
+    loadUsers();
+}
+
+// Alterna el orden (asc/desc) de una columna y recarga.
+function toggleSort(column) {
+    if (usersState.sortBy === column) {
+        usersState.sortDir = usersState.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        usersState.sortBy = column;
+        usersState.sortDir = 'asc';
+    }
+    usersState.page = 1;
+    updateSortIndicators();
+    loadUsers();
+}
+
+// Pinta los indicadores asc/desc en las cabeceras ordenables de usuarios.
+function updateSortIndicators() {
+    document.querySelectorAll('#users-view th.sortable').forEach((th) => {
+        const col = th.getAttribute('data-sort');
+        const existing = th.querySelector('.sort-icon');
+        if (existing) th.removeChild(existing);
+        if (col === usersState.sortBy) {
+            const icon = document.createElement('span');
+            icon.className = 'sort-icon';
+            icon.textContent = usersState.sortDir === 'asc' ? '▲' : '▼';
+            th.appendChild(icon);
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -318,14 +421,14 @@ async function resetUserForm() {
     baseSaveText = 'Guardar';
     const text = document.getElementById('btn-save-text');
     if (text) text.textContent = baseSaveText;
-    await Promise.all([loadRoles(), loadDepartments()]);
+    await Promise.all([loadRoles(), loadRoleFilter()]);
 }
 
 function openCreateModal() {
     resetUserForm().then(() => {
         const modal = getModal('user-modal');
         if (modal) modal.show();
-        const nameInput = document.getElementById('name');
+        const nameInput = document.getElementById('nombre_completo');
         setTimeout(() => nameInput && nameInput.focus(), 350);
     });
 }
@@ -340,20 +443,44 @@ async function editUser(userId) {
             return;
         }
         const u = await res.json();
-        document.getElementById('user-id').value = u.id;
-        document.getElementById('name').value = u.name;
-        document.getElementById('lastname').value = u.lastname;
-        document.getElementById('code').value = u.code;
+        document.getElementById('user-id').value = u.id_usuario;
+        document.getElementById('nombre_completo').value = u.nombre_completo;
         document.getElementById('username').value = u.username;
         document.getElementById('password').value = '';
         document.getElementById('password').required = false;
-        document.getElementById('is_active').checked = u.is_active;
+        const estadoSel = document.getElementById('estado');
+        if (estadoSel) estadoSel.value = u.estado === 'Activo' ? 'Activo' : 'Inactivo';
         document.getElementById('user-modal-title').textContent = 'Editar Usuario';
         baseSaveText = 'Actualizar';
         const text = document.getElementById('btn-save-text');
         if (text) text.textContent = baseSaveText;
-        await Promise.all([loadRoles(u.role_id), loadDepartments(u.department_id)]);
+        await Promise.all([loadRoles(u.id_rol), loadRoleFilter()]);
         const modal = getModal('user-modal');
+        if (modal) modal.show();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// Modal informativo de detalle (solo lectura, backdrop estático).
+async function viewUserDetail(userId) {
+    try {
+        const res = await fetch(`${USERS_API}/${userId}`, { headers: authHeaders() });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => null);
+            showToast((errData && errData.detail) || 'No se encontró el usuario', 'danger');
+            return;
+        }
+        const u = await res.json();
+        document.getElementById('detail-id').textContent = u.id_usuario;
+        document.getElementById('detail-nombre').textContent = u.nombre_completo || '-';
+        document.getElementById('detail-username').textContent = u.username || '-';
+        document.getElementById('detail-rol').textContent = (u.rol && u.rol.nombre) ? u.rol.nombre : '-';
+        document.getElementById('detail-estado').textContent = u.estado || '-';
+        document.getElementById('detail-fecha').textContent = u.fecha_creacion
+            ? new Date(u.fecha_creacion).toLocaleString()
+            : '-';
+        const modal = getModal('user-detail-modal');
         if (modal) modal.show();
     } catch (err) {
         showToast(err.message, 'danger');
@@ -367,26 +494,24 @@ async function saveUser(event) {
     setSaving(true);
 
     const id = document.getElementById('user-id').value;
-    const roleId = parseInt(document.getElementById('role_id').value, 10);
-    const departmentId = parseInt(document.getElementById('department_id').value, 10);
     const password = document.getElementById('password').value;
+    const estadoSel = document.getElementById('estado');
 
-    // .trim() defensivo para evitar espacios vacíos accidentales
+    // Payload con las claves exactas de Pydantic (UsuarioCreate / UsuarioUpdate).
+    // `estado` solo se envía si el usuario eligió una opción (evita sobrescribir
+    // el valor por defecto y no dispara el dirty check con el placeholder vacío).
     const payload = {
+        nombre_completo: document.getElementById('nombre_completo').value.trim(),
         username: document.getElementById('username').value.trim(),
-        name: document.getElementById('name').value.trim(),
-        lastname: document.getElementById('lastname').value.trim(),
-        code: document.getElementById('code').value.trim(),
-        role_id: roleId,
-        department_id: departmentId,
+        id_rol: parseInt(document.getElementById('id_rol').value, 10),
     };
+    if (estadoSel && estadoSel.value) payload.estado = estadoSel.value;
 
     if (id) {
+        // En edición se omite la contraseña si va en blanco (no se sobrescribe).
         if (password) payload.password = password;
-        payload.is_active = document.getElementById('is_active').checked;
     } else {
         payload.password = password;
-        payload.is_active = true;
     }
 
     const url = id ? `${USERS_API}/${id}` : USERS_API;
@@ -459,7 +584,8 @@ window.addEventListener('beforeunload', (event) => {
 // ---------------------------------------------------------------------------
 
 window.showUsersModule = async function () {
-    await loadUsers();
+    updateSortIndicators();
+    await Promise.all([loadUsers(), loadRoleFilter()]);
 };
 
 window.goToDashboard = function () {
@@ -467,6 +593,7 @@ window.goToDashboard = function () {
 };
 
 window.editUser = editUser;
+window.viewUserDetail = viewUserDetail;
 
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('user-form');
@@ -482,5 +609,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnNew = document.getElementById('btn-new-user');
     if (btnNew) btnNew.addEventListener('click', openCreateModal);
     const btnFilter = document.getElementById('btn-filter-users');
-    if (btnFilter) btnFilter.addEventListener('click', loadUsers);
+    if (btnFilter) btnFilter.addEventListener('click', () => {
+        usersState.page = 1;
+        loadUsers();
+    });
+    // Paginación
+    const pageSize = document.getElementById('users-page-size');
+    if (pageSize) pageSize.addEventListener('change', () => {
+        usersState.pageSize = parseInt(pageSize.value, 10);
+        usersState.page = 1;
+        loadUsers();
+    });
+    const prevBtn = document.getElementById('users-prev-page');
+    if (prevBtn) prevBtn.addEventListener('click', () => goToPage(usersState.page - 1));
+    const nextBtn = document.getElementById('users-next-page');
+    if (nextBtn) nextBtn.addEventListener('click', () => goToPage(usersState.page + 1));
+    // Ordenamiento de columnas
+    document.querySelectorAll('#users-view th.sortable').forEach((th) => {
+        th.addEventListener('click', () => toggleSort(th.getAttribute('data-sort')));
+    });
 });

@@ -1,72 +1,54 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.database import get_db
-from app.db.models import CashRegister, User
-from app.api.deps import get_current_user
+from fastapi import APIRouter, Depends, status
+from typing import Optional, List
+from app.api.deps import get_cash_service, get_current_user
+from app.db.models import Usuario
+from app.services.cash_service import ConcreteCashService
 from app.schemas import schemas
-from datetime import datetime
 
 router = APIRouter()
 
 
-@router.post("/apertura", response_model=schemas.CashRegisterResponse)
+@router.post("/apertura", response_model=schemas.TurnoResponse, status_code=status.HTTP_201_CREATED)
 async def open_cash_register(
-    cash_data: schemas.CashRegisterOpen,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    turno_data: schemas.TurnoApertura,
+    service: ConcreteCashService = Depends(get_cash_service),
+    current_user: Usuario = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(CashRegister).where(
-            CashRegister.user_id == current_user.id,
-            CashRegister.status == "Abierta",
-        )
-    )
-    open_register = result.scalar_one_or_none()
-
-    if open_register:
-        raise HTTPException(status_code=400, detail="El usuario ya tiene una caja abierta")
-
-    try:
-        new_register = CashRegister(
-            user_id=current_user.id,
-            opening_amount=cash_data.opening_amount,
-            petty_cash=cash_data.petty_cash,
-            status="Abierta",
-        )
-        db.add(new_register)
-        await db.commit()
-        await db.refresh(new_register)
-        return new_register
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al abrir la caja: {str(e)}")
+    return await service.abrir_caja(turno_data, current_user.id_usuario)
 
 
-@router.post("/cierre-ciegas", response_model=schemas.CashRegisterResponse)
+@router.post("/cierre", response_model=schemas.TurnoResponse)
 async def close_cash_register(
-    cash_data: schemas.CashRegisterClose,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    turno_data: schemas.TurnoCierre,
+    service: ConcreteCashService = Depends(get_cash_service),
+    current_user: Usuario = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(CashRegister).where(
-            CashRegister.user_id == current_user.id,
-            CashRegister.status == "Abierta",
-        )
-    )
-    open_register = result.scalar_one_or_none()
+    return await service.cerrar_caja(turno_data, current_user.id_usuario)
 
-    if not open_register:
-        raise HTTPException(status_code=400, detail="El usuario no tiene una caja abierta")
 
-    try:
-        open_register.blind_closing_amount = cash_data.blind_closing_amount
-        open_register.closing_time = datetime.utcnow()
-        open_register.status = "Cerrada"
-        await db.commit()
-        await db.refresh(open_register)
-        return open_register
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al cerrar la caja: {str(e)}")
+@router.get("/estado-actual", response_model=Optional[schemas.TurnoResponse])
+async def get_current_cash_status(
+    service: ConcreteCashService = Depends(get_cash_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await service.get_estado_actual(current_user.id_usuario)
+
+
+@router.get("/turnos", response_model=schemas.TurnoList)
+async def list_cash_turnos(
+    filters: schemas.TurnoFilter = Depends(),
+    service: ConcreteCashService = Depends(get_cash_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    items = await service.list_turnos(filters)
+    total = await service.count_turnos(filters)
+    return schemas.TurnoList(total=total, items=items)
+
+
+@router.get("/cajas", response_model=List[schemas.CajaOut])
+async def list_cash_registers(
+    include_inactive: bool = False,
+    service: ConcreteCashService = Depends(get_cash_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await service.list_cajas(include_inactive=include_inactive)

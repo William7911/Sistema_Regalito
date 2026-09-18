@@ -8,6 +8,17 @@
     --color-text-muted: #6B7280;
     --color-success: #10B981;
     --color-danger: #EF4444;
+
+    /* Paleta corporativa oficial (RNF24): celeste, rosado y verde */
+    --color-celeste: #38BDF8;
+    --color-celeste-dark: #0284C7;
+    --color-celeste-light: rgba(56, 189, 248, 0.12);
+    --color-rosado: #F472B6;
+    --color-rosado-dark: #DB2777;
+    --color-rosado-light: rgba(244, 114, 182, 0.12);
+    --color-verde: #34D399;
+    --color-verde-dark: #059669;
+    --color-verde-light: rgba(52, 211, 153, 0.12);
 }
 
 body {
@@ -34,6 +45,223 @@ body {
     background-color: var(--color-teal-dark);
     color: white;
     transform: translateY(-1px);
+}
+
+/* ---------------------------------------------------------------------------
+   Paleta corporativa (RNF24) — Módulo de Catálogos: celeste, rosado y verde
+--------------------------------------------------------------------------- */
+.btn-celeste {
+    background-color: var(--color-celeste);
+    color: #0F172A;
+    border: none;
+    transition: all 0.2s ease;
+}
+.btn-celeste:hover {
+    background-color: var(--color-celeste-dark);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-rosado {
+    background-color: var(--color-rosado);
+    color: #0F172A;
+    border: none;
+    transition: all 0.2s ease;
+}
+.btn-rosado:hover {
+    background-color: var(--color-rosado-dark);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-verde {
+    background-color: var(--color-verde);
+    color: #0F172A;
+    border: none;
+    transition: all 0.2s ease;
+}
+.btn-verde:hover {
+    background-color: var(--color-verde-dark);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-outline-celeste {
+    color: var(--color-celeste-dark);
+    border: 1px solid var(--color-celeste);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+.btn-outline-celeste:hover {
+    background-color: var(--color-celeste-light);
+    color: var(--color-celeste-dark);
+}
+
+.btn-outline-rosado {
+    color: var(--color-rosado-dark);
+    border: 1px solid var(--color-rosado);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+.btn-outline-rosado:hover {
+    background-color: var(--color-rosado-light);
+    color: var(--color-rosado-dark);
+}
+
+.btn-outline-verde {
+    color: var(--color-verde-dark);
+    border: 1px solid var(--color-verde);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+.btn-outline-verde:hover {
+    background-color: var(--color-verde-light);
+    color: var(--color-verde-dark);
+}
+
+/* ---------------------------------------------------------------------------
+   Cabeceras de Tabla y Homologación Visual (Usuarios, Catálogos, Caja)
+   Estándar RNF24: Contraste garantizado, soporte para fondos corporativos y claros
+--------------------------------------------------------------------------- */
+
+/* Regla base de alto contraste para cualquier cabecera clara o por defecto */
+table thead th,
+.table thead th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+    white-space: nowrap;
+    border-bottom: 2px solid #E2E8F0;
+    color: #1E293B !important; /* Texto oscuro de alto contraste (#1e293b) */
+    background-color: #F8FAFC !important; /* Fondo gris claro suave */
+    box-shadow: none !important;
+    padding: 0.75rem 1rem;
+}
+
+/* Reglas comunes para cabeceras con fondo corporativo */
+.thead-catalog th,
+.thead-cash th,
+.thead-users th {
+    color: #FFFFFF !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    vertical-align: middle;
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+}
+
+/* Asegurar herencia de color blanco en elementos hijos de cabeceras corporativas */
+.thead-catalog th a,
+.thead-catalog th span,
+.thead-catalog th i,
+.thead-cash th a,
+.thead-cash th span,
+.thead-cash th i,
+.thead-users th a,
+.thead-users th span,
+.thead-users th i {
+    color: #FFFFFF !important;
+}
+
+/* Cabeceras de tabla del módulo de Catálogos (Celeste corporativo RNF24) */
+.thead-catalog,
+.thead-catalog tr,
+.thead-catalog th {
+    background-color: var(--color-celeste-dark) !important;
+    background: linear-gradient(135deg, #0284C7, #0369A1) !important;
+    color: #FFFFFF !important;
+}
+
+/* Cabeceras de tabla del módulo de Caja (Teal corporativo RNF24) */
+.thead-cash,
+.thead-cash tr,
+.thead-cash th {
+    background-color: var(--color-teal-dark) !important;
+    background: linear-gradient(135deg, var(--color-teal), var(--color-teal-dark)) !important;
+    color: #FFFFFF !important;
+}
+
+/* Cabeceras de tabla del módulo de Usuarios (Teal corporativo RNF24) */
+.thead-users,
+.thead-users tr,
+.thead-users th {
+    background-color: var(--color-teal-dark) !important;
+    background: linear-gradient(135deg, var(--color-teal), var(--color-teal-dark)) !important;
+    color: #FFFFFF !important;
+}
+
+/* Bordes redondeados en extremos de cabeceras corporativas */
+.thead-catalog th:first-child,
+.thead-cash th:first-child,
+.thead-users th:first-child {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+}
+.thead-catalog th:last-child,
+.thead-cash th:last-child,
+.thead-users th:last-child {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+}
+
+/* Cabeceras de tabla ordenables */
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+/* Hover en cabeceras corporativas: sutil resalte conservando texto blanco */
+.thead-catalog th.sortable:hover,
+.thead-cash th.sortable:hover,
+.thead-users th.sortable:hover {
+    filter: brightness(1.12);
+    color: #FFFFFF !important;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* Hover en cabeceras claras sin clase corporativa */
+table thead:not([class*="thead-"]) th.sortable:hover,
+.table thead:not([class*="thead-"]) th.sortable:hover {
+    color: var(--color-celeste-dark) !important;
+    background-color: #EDF2F7 !important;
+}
+
+/* Iconos de ordenamiento */
+th.sortable .sort-icon {
+    font-size: 0.75em;
+    margin-left: 5px;
+    opacity: 0.85;
+    display: inline-block;
+    vertical-align: middle;
+}
+.thead-catalog th.sortable .sort-icon,
+.thead-cash th.sortable .sort-icon,
+.thead-users th.sortable .sort-icon {
+    color: #FFFFFF !important;
+}
+table thead:not([class*="thead-"]) th.sortable .sort-icon {
+    color: #64748B;
+}
+
+
+/* Texto con la paleta corporativa */
+.text-celeste { color: var(--color-celeste-dark) !important; }
+.text-rosado { color: var(--color-rosado-dark) !important; }
+.text-verde { color: var(--color-verde-dark) !important; }
+
+/* ---------------------------------------------------------------------------
+   Diálogo de confirmación por encima de otros modales (p. ej. #user-modal).
+   Se conserva el centrado vertical/`modal-dialog-centered`; solo elevamos el
+   z-index para que quede por encima y completamente visible.
+--------------------------------------------------------------------------- */
+#confirm-modal.modal {
+    z-index: 2000;
 }
 
 /* Auth Module - Desert Background */
