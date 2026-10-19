@@ -1,15 +1,22 @@
 @echo off
 echo =========================================
-echo    Iniciando Sistema Regalito POS...
+echo    Iniciando Sistema Regalito (Produccion)
 echo =========================================
 echo.
 
-echo [1/2] Levantando Base de Datos en Docker...
-docker-compose up -d db
+echo [1/2] Entrando a la carpeta...
+cd /d "C:\Users\abima\OneDrive\Desktop\Sistema_Regalito\Sistema_Regalito"
+
+echo [2/2] Levantando contenedores...
+docker compose -f docker-compose.prod.yml up -d
+
 echo.
+echo Esperando arranque...
+timeout /t 5 /nobreak > NUL
 
-echo [2/2] Levantando Servidor Backend (FastAPI)...
-cd backend
-python -m uvicorn app.main:app --reload --port 8000
+echo.
+echo Abriendo navegador...
+start "" "http://localhost:9090"
 
+echo.
 pause

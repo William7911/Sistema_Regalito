@@ -4,6 +4,7 @@ from datetime import datetime
 from fastapi import HTTPException
 from app.db.models import Merma, DetalleMerma
 from app.schemas import merma_schema
+from app.services.audit_service import log_action
 
 
 class ConcreteMermaService:
@@ -87,6 +88,14 @@ class ConcreteMermaService:
             raise
 
         fresh = await self.uow.mermas.get_merma_by_id(created.id_merma)
+        await log_action(
+            self.uow.db,
+            id_usuario=user_id,
+            tabla="merma",
+            accion="MERMA",
+            descripcion=f"Registró merma ID {fresh.id_merma}, costo Q{costo_total:.2f}.",
+        )
+        await self.uow.commit()
         resp = merma_schema.MermaOut.model_validate(fresh)
         resp.costo_total_perdida = costo_total
         return resp

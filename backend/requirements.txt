@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-sqlalchemy>=2.0
+sqlalchemy[asyncio]>=2.0
 psycopg2-binary
 asyncpg
 pydantic

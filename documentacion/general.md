@@ -48,6 +48,30 @@ Sistema_Regalito/
 └── documentacion/           # Documentación del proyecto
 ```
 
+## 1.1 Facturación Electrónica FEL
+
+El módulo FEL implementa la emisión de facturas electrónicas (SDD `specs/emision_factura_fel.feature`):
+
+- **Capa DERCAS**: `app/schemas/fel_schema.py` (DTOs), `app/repositories/fel_repository.py`, `app/services/fel_service.py`, `app/api/facturacion.py`.
+- **Reglas de negocio SAT**:
+  - Totales Q0.00 o negativos se bloquean antes de contactar al certificador (HTTP 400).
+  - NIT "CF" (Consumidor Final) prohibido en ventas > Q2,500.00 (Decreto 7-2019/SAT).
+- **Comunicación**: `httpx.AsyncClient` (asíncrono, timeout configurable) contra `FEL_API_URL`.
+- **Contingencia**: ante timeout/caída de red/5xx (o sin URL configurada), la venta NO se revierte y `factura_fel.estado = 'Contingencia'` (los campos del DTE quedan NULL hasta certificar). Reintento vía `POST /api/facturacion/reintentar/{id_venta}`.
+- **Rechazo fiscal** (400/422 del certificador): HTTP 400; al integrarse en `sale_service` vía UnitOfWork la venta y el descuento de inventario se revierten (rollback).
+- **Integración con ventas**: `sale_service.registrar_venta` descarga stock, crea la venta y (si `FEL_ENABLED` y hay datos de receptor) llama a `emitir_factura` en la misma transacción UoW; un solo `commit`.
+
+### Configuración FEL (`.env`)
+```
+FEL_ENABLED=true
+FEL_API_URL=https://...            # URL del certificador SAT (vacío = offline/contingencia)
+FEL_API_KEY=...
+FEL_TIMEOUT=15
+FEL_SERIE=FEL
+FEL_EMISOR_NIT=
+FEL_EMISOR_NOMBRE=
+```
+
 ## 2. Tecnologías detectadas
 
 | Capa | Tecnología |

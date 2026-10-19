@@ -3,7 +3,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from app.api import auth, cash_register, catalogos, categories, compras, departments, mermas, products, roles, sales, users
+from app.api import auth, cash_register, catalogos, categories, compras, dashboard, departments, mermas, products, roles, sales, users, sync, health, reportes, configuracion, inventory, facturacion
 from app.db.database import engine, Base
 import logging
 import os
@@ -14,12 +14,32 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Tienda el Regalito POS API")
+from contextlib import asynccontextmanager
+from app.core.sync_daemon import sync_daemon
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: iniciar el daemon de sincronizacion
+    await sync_daemon.start()
+    yield
+    # Shutdown: detener el daemon limpiamente
+    await sync_daemon.stop()
+
+from app.core.config import settings
+
+app = FastAPI(
+    title="Tienda el Regalito POS API", 
+    lifespan=lifespan,
+    debug=(settings.ENVIRONMENT != "production"),
+    docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
+    redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
+    openapi_url="/openapi.json" if settings.ENVIRONMENT != "production" else None,
+)
 
 # Configurar CORS (seguridad web)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # En producción se debería especificar el origen (ej. http://localhost:8000)
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,6 +73,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(cash_register.router, prefix="/api/caja", tags=["caja"])
 app.include_router(sales.router, prefix="/api/ventas", tags=["ventas"])
+app.include_router(facturacion.router, prefix="/api/facturacion", tags=["facturacion"])
 app.include_router(mermas.router, prefix="/api/mermas", tags=["mermas"])
 app.include_router(categories.router, prefix="/api/categorias", tags=["categorias"])
 app.include_router(products.router, prefix="/api/productos", tags=["productos"])
@@ -61,6 +82,13 @@ app.include_router(roles.router, prefix="/api/roles", tags=["roles"])
 app.include_router(departments.router, prefix="/api/departamentos", tags=["departamentos"])
 app.include_router(users.router, prefix="/api/usuarios", tags=["usuarios"])
 app.include_router(compras.router, prefix="/api/compras", tags=["compras"])
+app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
+app.include_router(health.router, prefix="/api/health", tags=["health"])
+app.include_router(reportes.router)
+app.include_router(configuracion.router)
+app.include_router(inventory.router)
+app.include_router(inventory.inventario_router)
+app.include_router(dashboard.router)
 
 # Servir archivos estáticos del frontend en la ruta principal (Recomendado para simplicidad)
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")

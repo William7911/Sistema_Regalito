@@ -11,7 +11,14 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=2.4">
+    <style>
+        /* Desactivar de inmediato ícono nativo de contraseña en Edge/Chromium */
+        input[type="password"]::-ms-reveal { display: none !important; width: 0 !important; height: 0 !important; }
+        input[type="password"]::-ms-clear { display: none !important; width: 0 !important; height: 0 !important; }
+        #login-pass::-ms-reveal { display: none !important; width: 0 !important; height: 0 !important; }
+        #login-pass::-ms-clear { display: none !important; width: 0 !important; height: 0 !important; }
+    </style>
 </head>
 <body class="bg-light-gray">
 
@@ -40,7 +47,10 @@
                     <label class="form-label text-dark fw-medium">Contraseña</label>
                     <div class="input-group">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-lock text-muted"></i></span>
-                        <input type="password" id="login-pass" class="form-control border-start-0 ps-0" placeholder="••••••••" required>
+                        <input type="password" id="login-pass" class="form-control border-start-0 border-end-0 ps-0" placeholder="••••••••" required autocomplete="current-password">
+                        <button type="button" id="btn-toggle-pass" class="input-group-text bg-white border-start-0 btn-toggle-password" tabindex="-1" title="Mostrar u ocultar contraseña" onclick="toggleLoginPassword(event)">
+                            <i class="bi bi-eye-slash text-muted" id="btn-toggle-pass-icon"></i>
+                        </button>
                     </div>
                 </div>
                 
@@ -54,7 +64,7 @@
                 
                 <div class="alert alert-danger d-none small" id="login-error"></div>
                 
-                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Ingresar al Sistema</button>
+                <button type="submit" id="btn-login-submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Ingresar al Sistema</button>
                 <div class="text-center">
                     <span class="text-muted small"><i class="bi bi-shield-lock me-1"></i>El acceso es otorgado por el administrador del sistema.</span>
                 </div>
@@ -143,8 +153,8 @@
                         <i class="bi bi-cart-fill me-2"></i> POS / Ventas
                     </a>
                 </li>
-                <li data-module-item="inventario">
-                    <a href="#" id="nav-inventario" class="nav-link text-white-50 sidebar-link" data-nav="inventario" onclick="navigateTo('inventario'); return false;">
+                <li data-module-item="inventory">
+                    <a href="#" id="nav-inventory" class="nav-link text-white-50 sidebar-link" data-nav="inventory" onclick="navigateTo('inventory'); return false;">
                         <i class="bi bi-box-seam-fill me-2"></i> Inventario / Bodega
                     </a>
                 </li>
@@ -208,8 +218,22 @@
                     <small class="text-muted" id="header-date">Septiembre 2026</small>
                 </div>
                 <div class="d-flex align-items-center gap-3">
+                    <button id="btn-sync-modal" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#sync-modal" title="Estado de Sincronización Offline (SQLite)">
+                        <i class="bi bi-cloud-check-fill text-success" id="sync-icon-indicator"></i>
+                        <span class="small fw-semibold" id="sync-text-indicator">Copia Local</span>
+                    </button>
                     <span class="badge bg-teal-light text-teal-dark px-3 py-2 rounded-pill"><i class="bi bi-shield-check"></i> <span id="header-role">Administrador</span></span>
-                    <button class="btn btn-light rounded-circle position-relative"><i class="bi bi-bell"></i><span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span></button>
+                    <div class="dropdown">
+                        <button class="btn btn-light rounded-circle position-relative dropdown-toggle" id="btn-notificaciones" data-bs-toggle="dropdown" aria-expanded="false" title="Notificaciones de stock">
+                            <i class="bi bi-bell"></i>
+                            <span id="badge-notificaciones" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light d-none">0</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end shadow" id="lista-notificaciones" aria-labelledby="btn-notificaciones" style="max-width: 340px;">
+                            <h6 class="dropdown-header"><i class="bi bi-exclamation-triangle me-1"></i>Alertas de stock pendientes</h6>
+                            <div class="dropdown-divider"></div>
+                            <div id="notificaciones-contenido" style="max-height: 300px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
                 </div>
             </header>
 
@@ -230,7 +254,8 @@
                                     <span class="status-dot status-normal" title="Normal"></span>
                                 </div>
                                 <p class="text-muted mb-1 fw-medium">Ventas de hoy</p>
-                                <h3 class="fw-bold text-dark" id="metric-sales_today">Q 1,245.00</h3>
+                                <h3 class="fw-bold text-dark"><span id="dash-ventas-hoy">Q 0.00</span></h3>
+                                <small class="text-muted fs-6" id="dash-ventas-hoy-detalle">Cargando...</small>
                             </div>
                         </div>
                     </div>
@@ -242,7 +267,7 @@
                                     <span class="status-dot status-critical" title="Crítico"></span>
                                 </div>
                                 <p class="text-muted mb-1 fw-medium">Stock crítico</p>
-                                <h3 class="fw-bold text-dark" id="metric-critical_stock">12 <small class="text-muted fs-6">productos</small></h3>
+                                <h3 class="fw-bold text-dark"><span id="dash-stock-critico">0</span> <small class="text-muted fs-6">productos</small></h3>
                             </div>
                         </div>
                     </div>
@@ -253,8 +278,9 @@
                                     <div class="icon-circle bg-warning-light text-warning-dark"><i class="bi bi-receipt"></i></div>
                                     <span class="status-dot status-critical" title="Crítico"></span>
                                 </div>
-                                <p class="text-muted mb-1 fw-medium">Cuentas por pagar</p>
-                                <h3 class="fw-bold text-dark" id="metric-payables_pending">3 <small class="text-muted fs-6">pendientes</small></h3>
+                                <p class="text-muted mb-1 fw-medium">Compras del mes</p>
+                                <h3 class="fw-bold text-dark"><span id="dash-compras-mes">Q 0.00</span></h3>
+                                <small class="text-muted fs-6" id="dash-compras-mes-detalle">Cargando...</small>
                             </div>
                         </div>
                     </div>
@@ -265,8 +291,8 @@
                                     <div class="icon-circle bg-teal-light text-teal-dark"><i class="bi bi-people"></i></div>
                                     <span class="status-dot status-normal" title="Normal"></span>
                                 </div>
-                                <p class="text-muted mb-1 fw-medium">Clientes nuevos</p>
-                                <h3 class="fw-bold text-dark" id="metric-new_customers">5 <small class="text-muted fs-6">hoy</small></h3>
+                                <p class="text-muted mb-1 fw-medium">Turnos de caja activos</p>
+                                <h3 class="fw-bold text-dark"><span id="dash-turnos-activos">0</span> <small class="text-muted fs-6">turnos</small></h3>
                             </div>
                         </div>
                     </div>
@@ -283,8 +309,8 @@
                                     <span class="fw-medium text-dark">POS / Ventas</span>
                                 </button>
                             </div>
-                            <div class="col-6 col-md-4 col-lg-3" data-card-module="inventario">
-                                <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="inventario" onclick="openModule('inventario')">
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="inventory">
+                                <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="inventory" onclick="openModule('inventory')">
                                     <i class="bi bi-box-seam-fill fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">Inventario / Bodega</span>
                                 </button>
@@ -329,6 +355,164 @@
                     </div>
                 </div>
 
+            </div>
+
+            <!-- POS / Ventas Module View -->
+            <div id="pos-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="pos">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-1">Punto de Venta</h4>
+                        <p class="text-muted small mb-0">Cobra productos del catálogo con mayoreo automático y descargo atómico de inventario</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="pos-turn-badge" class="badge bg-light text-dark px-3 py-2 rounded-pill"><i class="bi bi-cash-stack me-1"></i> <span id="pos-turn-text">Verificando turno...</span></span>
+                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                    </div>
+                </div>
+
+                <!-- Alerta: turno de caja requerido -->
+                <div id="pos-no-shift" class="alert alert-warning d-none gap-2" role="alert">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <span><i class="bi bi-exclamation-triangle me-2"></i>Debes abrir un turno de caja antes de poder registrar ventas en el POS.</span>
+                        <button type="button" class="btn btn-sm btn-teal" onclick="openModule('cash')"><i class="bi bi-cash-coin me-1"></i> Ir a Caja</button>
+                    </div>
+                </div>
+
+                <div id="pos-workspace">
+                    <div class="row g-3">
+                        <!-- Columna izquierda: catálogo de productos -->
+                        <div class="col-12 col-xl-7">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
+                                <div class="card-body p-3">
+                                    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                                        <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                                            <span class="position-absolute start-0 top-0 h-100 d-flex align-items-center px-2 text-muted"><i class="bi bi-search"></i></span>
+                                            <input type="text" id="pos-search" class="form-control ps-4" placeholder="Buscar producto..." autocomplete="off">
+                                        </div>
+                                        <div class="position-relative flex-grow-1" style="min-width: 200px;">
+                                            <span class="position-absolute start-0 top-0 h-100 d-flex align-items-center px-2 text-muted"><i class="bi bi-upc-scan"></i></span>
+                                            <input type="text" id="pos-barcode" class="form-control ps-4" placeholder="Código de barras (Enter)" autocomplete="off">
+                                        </div>
+                                        <button id="btn-pos-filter" class="btn btn-teal"><i class="bi bi-funnel"></i> Filtrar</button>
+                                        <button id="btn-pos-refresh" class="btn btn-outline-secondary" title="Recargar catálogo"><i class="bi bi-arrow-clockwise"></i></button>
+                                    </div>
+
+                                    <div id="pos-products-grid" class="row row-cols-2 row-cols-md-3 row-cols-xl-3 g-2 mb-3"></div>
+
+                                    <div id="pos-products-empty" class="text-center text-muted py-4 d-none">
+                                        <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
+                                        <span>No hay productos con stock en esta sucursal</span>
+                                    </div>
+
+                                    <div id="pos-grid-pagination" class="d-flex justify-content-between align-items-center gap-2">
+                                        <span id="pos-grid-info" class="text-muted small">0 productos</span>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <button id="pos-grid-prev" class="btn btn-sm btn-outline-secondary" title="Página anterior"><i class="bi bi-chevron-left"></i></button>
+                                            <span id="pos-grid-page" class="text-muted small px-2">Página 1 de 1</span>
+                                            <button id="pos-grid-next" class="btn btn-sm btn-outline-secondary" title="Página siguiente"><i class="bi bi-chevron-right"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna derecha: carrito y cobro -->
+                        <div class="col-12 col-xl-5">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
+                                <div class="card-body p-3">
+                                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-cart3 me-2 text-teal"></i>Venta actual</h6>
+
+                                    <div id="pos-cart-empty" class="text-center text-muted py-4">
+                                        <i class="bi bi-cart3 fs-1 d-block mb-2 opacity-50"></i>
+                                        <span class="small">Agrega productos al carrito para iniciar la venta</span>
+                                    </div>
+
+                                    <table class="table table-sm table-hover align-middle mb-2 d-none" id="pos-cart-table">
+                                        <thead class="table-light small">
+                                            <tr>
+                                                <th>Producto</th>
+                                                <th class="text-center" style="width: 100px;">Cant.</th>
+                                                <th class="text-end">Total</th>
+                                                <th style="width: 32px;"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pos-cart-body"></tbody>
+                                    </table>
+
+                                    <div class="d-flex justify-content-between py-2 px-3 mb-1">
+                                        <span class="text-muted small">Subtotal bruto</span>
+                                        <strong class="text-dark small" id="pos-subtotal">Q 0.00</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-2 px-3 mb-1 text-success">
+                                        <span class="text-muted small">Descuento (mayoreo)</span>
+                                        <strong class="text-success small" id="pos-discount">- Q 0.00</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-2 px-3 mb-3 border-top">
+                                        <span class="fw-bold">TOTAL</span>
+                                        <span class="fw-bold fs-4 text-teal" id="pos-total">Q 0.00</span>
+                                    </div>
+
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-12 col-sm-6">
+                                            <label class="form-label small text-muted">Efectivo recibido (Q)</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">Q</span>
+                                                <input type="number" id="pos-cash-received" class="form-control" min="0" step="0.01" placeholder="0.00">
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <label class="form-label small text-muted">Transferencia (Q)</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">Q</span>
+                                                <input type="number" id="pos-transfer-amount" class="form-control" min="0" step="0.01" placeholder="0.00">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-2 px-3 mb-1">
+                                        <span class="text-muted small">Total recibido</span>
+                                        <strong class="text-dark" id="pos-received">Q 0.00</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-2 px-3 mb-3">
+                                        <span class="text-muted small">Cambio</span>
+                                        <strong class="text-verde fs-5" id="pos-change">Q 0.00</strong>
+                                    </div>
+
+                                    <button id="btn-pos-charge" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm" disabled><i class="bi bi-cash-coin me-1"></i> Cobrar</button>
+                                    <button id="btn-pos-clear" class="btn btn-outline-secondary btn-sm w-100 mt-2">Vaciar carrito</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historial de ventas del turno -->
+                <div class="card border-0 shadow-sm rounded-4 mt-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <h6 class="fw-bold mb-0"><i class="bi bi-receipt-cutoff me-2 text-celeste"></i>Ventas recientes del turno</h6>
+                            <button id="btn-pos-reload-history" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Recargar</button>
+                        </div>
+                        <div class="table-responsive" style="max-height: 260px; overflow-y: auto;">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="thead-cash small">
+                                    <tr>
+                                        <th># Venta</th>
+                                        <th>Fecha</th>
+                                        <th class="text-end">Subtotal</th>
+                                        <th class="text-end">Descuento</th>
+                                        <th class="text-end">Total</th>
+                                        <th class="text-center">Artículos</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pos-history-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="pos-history-empty" class="text-center text-muted py-3 d-none">
+                            <span class="small">Aún no hay ventas registradas en este turno.</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Users Module View -->
@@ -704,9 +888,360 @@
                     </div>
                 </div>
             </div>
+            <!-- Reportes Module View -->
+            <div id="reportes-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="reportes">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-1">Reportes y Estadísticas</h4>
+                        <p class="text-muted small mb-0">Consolidado de ventas, mermas e ingresos por periodo</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                    </div>
+                </div>
+
+                <!-- Filtros Inteligentes -->
+                <div class="d-flex gap-2 flex-wrap align-items-center mb-4 p-3 bg-white rounded-4 shadow-sm border-0">
+                    <div class="input-group" style="max-width: 250px;">
+                        <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Desde</span>
+                        <input type="date" id="filter-reportes-from" class="form-control form-control-sm border-start-0 ps-0" title="Fecha desde">
+                    </div>
+                    <div class="input-group" style="max-width: 250px;">
+                        <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
+                        <input type="date" id="filter-reportes-to" class="form-control form-control-sm border-start-0 ps-0" title="Fecha hasta">
+                    </div>
+                    <button id="btn-filter-reportes" class="btn btn-celeste ms-2"><i class="bi bi-funnel"></i> Consultar</button>
+                    
+                    <div class="ms-auto d-flex gap-2">
+                        <button id="btn-export-excel" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
+                        <button id="btn-export-csv" class="btn btn-outline-secondary"><i class="bi bi-filetype-csv me-1"></i> CSV</button>
+                    </div>
+                </div>
+
+                <!-- Resumen Rápido -->
+                <div class="row g-4 mb-4" id="reportes-summary-cards">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2"><i class="bi bi-graph-up-arrow me-2 text-success"></i>Total Ventas</h6>
+                                <h3 class="fw-bold mb-0 text-dark" id="reportes-total-ventas">Q 0.00</h3>
+                                <small class="text-muted" id="reportes-count-ventas">0 registros</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2"><i class="bi bi-graph-down-arrow me-2 text-danger"></i>Total Mermas</h6>
+                                <h3 class="fw-bold mb-0 text-dark" id="reportes-total-mermas">Q 0.00</h3>
+                                <small class="text-muted" id="reportes-count-mermas">0 registros</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2"><i class="bi bi-box-arrow-in-right me-2 text-teal"></i>Total Compras (Ingresos)</h6>
+                                <h3 class="fw-bold mb-0 text-dark" id="reportes-total-compras">Q 0.00</h3>
+                                <small class="text-muted" id="reportes-count-compras">0 registros</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla Responsiva Preview -->
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                        <h6 class="fw-bold"><i class="bi bi-table me-2"></i>Vista Previa de Ventas Recientes</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table align-middle table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Estado</th>
+                                        <th>Vendedor</th>
+                                        <th class="text-end">Subtotal</th>
+                                        <th class="text-end">Descuento</th>
+                                        <th class="text-end">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportes-table-body">
+                                    <tr><td colspan="6" class="text-center text-muted py-4">Seleccione un rango de fechas y haga clic en "Consultar"</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Inventory Module View -->
+            <div id="inventory-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="inventory">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-1">Inventario y Bodega</h4>
+                        <p class="text-muted small mb-0">Gestión de existencias y ajustes de stock</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <button id="btn-inventory-alerts" class="btn btn-warning"><i class="bi bi-exclamation-triangle"></i> Alertas</button>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body d-flex gap-2 flex-wrap align-items-center">
+                        <input type="text" id="filter-inv-sku" class="form-control" style="max-width: 200px;" placeholder="SKU / Código de Barras">
+                        <div class="form-check form-switch ms-2">
+                            <input class="form-check-input" type="checkbox" id="filter-inv-low-stock">
+                            <label class="form-check-label text-muted small" for="filter-inv-low-stock">Solo stock crítico</label>
+                        </div>
+                        <button id="btn-filter-inventory" class="btn btn-teal ms-auto"><i class="bi bi-funnel"></i> Filtrar</button>
+                    </div>
+                </div>
+
+                <!-- Tabla de Inventario -->
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table align-middle table-hover mb-0">
+                                <thead class="thead-users">
+                                    <tr>
+                                        <th class="sortable" data-sort="id_inventario" style="width: 70px;">ID <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="producto_nombre">Producto <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="variante_sku">SKU <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="sucursal_nombre">Sucursal <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="stock_actual">Stock Actual <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="stock_minimo">Stock Mínimo <span class="sort-icon"></span></th>
+                                        <th class="text-end" style="width: 140px;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventory-table-body"></tbody>
+                            </table>
+                        </div>
+                        <!-- Estado vacío -->
+                        <div id="inventory-empty" class="text-center text-muted py-5 d-none">
+                            <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
+                            <span>No hay registros de inventario</span>
+                        </div>
+
+                        <!-- Paginación Reactiva -->
+                        <div id="inventory-pagination" class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 d-none">
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="text-muted small mb-0">Registros por página</label>
+                                <select id="inventory-page-size" class="form-select form-select-sm" style="width: 80px;">
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <button id="inventory-prev-page" class="btn btn-sm btn-outline-secondary" title="Página anterior"><i class="bi bi-chevron-left"></i></button>
+                                <span id="inventory-page-info" class="text-muted small px-2">Página 1 de 1</span>
+                                <button id="inventory-next-page" class="btn btn-sm btn-outline-secondary" title="Página siguiente"><i class="bi bi-chevron-right"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compras Module View -->
+            <div id="compras-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="compras">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-1">Compras / Ingreso de Mercadería</h4>
+                        <p class="text-muted small mb-0">Registra la recepción de mercadería y actualiza el stock automáticamente</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <button id="btn-compras-refresh" class="btn btn-outline-secondary" title="Recargar catálogo"><i class="bi bi-arrow-clockwise"></i></button>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <!-- Columna izquierda: buscador de productos -->
+                    <div class="col-12 col-xl-7">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body p-3">
+                                <div class="d-flex gap-2 align-items-center mb-3">
+                                    <div class="position-relative flex-grow-1">
+                                        <span class="position-absolute start-0 top-0 h-100 d-flex align-items-center px-2 text-muted"><i class="bi bi-search"></i></span>
+                                        <input type="text" id="compras-search" class="form-control ps-4" placeholder="Buscar producto por nombre, talla, color o código..." autocomplete="off">
+                                    </div>
+                                    <button id="btn-compras-filter" class="btn btn-teal"><i class="bi bi-funnel"></i> Filtrar</button>
+                                </div>
+
+                                <div id="compras-products-list" class="d-flex flex-column gap-2 mb-2" style="max-height: 400px; overflow-y: auto;"></div>
+
+                                <div id="compras-products-empty" class="text-center text-muted py-4 d-none">
+                                    <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
+                                    <span>No hay productos que coincidan con la búsqueda</span>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span id="compras-products-info" class="text-muted small">0 productos</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Columna derecha: compra en curso -->
+                    <div class="col-12 col-xl-5">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body p-3">
+                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-bag-check me-2 text-teal"></i>Compra en curso</h6>
+
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Proveedor <span class="text-danger">*</span></label>
+                                    <select id="compras-proveedor" class="form-select">
+                                        <option value="">Cargando proveedores...</option>
+                                    </select>
+                                </div>
+
+                                <div id="compras-cart-empty" class="text-center text-muted py-4">
+                                    <i class="bi bi-cart3 fs-1 d-block mb-2 opacity-50"></i>
+                                    <span class="small">Agrega productos de la izquierda para iniciar la compra</span>
+                                </div>
+
+                                <table class="table table-sm table-hover align-middle mb-2 d-none" id="compras-cart-table">
+                                    <thead class="table-light small">
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th class="text-center" style="width: 92px;">Costo (Q)</th>
+                                            <th class="text-center" style="width: 76px;">Cant.</th>
+                                            <th class="text-end" style="width: 80px;">Subtotal</th>
+                                            <th style="width: 30px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="compras-cart-body"></tbody>
+                                </table>
+
+                                <div class="row g-2 mb-3">
+                                    <div class="col-12 col-sm-6">
+                                        <label class="form-label small text-muted">N° Factura proveedor <span class="text-danger">*</span></label>
+                                        <input type="text" id="compras-factura" class="form-control form-control-sm" placeholder="Ej. F-00123" autocomplete="off">
+                                    </div>
+                                    <div class="col-12 col-sm-6">
+                                        <label class="form-label small text-muted">Gasto de flete (Q)</label>
+                                        <input type="number" id="compras-flete" class="form-control form-control-sm" min="0" step="0.01" value="0.00">
+                                    </div>
+                                    <div class="col-12 col-sm-6">
+                                        <label class="form-label small text-muted">Gasto de cargadores (Q)</label>
+                                        <input type="number" id="compras-cargadores" class="form-control form-control-sm" min="0" step="0.01" value="0.00">
+                                    </div>
+                                    <div class="col-12 col-sm-6 d-flex align-items-end">
+                                        <button id="btn-compras-clear" class="btn btn-outline-secondary btn-sm w-100">Vaciar carrito</button>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between py-2 px-3 mb-1">
+                                    <span class="text-muted small">Subtotal mercadería</span>
+                                    <strong class="text-dark small" id="compras-subtotal">Q 0.00</strong>
+                                </div>
+                                <div class="d-flex justify-content-between py-2 px-3 mb-1">
+                                    <span class="text-muted small">Flete + Cargadores</span>
+                                    <strong class="text-dark small" id="compras-gastos">Q 0.00</strong>
+                                </div>
+                                <div class="d-flex justify-content-between py-2 px-3 mb-3 border-top">
+                                    <span class="fw-bold">COSTO TOTAL</span>
+                                    <span class="fw-bold fs-4 text-teal" id="compras-total">Q 0.00</span>
+                                </div>
+
+                                <button id="btn-compras-process" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm" disabled>
+                                    <i class="bi bi-box-arrow-in-down me-1"></i> Procesar Ingreso
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration Module View -->
+            <div id="configuracion-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="configuracion">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-1">Configuración General</h4>
+                        <p class="text-muted small mb-0">Parámetros del negocio y credenciales SAT</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm rounded-4" style="max-width: 600px; margin: 0 auto;">
+                    <div class="card-body p-5">
+                        <form id="configuracion-form">
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">NIT de la Empresa</label>
+                                <input type="text" id="config-nit" class="form-control" placeholder="Ej. 1234567-8" required>
+                                <div class="invalid-feedback">El NIT es obligatorio.</div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">Razón Social</label>
+                                <input type="text" id="config-razon-social" class="form-control" placeholder="Razón social registrada" required>
+                                <div class="invalid-feedback">La Razón Social es obligatoria.</div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">Dirección</label>
+                                <input type="text" id="config-direccion" class="form-control" placeholder="Dirección física" required>
+                                <div class="invalid-feedback">La Dirección es obligatoria.</div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">Token FEL (Facturación Electrónica)</label>
+                                <div class="input-group">
+                                    <input type="password" id="config-token-fel" class="form-control" placeholder="Token proporcionado por el certificador">
+                                    <button class="btn btn-outline-secondary" type="button" id="toggle-token-visibility"><i class="bi bi-eye"></i></button>
+                                </div>
+                            </div>
+                            <div class="d-grid mt-5">
+                                <button type="submit" id="btn-save-config" class="btn btn-teal py-2 fw-bold">Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
+
+    <!-- Modal: Ajuste de Inventario -->
+    <div class="modal fade" id="inventory-modal" tabindex="-1" aria-labelledby="inventory-modal-title" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="inventory-form" novalidate>
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="inventory-modal-title">Ajuste de Stock</h5>
+                        <button type="button" class="btn-close" data-bs-close-modal aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="inv-id">
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Producto</label>
+                            <input type="text" id="inv-producto" class="form-control" disabled>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Stock Actual</label>
+                            <input type="text" id="inv-stock-actual" class="form-control" disabled>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Motivo del Ajuste <span class="text-danger">*</span></label>
+                            <input type="text" id="inv-motivo" class="form-control" required minlength="3">
+                            <div class="invalid-feedback">Ingrese un motivo válido.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Cantidad (Positiva o Negativa) <span class="text-danger">*</span></label>
+                            <input type="number" id="inv-cantidad" class="form-control" required>
+                            <div class="invalid-feedback">Ingrese la cantidad de ajuste.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-close-modal>Cancelar</button>
+                        <button type="submit" id="btn-save-inventory" class="btn btn-teal">Guardar Ajuste</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal: Formulario de Usuario -->
     <div class="modal fade" id="user-modal" tabindex="-1" aria-labelledby="user-modal-title" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -1120,6 +1655,130 @@
         </div>
     </div>
 
+    <!-- Modal: Sincronización Offline SQLite (Fase 2 de 6) -->
+    <div class="modal fade" id="sync-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-teal text-white">
+                    <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                        <i class="bi bi-cloud-arrow-down-fill"></i> Sincronización Offline SQLite
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Status Card -->
+                    <div class="card border-0 bg-light rounded-3 p-3 mb-4 shadow-sm">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <h6 class="fw-bold mb-1 text-dark"><i class="bi bi-database-check text-teal me-1"></i> Base SQLite Local: <code>pos_local.db</code></h6>
+                                <p class="text-muted small mb-0" id="sync-modal-status-text">Cargando estado...</p>
+                                <small class="text-muted" id="sync-modal-last-date">Última sincronización: -</small>
+                            </div>
+                            <div>
+                                <button type="button" id="btn-run-sync" class="btn btn-teal px-3 py-2 fw-semibold shadow-sm d-flex align-items-center gap-2">
+                                    <i class="bi bi-arrow-repeat" id="sync-spinner-icon"></i>
+                                    <span id="sync-btn-text">Sincronizar Nube → Local</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs de Navegación de Datos Locales -->
+                    <ul class="nav nav-pills mb-3 gap-2" id="sync-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active btn-sm" id="tab-sync-products" data-bs-toggle="pill" data-bs-target="#pane-sync-products" type="button" role="tab">
+                                <i class="bi bi-box-seam me-1"></i> Catálogo y Precios Locales (<span id="count-sync-prods">0</span>)
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link btn-sm" id="tab-sync-users" data-bs-toggle="pill" data-bs-target="#pane-sync-users" type="button" role="tab">
+                                <i class="bi bi-people me-1"></i> Usuarios y Roles Locales (<span id="count-sync-users">0</span>)
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content border rounded-3 p-3 bg-white" style="min-height: 240px; max-height: 380px; overflow-y: auto;">
+                        <!-- Pane Productos -->
+                        <div class="tab-pane fade show active" id="pane-sync-products" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead class="table-light small">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Producto</th>
+                                            <th>Categoría</th>
+                                            <th>Cód. Barras</th>
+                                            <th class="text-end">Precio Detalle</th>
+                                            <th class="text-end">Precio Mayoreo</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sync-products-tbody" class="small">
+                                        <tr><td colspan="7" class="text-center text-muted py-3">Cargando productos locales...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Pane Usuarios -->
+                        <div class="tab-pane fade" id="pane-sync-users" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead class="table-light small">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Nombre Completo</th>
+                                            <th>Usuario</th>
+                                            <th>Rol</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sync-users-tbody" class="small">
+                                        <tr><td colspan="5" class="text-center text-muted py-3">Cargando usuarios locales...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <span class="text-muted small me-auto"><i class="bi bi-info-circle me-1"></i> Los datos mostrados se leen directamente desde la base SQLite local en esta laptop.</span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Comprobante de Venta (Ticket) -->
+    <div class="modal fade" id="pos-ticket-modal" tabindex="-1" aria-labelledby="posTicketModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark" id="posTicketModalTitle"><i class="bi bi-receipt-cutoff text-verde me-2"></i>Venta registrada</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="p-3 bg-light rounded-3 mb-3 border" id="pos-ticket-details">
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Folio de venta:</span><strong class="text-dark" id="ticket-id">-</strong></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Fecha:</span><span class="text-dark small" id="ticket-fecha">-</span></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Artículos:</span><span class="text-dark small" id="ticket-items">-</span></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Subtotal:</span><span class="text-dark small" id="ticket-subtotal">-</span></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Descuento:</span><span class="text-success small" id="ticket-discount">-</span></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Total:</span><strong class="text-verde" id="ticket-total">-</strong></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Efectivo recibido:</span><span class="text-dark small" id="ticket-cash">-</span></div>
+                        <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Transferencia:</span><span class="text-dark small" id="ticket-transfer">-</span></div>
+                        <div class="d-flex justify-content-between border-top pt-2"><span class="text-muted small">Cambio a entregar:</span><strong class="text-verde fs-5" id="ticket-change">-</strong></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-teal" id="btn-ticket-new-sale" data-bs-dismiss="modal">Nueva Venta</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Confirmación de eliminación (sin confirm() nativo) -->
     <div class="modal fade" id="confirm-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -1142,9 +1801,17 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- App Logic -->
-    <script src="js/app.js?v=2.3"></script>
+    <script src="js/app.js?v=2.4"></script>
+    <script src="js/dashboard.js?v=1.0"></script>
+    <script src="js/notificaciones.js?v=1.0"></script>
     <script src="js/users.js?v=2.3"></script>
     <script src="js/catalog.js?v=2.3"></script>
     <script src="js/cash_register.js?v=2.3"></script>
+    <script src="js/reportes.js?v=2.3"></script>
+    <script src="js/sync.js?v=2.3"></script>
+    <script src="js/configuracion.js?v=2.3"></script>
+    <script src="js/pos.js?v=1.0"></script>
+    <script src="js/inventory.js"></script>
+    <script src="js/compras.js?v=1.0"></script>
 </body>
 </html>

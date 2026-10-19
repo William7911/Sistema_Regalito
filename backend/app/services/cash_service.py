@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from app.db.models import TurnoCaja, CierreCajaCiegas, DetalleArqueoEfectivo
 from app.interfaces.services import CashRegisterService
 from app.schemas import schemas
+from app.services.audit_service import log_action
 
 
 class ConcreteCashService(CashRegisterService):
@@ -62,6 +63,14 @@ class ConcreteCashService(CashRegisterService):
             raise
 
         fresh = await self.uow.turnos.get_by_id(created.id_turno)
+        await log_action(
+            self.uow.db,
+            id_usuario=user_id,
+            tabla="turno_caja",
+            accion="APERTURA",
+            descripcion=f"Abrió turno ID {fresh.id_turno} en caja ID {data.id_caja} con fondo Q{data.monto_apertura}.",
+        )
+        await self.uow.commit()
         return schemas.TurnoResponse.model_validate(fresh)
 
     async def cerrar_caja(self, data: schemas.TurnoCierre, user_id: int) -> schemas.TurnoResponse:
@@ -208,6 +217,18 @@ class ConcreteCashService(CashRegisterService):
             raise
 
         fresh_cierre = await self.uow.turnos.get_cierre_ciegas_by_id(created_cierre.id_cierre)
+        await log_action(
+            self.uow.db,
+            id_usuario=user_id,
+            tabla="cierre_caja_ciegas",
+            accion="CIERRE_CIEGAS",
+            descripcion=(
+                f"Cierre a ciegas turno ID {active_turno.id_turno}: "
+                f"{estado_cierre}, contado Q{total_contado:.2f}, "
+                f"diferencia Q{diferencia:.2f}."
+            ),
+        )
+        await self.uow.commit()
         resp = schemas.CierreCiegasResponse.model_validate(fresh_cierre)
         resp.estado_cierre = estado_cierre
         return resp

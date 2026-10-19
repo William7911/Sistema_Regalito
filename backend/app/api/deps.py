@@ -15,6 +15,9 @@ from app.repositories.user_repository import UserRepositoryImpl
 from app.repositories.cash_repository import CajaRepositoryImpl, TurnoCajaRepositoryImpl
 from app.repositories.merma_repository import MermaRepositoryImpl
 from app.repositories.sale_repository import SaleRepositoryImpl
+from app.repositories.fel_repository import FelRepositoryImpl
+from app.repositories.login_attempt_repository import LoginAttemptRepositoryImpl
+from app.repositories.sync_repository import SyncRepositoryImpl
 from app.services.category_service import ConcreteCategoryService
 from app.services.product_service import ConcreteProductService
 from app.services.catalogo_service import ConcreteCatalogoService
@@ -24,6 +27,10 @@ from app.services.user_service import ConcreteUserService
 from app.services.cash_service import ConcreteCashService
 from app.services.merma_service import ConcreteMermaService
 from app.services.sale_service import ConcreteSaleService
+from app.services.login_security_service import LoginSecurityService
+from app.services.sync_service import ConcreteSyncService
+from app.repositories.health_repository import HealthRepositoryImpl
+from app.services.health_service import ConcreteHealthService
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
@@ -72,6 +79,29 @@ class UnitOfWork:
     def sales(self):
         return SaleRepositoryImpl(self.db)
 
+    @property
+    def fel(self):
+        return FelRepositoryImpl(self.db)
+
+    @property
+    def compras(self):
+        from app.repositories.compra_repository import CompraRepositoryImpl
+        return CompraRepositoryImpl(self.db)
+        
+    @property
+    def reportes(self):
+        from app.repositories.reporte_repository import ReporteRepositoryImpl
+        return ReporteRepositoryImpl(self.db)
+
+    @property
+    def configuracion(self):
+        from app.repositories.configuracion_repository import ConfiguracionRepositoryImpl
+        return ConfiguracionRepositoryImpl(self.db)
+
+    @property
+    def inventory(self):
+        from app.repositories.inventory_repository import InventoryRepositoryImpl
+        return InventoryRepositoryImpl(self.db)
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
@@ -184,3 +214,47 @@ def get_merma_service(db: AsyncSession = Depends(get_db)) -> ConcreteMermaServic
 
 def get_sale_service(db: AsyncSession = Depends(get_db)) -> ConcreteSaleService:
     return ConcreteSaleService(UnitOfWork(db))
+
+
+def get_fel_service(db: AsyncSession = Depends(get_db)):
+    from app.services.fel_service import ConcreteFelService
+    return ConcreteFelService(UnitOfWork(db))
+
+
+def get_login_security_service(db: AsyncSession = Depends(get_db)) -> LoginSecurityService:
+    repository = LoginAttemptRepositoryImpl(db)
+    return LoginSecurityService(repository)
+
+
+def get_sync_service(db: AsyncSession = Depends(get_db)) -> ConcreteSyncService:
+    repository = SyncRepositoryImpl(db)
+    return ConcreteSyncService(repository)
+
+
+def get_health_service(db: AsyncSession = Depends(get_db)) -> ConcreteHealthService:
+    repository = HealthRepositoryImpl(db)
+    return ConcreteHealthService(repository)
+
+
+def get_dashboard_service(db: AsyncSession = Depends(get_db)):
+    from app.repositories.dashboard_repository import DashboardRepositoryImpl
+    from app.services.dashboard_service import ConcreteDashboardService
+    repository = DashboardRepositoryImpl(db)
+    return ConcreteDashboardService(repository)
+
+
+def get_reporte_service(db: AsyncSession = Depends(get_db)):
+    from app.services.reporte_service import ReportesService
+    return ReportesService(UnitOfWork(db))
+
+def get_facturacion_offline_service(db: AsyncSession = Depends(get_db)):
+    from app.services.facturacion_offline_service import FacturacionOfflineService
+    return FacturacionOfflineService(UnitOfWork(db))
+
+def get_configuracion_service(db: AsyncSession = Depends(get_db)):
+    from app.services.configuracion_service import ConfiguracionService
+    return ConfiguracionService(UnitOfWork(db))
+
+def get_inventory_service(db: AsyncSession = Depends(get_db)):
+    from app.services.inventory_service import ConcreteInventoryService
+    return ConcreteInventoryService(UnitOfWork(db))

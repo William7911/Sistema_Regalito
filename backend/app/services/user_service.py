@@ -10,6 +10,7 @@ from app.db.models import Usuario
 from app.core import security
 from app.interfaces.services import UserService
 from app.schemas import schemas
+from app.services.audit_service import log_action
 
 
 class ConcreteUserService(UserService):
@@ -54,7 +55,7 @@ class ConcreteUserService(UserService):
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         return schemas.UserResponse.model_validate(user)
 
-    async def create_user(self, data: schemas.UserCreate) -> schemas.UserResponse:
+    async def create_user(self, data: schemas.UserCreate, actor_id: int = 0) -> schemas.UserResponse:
         await self._validate_role(data.id_rol)
         if await self.uow.users.get_by_username(data.username.strip()):
             raise HTTPException(status_code=400, detail="Ya existe un usuario con ese nombre de usuario")
@@ -73,10 +74,19 @@ class ConcreteUserService(UserService):
             await self.uow.rollback()
             raise
         fresh = await self.uow.users.get_by_id(created.id_usuario)
+        audit_actor = actor_id or fresh.id_usuario
+        await log_action(
+            self.uow.db,
+            id_usuario=audit_actor,
+            tabla="usuario",
+            accion="CREAR",
+            descripcion=f"Creó usuario '{fresh.username}' (ID {fresh.id_usuario}).",
+        )
+        await self.uow.commit()
         return schemas.UserResponse.model_validate(fresh)
 
     async def update_user(
-        self, user_id: int, data: schemas.UserUpdate
+        self, user_id: int, data: schemas.UserUpdate, actor_id: int = 0
     ) -> schemas.UserResponse:
         user = await self.uow.users.get_by_id(user_id)
         if not user:
@@ -108,9 +118,18 @@ class ConcreteUserService(UserService):
             await self.uow.rollback()
             raise
         fresh = await self.uow.users.get_by_id(updated.id_usuario)
+        audit_actor = actor_id or fresh.id_usuario
+        await log_action(
+            self.uow.db,
+            id_usuario=audit_actor,
+            tabla="usuario",
+            accion="EDITAR",
+            descripcion=f"Editó usuario '{fresh.username}' (ID {fresh.id_usuario}).",
+        )
+        await self.uow.commit()
         return schemas.UserResponse.model_validate(fresh)
 
-    async def deactivate_user(self, user_id: int) -> schemas.UserResponse:
+    async def deactivate_user(self, user_id: int, actor_id: int = 0) -> schemas.UserResponse:
         """Eliminación lógica (soft delete)."""
         user = await self.uow.users.get_by_id(user_id)
         if not user:
@@ -123,6 +142,15 @@ class ConcreteUserService(UserService):
             await self.uow.rollback()
             raise
         fresh = await self.uow.users.get_by_id(updated.id_usuario)
+        audit_actor = actor_id or fresh.id_usuario
+        await log_action(
+            self.uow.db,
+            id_usuario=audit_actor,
+            tabla="usuario",
+            accion="DESACTIVAR",
+            descripcion=f"Desactivó usuario '{fresh.username}' (ID {fresh.id_usuario}).",
+        )
+        await self.uow.commit()
         return schemas.UserResponse.model_validate(fresh)
 
     # ------------------------------------------------------------------

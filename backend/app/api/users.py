@@ -44,7 +44,7 @@ async def create_user(
     service: ConcreteUserService = Depends(get_user_service),
     current_user: Usuario = Depends(require_admin),
 ):
-    return await service.create_user(payload)
+    return await service.create_user(payload, actor_id=current_user.id_usuario)
 
 
 @router.put("/{user_id}", response_model=schemas.UserResponse)
@@ -54,7 +54,7 @@ async def update_user(
     service: ConcreteUserService = Depends(get_user_service),
     current_user: Usuario = Depends(require_admin),
 ):
-    return await service.update_user(user_id, payload)
+    return await service.update_user(user_id, payload, actor_id=current_user.id_usuario)
 
 
 @router.delete("/{user_id}", response_model=schemas.UserResponse)
@@ -64,4 +64,4 @@ async def deactivate_user(
     current_user: Usuario = Depends(require_admin),
 ):
     """Eliminación lógica (soft delete): marca el usuario como inactivo."""
-    return await service.deactivate_user(user_id)
+    return await service.deactivate_user(user_id, actor_id=current_user.id_usuario)

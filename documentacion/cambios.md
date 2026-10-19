@@ -1,7 +1,922 @@
 # Registro de Cambios
 
 ## Regla de documentación (obligatoria)
-Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o elimines componentes.
+Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
+
+
+
+## [2026-10-18] Auditoría de Estado: Módulos I, II y III (BD y Capas DERCAS)
+
+### Causa Raíz / Requerimiento
+Auditoría técnica de solo lectura sobre las 23 tablas de los Módulos I, II y III para evaluar la cobertura en modelos SQLAlchemy, routers/endpoints, vistas frontend, campos de estado lógico, tablas sin CRUD y divergencias idiomáticas de nomenclatura. Se profundizó en las capas DERCAS (schemas, repositorios, servicios, interfaces y tests) y en los endpoints de catálogos consumidos por el frontend.
+
+### Solución Implementada
+- Se actualizó el reporte técnico [`documentacion/auditoria_estado.md`](file:///c:/Users/abima/OneDrive/Desktop/Sistema_Regalito/Sistema_Regalito/documentacion/auditoria_estado.md) con la sección "Capas".
+- Se verificó que solo `usuario` y `producto` tienen filtros y paginación completos; `rol`, `usuario`, `categoria`, `producto` y `departamento` soportan soft delete (`Inactivo`).
+- Se confirmó que `departments.py` / `department_service.py` apunta a la tabla `departamento_geografico`.
+- Se mapearon las rutas exactas de catálogo (`/api/catalogos/subcategorias`, `/unidades`, `/sucursales`, `/areas`) consumidas por `frontend/js/catalog.js`.
+
+## [2026-10-18] Mejoras de UX y Rendimiento en Inicio de Sesión (Login)
+
+### Causa Raíz / Requerimiento
+1. **Comportamiento inconsistente del visor de contraseña**: El botón de revelar contraseña dependía de los controles nativos del navegador (`::-ms-reveal`), los cuales desaparecían según el foco o la interacción del usuario.
+2. **Ausencia de feedback visual inmediato al autenticar**: Al presionar "Ingresar al Sistema", no existía indicación de carga ni bloqueo de clics repetidos, dando sensación de lentitud o falta de respuesta.
+3. **Bloqueo del event loop en backend**: La función `pwd_context.verify` (bcrypt) es una operación intensiva en CPU ejecutada de forma síncrona directamente sobre el hilo principal de asyncio, lo que degradaba la fluidez de respuesta del servidor ante peticiones concurrentes.
+
+### Solución Implementada
+- **Desactivación de ícono nativo y botón persistente (HTML/CSS)**:
+  - En `frontend/index.html`, se incorporó un botón permanente `#btn-toggle-pass` con `tabindex="-1"` y enlace directo `onclick="toggleLoginPassword(event)"`.
+  - **Aislamiento de selectores vendor-prefix**: En CSS, agrupar selectores de distintos navegadores con coma hace que el navegador descarte toda la regla si desconoce uno. Se separaron las reglas de `input[type="password"]::-ms-reveal` y `::-ms-clear` en bloques individuales independientes y se inyectaron en `<style>` en el `<head>` para sobreescritura inmediata sin depender de la caché.
+  - En `frontend/css/style.css`, se actualizaron las reglas individuales y se estilizó la clase `.btn-toggle-password` junto al foco en `#form-login .input-group:focus-within`.
+- **Micro-interacciones y estado de carga en Login (JavaScript)**:
+  - En `frontend/js/app.js`, se expuso globalmente `window.toggleLoginPassword(event)` para alternar de forma idempotente `type="password"` y `type="text"`, actualizando el icono entre `bi-eye-slash` y `bi-eye` y preservando el foco y posición del cursor.
+  - Se implementó `setLoginLoading(loading)`, deshabilitando `#btn-login-submit` y mostrando un spinner Bootstrap con el texto `"Ingresando..."` durante la llamada a la API, restaurándolo de forma segura en un bloque `finally`.
+  - Se incrementaron las versiones de los assets a `css/style.css?v=2.4` y `js/app.js?v=2.4` en `index.html` para invalidar la caché HTTP de navegadores existentes.
+- **Verificación asíncrona no bloqueante (FastAPI / Core Security)**:
+  - En `backend/app/core/security.py`, se añadió `verify_password_async()`, delegando la carga computacional de bcrypt a un hilo independiente mediante `loop.run_in_executor()`.
+  - En `backend/app/api/auth.py`, se actualizó la validación a `await security.verify_password_async(form_data.password, user.password_hash)`.
+
+### Verificación y Pruebas
+- Sintaxis de `frontend/js/app.js` validada exitosamente con `node --check`.
+- Sintaxis de módulos Python verificada mediante `ast.parse`.
+- Ejecución completa de la suite de pruebas del backend: **82 pruebas pasadas** (0 regresiones).
+
+## [2026-10-13] Módulo de Facturación Electrónica FEL (SDD: `specs/emision_factura_fel.feature`)
+
+### Componentes creados
+| Archivo | Capa | Descripción |
+|---------|------|-------------|
+| `backend/app/schemas/fel_schema.py` | DTOs | `FelEmisionRequest`, `FelCertificacionRespuesta`, `FelEmisionResponse`, `FelItem`, `FelReintentoRequest` (Pydantic v2) |
+| `backend/app/repositories/fel_repository.py` | Repositorio | `FelRepositoryImpl`: CRUD async sobre `factura_fel` (no hace commit; lo controla el UoW) |
+| `backend/app/services/fel_service.py` | Servicio | `ConcreteFelService`: reglas de negocio SAT, httpx async, contingencia y reintento |
+| `backend/app/api/facturacion.py` | Controller | `GET /api/facturacion/pendientes` y `POST /api/facturacion/reintentar/{id_venta}` |
+| `backend/tests/test_fel_service.py` | Pruebas | 7 pruebas (éxito, rechazo fiscal, timeout, sin certificador, CF>2500, totales inválidos, reintento) |
+| `backend/alembic/versions/0009_factura_fel_estado_y_dte_nullable.py` | Migración | `estado` + campos DTE NULLables |
+
+### Componentes modificados
+| Archivo | Cambio |
+|---------|--------|
+| `backend/app/db/models.py` | `FacturaFel` gana `estado` (default `Certificada`); `numero_autorizacion_sat`, `serie`, `numero_dte`, `fecha_certificacion` pasan a NULLables |
+| `backend/app/core/config.py` | Settings FEL: `FEL_ENABLED`, `FEL_API_URL`, `FEL_API_KEY`, `FEL_TIMEOUT`, `FEL_SERIE`, `FEL_EMISOR_NIT`, `FEL_EMISOR_NOMBRE` |
+| `backend/app/api/deps.py` | `UnitOfWork.fel` (propiedad) + `get_fel_service` |
+| `backend/app/services/sale_service.py` | Al confirmar la venta (stock ya descontado) dispara `ConcreteFelService.emitir_factura` bajo la misma transacción UoW |
+| `backend/app/schemas/sale_schema.py` | `SaleCreate` gana `nit_receptor` y `nombre_receptor` (opcionales) |
+| `backend/app/interfaces/repositories.py` | Contrato `FelRepository` |
+| `backend/app/interfaces/services.py` | Contrato `FelService` |
+| `backend/app/main.py` | Router de `facturacion` registrado |
+| `backend/tests/conftest.py` | `TestUnitOfWork.fel` |
+| `database/init.sql` | Tabla `factura_fel` con `estado` y DTE NULLable |
+| `.env.example` | Variables FEL documentadas |
+
+### Reglas de negocio implementadas (de la especificación Gherkin)
+- **Bloqueo de totales inválidos**: totales Q0.00 o negativos se detienen antes de contactar al certificador (HTTP 400).
+- **NIT "CF" bloqueado > Q2,500.00** (Decreto 7-2019/SAT): si `nit_receptor` es vacío/"CF" y el total supera Q2,500.00, la operación se detiene con HTTP 400.
+- **Comunicación asíncrona**: `httpx.AsyncClient` en `_certificar` (timeout configurable `FEL_TIMEOUT`).
+- **Contingencia (offline/timeout)**: si el certificador no responde (timeout), falla la red o devuelve 5xx (o no hay URL configurada), la venta NO se revierte y `factura_fel` se guarda con estado `Contingencia` (DTE NULL), permitiendo reintentar por `POST /api/facturacion/reintentar/{id_venta}`.
+- **Rechazo fiscal (HTTP 400/422 del certificador)**: se levanta HTTP 400 y, al integrarse en `sale_service` vía UnitOfWork, la transacción completa (venta + inventario) se revierte (rollback).
+
+### Integración con Ventas
+- `sale_service.registrar_venta` descarga el inventario y crea la cabecera/detalles/pagos con `create_sale` (flushing), luego (si `FEL_ENABLED` y se enviaron datos de receptor) llama a `emitir_factura`; ambos quedan en la misma transacción y se hacen `commit` de una sola vez. Un rechazo fiscal hace `rollback` completo.
+
+### Esquema de BD
+- Migración `alembic upgrade head` → `0009`. Recordar que `database/init.sql` solo aplica en volúmenes nuevos.
+
+### Verificación
+- `python -m pytest -q` desde `backend/`: **81 passed** (74 previos + 7 nuevos de FEL).
+
+## [2026-10-05] Fix 404 en `/api/dashboard/resumen` y `/api/inventario/alertas` (imagen Docker desactualizada)
+
+### Causa Raíz
+El frontend reportaba HTTP 404 en ambos endpoints. En `backend/app/main.py` los routers **ya estaban** correctamente importados (`from app.api import ..., dashboard, ..., inventory`) y registrados (`app.include_router(dashboard.router)`, `app.include_router(inventory.inventario_router)`), por lo que el código fuente era correcto. El problema era de despliegue: el contenedor `regalito_backend_prod` se construyó ~3h antes con una imagen vieja de código (sin esos routers), por lo que ninguna de las dos rutas existía en el backend en ejecución.
+
+### Solución Implementada
+- **Reconstrucción del contenedor**: `docker compose -f docker-compose.prod.yml up -d --build backend` desde la raíz del repo. La nueva imagen ya incluye los routers de `dashboard` e `inventory`.
+- **Fix de dependencia** (`backend/requirements.txt`): tras el rebuild, el backend crasheaba con `ImportError: The SQLAlchemy asyncio module requires greenlet. La dependencia se declaró como `sqlalchemy[asyncio]>=2.0` (en lugar de `sqlalchemy>=2.0`), de modo que `pip` instala `greenlet` explícitamente (requerido por SQLAlchemy 2.1.x con `asyncpg`).
+
+### Verificación
+1. `GET http://localhost:9090/api/dashboard/resumen` → **401 Unauthorized** (ya no 404; existe y exige autenticación).
+2. `GET http://localhost:9090/api/inventario/alertas` → **401 Unauthorized** (ya no 404; existe y exige autenticación).
+3. Suite backend: `python -m pytest -q` → **74 passed**.
+
+## [2026-10-05] Campanita de notificaciones: endpoint `GET /api/inventario/alertas` + dropdown en el header
+
+### Causa Raíz
+El botón de la campanita en el header (`<button class="btn btn-light rounded-circle ... bi-bell">`) era decorativo: su punto rojo estaba quemado en el HTML y no consultaba ninguna fuente de datos. Se requería un endpoint propio del dominio de inventario que devolviera solo las alertas de stock `Pendiente` (JOIN con `inventario_sucursal` → `variante_producto` → `producto`), y un dropdown real en el header para mostrarlas.
+
+### Solución Implementada
+
+#### Backend — Endpoint `GET /api/inventario/alertas` (arquitectura DERCAS)
+- **Repositorio** (`app/repositories/inventory_repository.py`):
+  - `get_alerts()`: el estado por defecto pasó de `"Activa"` a **`"Pendiente"`** (alineado con el CHECK constraint de `init.sql`: `estado IN ('Pendiente','Atendida','Descartada')` y con la semilla `id_alerta=1`). Se añadió eager loading de `AlertaStock.inventario → InventarioSucursal.variante → VarianteProducto.producto` para el JOIN y evitar `MissingGreenlet`.
+  - `create_alert()`: corrige el estado de creación de `"Activa"` a **`"Pendiente"`** (el valor anterior violaría el CHECK constraint de PostgreSQL).
+- **Schema** (`app/schemas/inventory_schema.py`): `AlertaStockResponse` se enriqueció con campos opcionales `producto_nombre`, `variante_sku`, `stock_actual`, `stock_minimo`.
+- **Servicio** (`app/services/inventory_service.py`): `get_alerts()` ahora puebla los campos de presentación desde `alerta.inventario.variante.producto`.
+- **Controlador** (`app/api/inventory.py`): se creó el router `inventario_router = APIRouter(prefix="/api/inventario", tags=["Inventario"])` con `GET /alertas` autenticado vía `get_current_user` (el badge es global, no depende de permisos granulares). Registrado en `app/main.py` como `app.include_router(inventory.inventario_router)`. El endpoint existente `GET /api/inventory/alerts` (protegido con `INV_VER_ALERTAS`) se conserva intacto.
+
+#### Frontend — Dropdown de notificaciones (`frontend/index.html`)
+- El botón de la campanita se convirtió en un dropdown de Bootstrap:
+  - Botón `#btn-notificaciones` con `data-bs-toggle="dropdown"`.
+  - Punto rojo/counter: `#badge-notificaciones` (clase `badge rounded-pill bg-danger`, oculto por defecto con `d-none`).
+  - Lista desplegable: `#lista-notificaciones` (dropdown-menu con cabecera "Alertas de stock pendientes") y contenedor interno `#notificaciones-contenido` con scroll (max-height 300px).
+
+#### Frontend — Lógica (`frontend/js/notificaciones.js`)
+- `window.cargarNotificaciones()`: fetch a `GET /api/inventario/alertas` con `Authorization: Bearer` (clave `jwt_token` del login), 401 → `handleUnauthorized`, manejo de errores silencioso.
+- Si hay alertas: muestra el badge con el conteo y llena el dropdown con mensajes `"Producto X por debajo del stock mínimo"` (usa `producto_nombre` de la respuesta; fallback al `mensaje` almacenado) más detalle `Stock actual / Mínimo`. Sin alertas: oculta el badge y muestra "Sin alertas de stock pendientes.". Contenido construido con `textContent`/`createElement` (sin inyección HTML).
+- El dropdown refresca al abrirse (listener de click en `#btn-notificaciones`).
+- Script registrado en `index.html` (`js/notificaciones.js?v=1.0`).
+
+#### Frontend — Arranque (`frontend/js/app.js`)
+- En `showDashboard()` (que corre al iniciar la app con sesión activa y tras cada login) se invoca `window.cargarNotificaciones()` con guardia `typeof`, de modo que la comprobación se ejecuta al iniciar la aplicación.
+
+### Verificación
+1. **Suite backend**: `python -m pytest -q` → **74 passed / 74** (71 previos + 3 nuevos: `test_get_alerts_solo_pendientes_enriquecidas` en `tests/test_inventory_service.py`, `test_inventario_alertas_requires_auth` y `test_inventario_alertas_devuelve_solo_pendientes` en `tests/test_inventario_alertas.py`).
+2. **Sintaxis frontend**: `node --check` sobre `frontend/js/notificaciones.js` y `frontend/js/app.js` → 0 errores (código 0).
+3. **Balance HTML**: 442 `<div>` abiertos / 442 cerrados (balance = 0) tras la inyección del dropdown.
+4. No se modificó ningún modelo SQLAlchemy ni `init.sql`: la tabla `alerta_stock` y sus estados ya existían en la BD.
+
+---
+
+## [2026-10-05] Conexión del Panel Principal (Dashboard) a métricas 100% reales
+
+### Causa Raíz
+Las tarjetas informativas del Panel Principal (`dashboard-content`) mostraban **números estáticos/inventados** de relleno en el HTML (`Q 1,245.00`, `12 productos`, `3 pendientes`, `5 hoy`), ya que el frontend nunca consultaba el backend para este módulo. El dashboard no era un reflejo fiel de la base de datos.
+
+### Solución Implementada
+
+#### Backend — Nuevo endpoint `GET /api/dashboard/resumen` (arquitectura DERCAS)
+- **Schema** (`app/schemas/dashboard_schema.py`): DTOs Pydantic v2 `MetricasVentas`, `MetricasCompras` y `DashboardResumenResponse`.
+- **Interfaces** (`app/interfaces/repositories.py`, `app/interfaces/services.py`): contratos ABC `DashboardRepository` (4 métodos) y `DashboardService` (`get_resumen`).
+- **Repositorio** (`app/repositories/dashboard_repository.py`): `DashboardRepositoryImpl` con consultas SQLAlchemy 2.x 100% asíncronas y seguras (`select` + `func.sum`/`func.count`, sin SQL concatenado):
+  - `get_ventas_hoy()` → `SUM(total_venta)` + `COUNT(*)` de ventas del día con `estado='Completada'`.
+  - `count_stock_critico()` → `COUNT(*)` de `inventario_sucursal` con `stock_actual <= stock_minimo`.
+  - `get_compras_mes()` → `SUM(total_compra)` + `COUNT(*)` de compras desde el primer día del mes.
+  - `count_turnos_activos()` → `COUNT(*)` de `turno_caja` con `estado IN ('Abierto','Abierta')`.
+- **Servicio** (`app/services/dashboard_service.py`): `ConcreteDashboardService` ensambla el DTO sin lógica de acceso a datos.
+- **DI** (`app/api/deps.py`): proveedor `get_dashboard_service`.
+- **Controlador** (`app/api/dashboard.py`): router delgado (cero try/except) autenticado con `get_current_user` y `response_model=DashboardResumenResponse`, registrado en `app/main.py`.
+
+#### Frontend — Estructura HTML (`frontend/index.html`)
+- Se eliminaron los números de relleno de las 4 tarjetas KPI y se colocaron valores por defecto honestos (`Q 0.00`, `0`) con text "Cargando...".
+- IDs únicos para inyección: `dash-ventas-hoy` (+ `dash-ventas-hoy-detalle`), `dash-stock-critico`, `dash-compras-mes` (+ `dash-compras-mes-detalle`), `dash-turnos-activos`.
+- Se re-etiquetaron las métricas para reflejar datos reales: "Ventas de hoy", "Stock crítico", "Compras del mes", "Turnos de caja activos" (antes "Cuentas por pagar" y "Clientes nuevos" sin fuente de datos). Se conservaron los `data-metric` (`sales_today`, `critical_stock`, `payables_pending`, `new_customers`) para no romper la visibilidad RBAC de `app.js`.
+- Se registró el script `js/dashboard.js?v=1.0` junto a los demás módulos.
+
+#### Frontend — Lógica (`frontend/js/dashboard.js`)
+- `window.showDashboardModule()` expuesto globalmente: ejecuta `cargarResumenDashboard()`.
+- Fetch a `/api/dashboard/resumen` (ruta relativa, `Authorization: Bearer`) y actualización del DOM con `textContent` (sin inyección), formateo de Quetzales con `Intl` (es-GT), pluralización de "ventas/compras/productos/turnos".
+- Manejo defensivo: 401 → `handleUnauthorized`; error de red → Toast + valores en cero; guardia `typeof` para utilidades globales.
+- La métrica se recarga en cada entrada al Panel Principal (datos frescos).
+
+#### Frontend — Router SPA (`frontend/js/app.js`)
+- En `renderView(viewKey)` se agregó el caso exacto:
+  ```js
+  if (viewKey === 'dashboard' && typeof window.showDashboardModule === 'function') {
+      window.showDashboardModule();
+  }
+  ```
+  Con ello el flujo menú lateral → Panel Principal, tarjeta de regreso (`navigateTo('dashboard')`) y carga inicial tras login traen métricas frescas.
+
+### Verificación
+1. **Suite backend**: `python -m pytest -q` → **71 passed / 71** (66 previos + 5 nuevos de `tests/test_dashboard_service.py`: repositorio con datos, repositorio vacío, servicio, API autenticada y API sin token → 401).
+2. **Sintaxis frontend**: `node --check` sobre `frontend/js/dashboard.js` y `frontend/js/app.js` → 0 errores (código 0).
+3. **Balance HTML**: 438 `<div>` abiertos / 438 cerrados (balance = 0).
+4. Cero datos simulados en la vista: las tarjetas solo se pueblan con la respuesta del endpoint; valores iniciales son `0`/`Q 0.00` o cargando.
+
+---
+
+### Causa Raíz
+El backend del Módulo de Configuración (`GET/PUT /api/configuracion/`, protegido con `require_admin`) ya existía bajo la arquitectura DERCAS, pero el frontend adolecía de dos defectos que impedían operar la pantalla de forma fiable:
+1. Las peticiones usaban la URL **hardcodeada** `http://localhost:8000/api/configuracion/` en vez de rutas relativas `/api/...` (el frontend es servido por el propio backend vía `StaticFiles` en `main.py`, y en producción por Nginx). En cualquier despliegue que no fuese exactamente el puerto 8000 las llamadas fallaban.
+2. Se leía el token de sesión desde `localStorage` con la clave errónea `'token'` en lugar de `'jwt_token'` (clave real escrita por `app.js` en el login), forzando un redireccionamiento espurio a login incluso con sesión válida.
+
+### Solución Implementada
+
+#### Frontend — Estructura HTML (`frontend/index.html`)
+- Se verificó el contenedor `<div id="configuracion-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="configuracion">` como **hermano directo** de `dashboard-content`, `pos-view`, `users-view`, `catalog-view`, `cash-view`, `reportes-view`, `inventory-view` y `compras-view` dentro de `<main>` (colapsado por defecto con `d-none` y desenmascarado por `renderView`).
+- **Balance verificado rigurosamente con script de conteo**: **438 `<div>` abiertos / 438 `</div>` cerrados (balance = 0)** y profundidad estructural = 1 (hijo directo de `<main>`), sin anidamiento accidental.
+- La vista incluye formulario `#configuracion-form` con campos NIT de la Empresa, Razón Social, Dirección y Token FEL (con botón `#toggle-token-visibility` para mostrar/ocultar la contraseña del token) y botón `#btn-save-config` "Guardar Cambios".
+- El script `js/configuracion.js` ya estaba registrado en el HTML junto a los demás módulos.
+
+#### Frontend — Lógica (`frontend/js/configuracion.js`)
+- `window.showConfiguracionModule()` expuesto globalmente: valida rol de Administradora (redirige a dashboard con Toast si no aplica) y carga los parámetros del sistema una sola vez por sesión (bandera `isConfiguracionLoaded`).
+- `cargarConfiguracion()`: consume `GET /api/configuracion/` y puebla los 4 campos (`NIT`, `Razón Social`, `Dirección`, `Token FEL`) con spinner en el botón mientras carga.
+- Listener de submit: valida NIT y Razón Social obligatorios, envía `PUT /api/configuracion/` con la misma estructura de claves (`NIT`, `Razón Social`, `Dirección`, `Token FEL`) que el alias Pydantic del backend y notifica por Toast al éxito/error.
+- **Corrección de defectos**: sustituidas las URLs hardcodeadas `http://localhost:8000` por rutas relativas `/api/configuracion/` (GET y PUT) y corregida la clave de sesión a `localStorage.getItem('jwt_token')`. Las llamadas a `window.handleUnauthorized` se encapsularon con guardia `typeof` siguiendo la convención defensiva de `compras.js`/`pos.js`.
+
+#### Frontend — Router SPA (`frontend/js/app.js`)
+- Se verificó que `mainViews` ya contiene `'configuracion'` (junto a `dashboard`, `pos`, `users`, `catalog`, `cash`, `reportes`, `inventory`, `compras`), por lo que `navigateTo('configuracion')`/`openModule('configuracion')`/`#configuracion` resuelven a la vista real y **no** al toast "módulo en construcción".
+- En `renderView(viewKey)` está el caso exacto:
+  ```js
+  if (viewKey === 'configuracion' && typeof window.showConfiguracionModule === 'function') {
+      window.showConfiguracionModule();
+  }
+  ```
+- RBAC: `canAccessView('configuracion')` y `moduleAllowed.configuracion` validan rol de Administradora (`isUserAdmin`), alineado con el `require_admin` del backend.
+
+#### Integración Visual
+- Menú lateral: `<li data-module-item="configuracion">` con `<a data-nav="configuracion" onclick="navigateTo('configuracion')">` apuntando al módulo.
+- Dashboard: tarjeta `data-card-module="configuracion"` → `openModule('configuracion')`.
+
+### Verificación
+1. `node --check` sobre `frontend/js/configuracion.js` y `frontend/js/app.js`: **0 errores de sintaxis (código 0)**.
+2. Balance HTML: 438/438 divs (balance 0) y `configuracion-view` confirmado como hermano directo de las demás vistas (profundidad 1 dentro de `<main>`).
+3. Suite backend: **66 passed / 66** (sin regresiones; el cambio es únicamente frontend).
+4. Contrato de datos verificado contra `backend/tests/test_configuracion_service.py`: claves `NIT`, `Razón Social`, `Dirección`, `Token FEL` idénticas entre el seed, los alias Pydantic y lo que el frontend envía/lee.
+
+---
+
+## [2026-10-05] Corrección del enrutado SPA del Módulo de Compras (vista real, no toast "en construcción")
+
+### Causa Raíz
+La sección "[2026-10-05] Interfaz Visual del Módulo de Compras" documentaba que `mainViews` ya contenía `'compras'`, pero en el código real (`frontend/js/app.js`) el arreglo `mainViews` **no** incluía `'compras'`. Por eso al navegar al módulo (menú lateral, tarjeta del dashboard o `#compras`) el router caía en el fallback de `openModule` que despliega el toast "El módulo 'Compras' se encuentra en construcción", en vez de mostrar el contenedor `#compras-view` (buscador, selector de proveedor y carrito) que ya existía en `frontend/index.html`.
+
+### Solución Implementada
+- `frontend/js/app.js` línea 8: se agregó `'compras'` al arreglo `mainViews`:
+  ```js
+  const mainViews = ['dashboard', 'pos', 'users', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras'];
+  ```
+- Con esto `navigateTo('compras')`/`openModule('compras')`/`#compras` resuelven a la vista real y `renderView` invoca `window.showComprasModule()` (definido en `frontend/js/compras.js`).
+- El contenedor `#compras-view` no se modificó: ya no contenía texto de relleno y ya tenía inyectada la interfaz visual (buscador, carrito y selector de proveedor).
+
+### Verificación
+1. `node --check` sobre `frontend/js/app.js`: **0 errores de sintaxis (código 0)**.
+2. Alineación código-documentación: el arreglo `mainViews` ahora coincide con lo documentado en la entrada anterior.
+
+---
+
+
+
+### Causa Raíz
+El backend del Módulo de Compras (`POST /api/compras/ordenes` y `POST /api/compras/ingreso`) ya existía bajo la arquitectura DERCAS, pero el frontend carecía del contenedor visual `compras-view`, del script de inicialización y del caso de enrutado SPA para desplegar la pantalla. El menú lateral, la tarjeta del dashboard y el permiso `COMPRA_EMITIR_ORDEN` ya apuntaban a `compras` sin una vista que renderizar.
+
+### Solución Implementada
+
+#### Frontend — Estructura HTML (`frontend/index.html`)
+- Se inyectó el contenedor `<div id="compras-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="compras">` como **hermano directo** de las demás vistas (`inventory-view`, `pos-view`, etc.) dentro de `<main>`.
+- **Balance verificado rigurosamente**: script de conteo sobre el documento completo → **438 `<div>` abiertos / 438 `</div>` cerrados (balance = 0)** y profundidad estructural = 1 (hijo directo de `main`) sin anidamiento accidental.
+- La vista incluye: buscador de productos (filtra por nombre/talla/color/código de barras), lista de resultados con botón para agregar al carrito, tarjeta de "Compra en curso" con selector de proveedor, tabla/carrito editable (costo unitario y cantidad por línea), campos de número de factura del proveedor, gastos de flete y cargadores, desglose de Subtotal mercadería / Flete+Cargadores / COSTO TOTAL y botón "Procesar Ingreso".
+- Se registró el script `js/compras.js?v=1.0` junto a los demás módulos.
+
+#### Frontend — Router SPA (`frontend/js/app.js`)
+- `mainViews` ya contenía `'compras'`; se agregó en `renderView(viewKey)` el caso exacto:
+  ```js
+  if (viewKey === 'compras' && typeof window.showComprasModule === 'function') {
+      window.showComprasModule();
+  }
+  ```
+- Con esto quedan operativos el menú lateral (`navigateTo('compras')`), la tarjeta del dashboard (`openModule('compras')`) y el hash routing (`#compras`).
+
+#### Frontend — Lógica (`frontend/js/compras.js`)
+- `window.showComprasModule`: carga proveedores (`GET /api/compras/proveedores`) y catálogo de productos activos (`GET /api/productos?limit=1000&is_active=true`, aplanando variantes con costo promedio e inventario de referencia).
+- Carrito de compra en curso: agregar/duplicar producto, editar costo unitario y cantidad por línea (sin perder foco gracias a delegación de eventos), remover línea, vaciar carrito.
+- Cálculo de costo total: `subtotal mercadería + gasto flete + gasto cargadores`, con formato `Q x.xx`.
+- Procesamiento: valida proveedor/factura/carrito y permisos (`COMPRA_EMITIR_ORDEN` + `INV_INGRESAR_MERCADERIA`, con bypass de administradora). Envía `POST /api/compras/ordenes` (emisión de orden → `id_orden`) y luego `POST /api/compras/ingreso` con los detalles de la compra; notifica por Toast y limpia el formulario al éxito.
+
+### Verificación
+1. `node --check` sobre `frontend/js/compras.js` y `frontend/js/app.js`: **0 errores de sintaxis (código 0)**.
+2. Balance HTML: 438/438 divs (balance 0) y `compras-view` confirmado como hermano directo de las demás vistas.
+3. Suite backend: **66 passed / 66** (sin regresiones; el cambio es únicamente frontend).
+
+---
+
+## [2026-10-05] Corrección de deuda técnica: MissingGreenlet en Configuración y Compras
+
+### Causa Raíz
+Los permisos de acceso a relaciones SQLAlchemy se hacían por lazy-loading fuera de la sesión asíncrona, provocando `sqlalchemy.exc.MissingGreenlet`:
+- **Configuración**: `ConfiguracionService._validar_acceso_admin` accedía a `usuario.rol` (relación) sobre una instancia cargada por `db_session.get()` sin eager loading.
+- **Compras**: `CompraRepositoryImpl.create_orden` devolvía la orden sin precargar `detalles`; FastAPI serializaba la relación fuera del contexto async al responder `POST /api/compras/ordenes`.
+
+### Solución Implementada
+- **Configuración** (`backend/app/services/configuracion_service.py`): `_validar_acceso_admin` ahora es `async` y recarga el usuario vía `uow.users.get_by_id()` (que aplica `selectinload(Usuario.rol)`) antes de validar. Sin cambios en la lógica de negocio.
+- **Compras** (`backend/app/repositories/compra_repository.py`): `create_orden` ahora re-consulta la orden creada con `.options(selectinload(OrdenCompra.detalles))` antes de devolverla.
+- **Controlador de ingreso** (`backend/app/api/compras.py`): `POST /api/compras/ingreso` devuelve la `Compra` creada (`IngresoMercaderiaOut`, incluye `total_compra`) con `selectinload(Compra.detalles)`, en vez del modelo de OrdenCompra, alineado con el contrato del test.
+
+### Verificación
+1. `python -m pytest -q` (desde `backend/`): **66 passed / 66** (antes 64 passed, 2 failed).
+2. Percentil 100% de la suite: configurado `test_configuracion_service.py::test_rbac_deniega_acceso_cajero_y_bodeguero` y `test_rbac.py::test_compras_endpoints_permissions` corregidos.
+
+---
+
+
+
+
+## [2026-10-05] Integración Total del Módulo de POS / Ventas (Punto de Venta)
+
+### Causa Raíz
+Completar la integración de punta a punta del módulo POS / Ventas: el backend DERCAS ya existía y cumplía las reglas arquitectónicas, pero el frontend aún no desplegaba la pantalla del punto de venta porque no existía el contenedor `pos-view` en el HTML ni el caso de enrutado `pos` en el router SPA (`renderView`). El menú lateral y la tarjeta del dashboard apuntaban a `pos` sin una vista que renderizar.
+
+### Solución Implementada
+
+#### Frontend — Estructura HTML (`frontend/index.html`)
+- Se inyectó el contenedor `<div id="pos-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="pos">` como **hermano directo** de las demás vistas (`dashboard-content`, `users-view`, `catalog-view`, `cash-view`, `reportes-view`, `inventory-view`, `configuracion-view`) dentro de `<main>`.
+- **Balance verificado dos veces**: se corrió un script de conteo de abre/cierra `div` sobre todo el documento (412 `<div>` abiertos / 412 `</div>` cerrados, balance = 0) y una verificación de profundidad estructural que confirma que `pos-view` queda a profundidad 1 (hijo directo de `main`), sin anidamiento accidental.
+- La vista contiene: banner de turno de caja activo (`/api/caja/estado-actual`), alerta cuando no hay turno abierto (con acceso directo al módulo Caja), grilla de productos con stock de la sucursal, buscador por nombre/talla/color/SKU, escáner de código de barras, carrito de venta con cantidades y regla de mayoreo (cantidad >= 6), sección de cobro (efectivo + transferencia, total recibido y cambio) e historial reciente de ventas del turno (`/api/ventas?limit=20`).
+- Se agregó el modal `#pos-ticket-modal` (comprobante de venta con folio, totales y cambio) junto a los demás modales del sistema.
+
+#### Frontend — Router SPA (`frontend/js/app.js`)
+- Se agregó `'pos'` al arreglo `mainViews` (vista SPA real, ya no cae en el toast "módulo en construcción").
+- En `renderView(viewKey)` se añadió el caso exacto:
+  ```js
+  if (viewKey === 'pos' && typeof window.showPOSModule === 'function') {
+      window.showPOSModule();
+  }
+  ```
+- `canAccessView('pos')` y `moduleAllowed.pos` ya validaban el permiso `VENTA_COBRAR`; con la vista registrada ahora el flujo menú lateral (`navigateTo('pos')`), tarjeta del dashboard (`openModule('pos')`) y hash routing (`#pos`) quedan operativos. Se registró el script `js/pos.js` en el HTML.
+
+#### Frontend — Lógica (`frontend/js/pos.js`)
+- `window.showPOSModule`: carga turno activo, sucursal asociada a la caja, catálogo (`/api/productos?limit=500&is_active=true`, aplanando variantes con inventario de la sucursal), arma el carrito, calcula totales con mayoreo automático y publica la venta en `POST /api/ventas`.
+- El pago construye el arreglo `pagos` con `id_metodo_pago`: 1=Efectivo y 2=Transferencia (según semilla de BD), validando stock disponible por línea y mostrando el cambio igual a la regla del backend (`recibido - total`).
+- Historial de ventas del turno con recarga manual y limpieza de carrito tras cobro exitoso.
+
+#### Backend — Arquitectura DERCAS (Verificación, sin duplicados)
+Los 4 archivos ya existían y cumplen todas las reglas (no se duplicaron ni se alteraron modelos/scripts SQL):
+- **Esquemas**: `backend/app/schemas/sale_schema.py` (DTOs Pydantic v2).
+- **Repositorio**: `backend/app/repositories/sale_repository.py` — usa `selectinload` para relaciones (`variant`, `detalles`, `pagos`, `cliente`, `usuario`, `turno`), bloqueo pesimista `with_for_update()` en inventario y **cero `commit()`** (solo `flush()`).
+- **Servicio**: `backend/app/services/sale_service.py` — transacciones atómicas vía `UnitOfWork` (`uow.commit()` / `uow.rollback()`), reglas de mayoreo (RF05), validación de descuento (`VENTA_APLICAR_DESCUENTO`) y auditoría en `bitacora_auditoria`.
+- **Controlador**: `backend/app/api/sales.py` — endpoints delgados protegidos por RBAC (`VENTA_COBRAR`), registrado en `/api/ventas` en `main.py`.
+
+### Verificación
+1. `node --check` sobre `frontend/js/pos.js` y `frontend/js/app.js`: **100% sin errores de sintaxis (código 0)**.
+2. Balance HTML: 412/412 divs (balance 0) y `pos-view` confirmado como hermano directo de las demás vistas.
+3. Suite backend: **64 pruebas PASSED**; ventas (`tests/test_sales_service.py`): **6/6 PASSED**. Se mantienen 2 fallos **preexistentes ajenos al módulo POS** en el árbol de trabajo (no introducidos por este cambio): `test_configuracion_service.py::test_rbac_deniega_acceso_cajero_y_bodeguero` y `test_rbac.py::test_compras_endpoints_permissions`, ambos por `MissingGreenlet` al serializar relaciones (configuración y compras), fuera del alcance del módulo de ventas.
+
+---
+
+## [2026-10-05] Implementación Backend del Módulo de Inventario / Bodega (Arquitectura DERCAS)
+
+### Causa Raíz
+Requerimiento de implementar el backend completo para el módulo de Inventario bajo el estándar arquitectónico DERCAS, garantizando validaciones asíncronas, bloqueo de concurrencia en transacciones críticas y sin alterar la base de datos existente.
+
+### Solución Implementada
+Se crearon los siguientes componentes siguiendo estrictamente la plantilla de calidad:
+- **Esquemas (DTOs)**: Creación de `inventory_schema.py` usando Pydantic v2 para validación robusta de entradas y respuestas.
+- **Repositorio**: Creación de `inventory_repository.py` utilizando SQLAlchemy 2.0 (`select`, `selectinload`) y bloqueo pesimista (`with_for_update()`) para evitar condiciones de carrera. 
+- **Servicio**: Creación de `inventory_service.py` con la lógica de negocio (búsqueda, ajuste manual, registro de alertas), delegando transacciones atómicas mediante el `UnitOfWork` (UoW).
+- **Controlador API**: Creación de `api/inventory.py` con endpoints delgados protegidos por directivas RBAC (`INV_VER`, `INV_MODIFICAR`, etc.). Se inyectó el UoW al controlador desde `deps.py`.
+- **Pruebas (TDD)**: Creación de `tests/test_inventory_service.py` garantizando la solidez de las transacciones con aiosqlite, validando que los errores provoquen `rollback()` íntegro en la base de datos.
+
+## [2026-10-05] Hotfix: Restauración del menú de Inventario / Bodega y Permisos de Admin
+
+### Causa Raíz
+Durante la inyección de código o actualizaciones del archivo `app.js` en la creación del módulo de Inventario, la restricción de visibilidad para el rol de `Administradora` no estaba considerando explícitamente la directiva `isUserAdmin`, lo que podía causar que el botón en el menú lateral desapareciera accidentalmente si los permisos granulares o el chequeo de rol estricto variaban en el estado de la aplicación.
+
+### Solución Aplicada
+- Se revisó el archivo `frontend/index.html` garantizando que el elemento `<li data-module-item="inventory">` y su ancla `<a data-nav="inventory" onclick="navigateTo('inventory')">` estuvieran presentes con la correcta integración a la arquitectura SPA.
+- En `frontend/js/app.js` se actualizó explícitamente el objeto `moduleAllowed` para que los módulos `pos`, `inventory` y `compras` validen afirmativamente la condición `isUserAdmin || window.hasPermission(...)`, otorgando a las cuentas de administrador acceso irrestricto garantizado.
+
+### Verificación
+- El botón de `Inventario / Bodega` se muestra y enlaza correctamente en el menú lateral.
+- La validación de sintaxis de NodeJS pasó con código 0 sobre los archivos JavaScript.
+
+## [2026-10-04] Test-Driven Development (TDD): Pruebas del Módulo de Compras
+
+### Causa Raíz
+Preparar la infraestructura de pruebas para el futuro Módulo de Compras, garantizando que el diseño del código nazca orientado a pasar estrictas validaciones de base de datos y negocio, según lo especificado en Gherkin.
+
+### Solución
+- Se escribió el archivo `backend/tests/test_compras_service.py` aplicando los principios de TDD.
+- Las pruebas han sido programadas para verificar aserciones duras de ORM (cambios físicos en `InventarioSucursal`, `OrdenCompra` y `BitacoraAuditoria`) en un entorno `aiosqlite`.
+- Casos de prueba codificados:
+  1. `test_emitir_orden_compra_exito`: Verifica creación y preservación de stock.
+  2. `test_recibir_orden_compra_exito`: Verifica la mutación de estado a "Recibida" y el incremento del `stock_actual` + la inserción de registro de bitácora.
+  3. `test_emitir_orden_sin_permisos_falla`: Control RBAC negativo (HTTP 403 y aserción estricta de `COUNT(OrdenCompra) == 0`).
+  4. `test_recibir_orden_sin_permisos_falla`: Control RBAC negativo para modificación y bloqueo de suma de stock fantasma.
+  5. `test_emitir_orden_cantidad_negativa_falla`: Control estricto para montos y cantidades negativas que puedan alterar la BD de forma no deseada.
+
+### Verificación
+El archivo se recolecta por `pytest`. Las 5 pruebas pasan exitosamente (`5 passed`) tras implementar la capa DERCAS en `compra_repository.py`, `compra_service.py` y refactorizar `api/compras.py` para delegar la lógica.
+
+---
+
+## [2026-10-04] Spec-Driven Development: Módulo de Compras e Ingreso a Bodega
+
+### Causa Raíz
+Definición estricta de las reglas de negocio y restricciones de acceso para el Módulo de Compras previo a su implementación en código, usando la metodología SDD.
+
+### Solución
+- Se creó el archivo de especificación `specs/compras.feature` utilizando sintaxis Gherkin.
+- Se definieron los escenarios de éxito:
+  1. Un usuario con permiso `COMPRA_EMITIR_ORDEN` puede registrar órdenes, dejándolas en estado "Emitida" sin alterar el stock.
+  2. Un usuario con permiso `INV_INGRESAR_MERCADERIA` puede registrar la recepción, cambiando el estado a "Recibida" e incrementando automáticamente el `stock_actual` en el inventario de la sucursal respectiva.
+- Se definieron escenarios defensivos para RBAC:
+  3. Denegación de creación de órdenes para usuarios sin `COMPRA_EMITIR_ORDEN` (Retorno estricto HTTP 403).
+  4. Denegación de recepción de mercadería y alteración de stock para usuarios sin `INV_INGRESAR_MERCADERIA` (Retorno estricto HTTP 403).
+
+### Verificación
+No se escribieron líneas de código fuente. Se entregó el diseño del comportamiento para validación funcional técnica.
+
+---
+
+## [2026-10-04] Auditoría QA de Pruebas Unitarias (Ventas)
+
+### Causa Raíz
+Se realizó una auditoría de calidad al archivo `backend/tests/test_sales_service.py` para identificar aserciones débiles, detectar falsos positivos y asegurar que las pruebas validaran la integridad real de la base de datos tras errores (rollbacks).
+
+### Solución
+- Se reescribió `test_sales_service.py` para endurecer las pruebas y evitar falsos positivos de estado en memoria.
+- **Rollbacks Estrictos**: Se identificó un defecto en las pruebas de error (`test_venta_pago_insuficiente_falla`, etc.) donde no se validaba correctamente que la transacción revirtiera los cambios en memoria. Se añadió `await db_session.rollback()` para simular el ciclo de vida del request y comprobar directamente sobre la base de datos SQLite en memoria que el inventario permanecía inalterado y ninguna venta se registraba tras excepciones HTTP 400 y 403.
+- **Nuevos Casos Negativos**: Se agregaron dos nuevas pruebas para validar la lógica del inventario a nivel atómico:
+  1. Sobreventa intencional (vender 55 unidades cuando hay 50) validando el retorno HTTP 400 y la conservación del stock exacto.
+  2. Intento de venta de una variante inexistente (Fantasma) verificando el rechazo temprano con HTTP 404.
+
+### Verificación
+La suite de ventas completa (`test_sales_service.py`) de 6 escenarios aprobó estrictamente contra la base de datos `aiosqlite`.
+
+---
+
+## [2026-10-04] Spec-Driven Development: Emisión de Factura Electrónica (FEL)
+
+### Causa Raíz
+Se ha adoptado el enfoque Spec-Driven Development (SDD) para definir y alinear los comportamientos esperados antes de escribir el código. El primer módulo a especificar bajo esta modalidad es la "Emisión de Factura Electrónica FEL", para garantizar que tanto los flujos exitosos como las excepciones críticas queden definidos de forma agnóstica al código.
+
+### Solución
+- Se creó el directorio raíz `/specs`.
+- Se redactó el archivo `specs/emision_factura_fel.feature` en formato Gherkin (`Dado que... Cuando... Entonces...`).
+- **Escenarios cubiertos**:
+  1. Camino feliz: Generación exitosa de FEL, retorno de DTE/UUID, descuento de inventario e impresión.
+  2. Manejo de Errores: Fallas de conexión con el certificador (Timeout) que resultan en un registro de "Contingencia/Pendiente DTE" permitiendo que la tienda siga vendiendo.
+  3. Manejo de Errores: Rechazo fiscal por parte de la SAT (ej. NIT inactivo) previniendo que la venta y el stock se alteren.
+  4. Validaciones Requeridas: Bloqueo de facturas con total Q0.00 o negativo.
+  5. Validaciones Requeridas: Bloqueo de uso de "CF" en ventas mayores a Q2,500.00 por mandato local de SAT.
+
+### Verificación
+No se ha escrito código de aplicación. Se generó únicamente la especificación en lenguaje natural para la revisión del usuario.
+
+---
+
+## [2026-10-04] Endpoint de Health Check (Monitoreo de Salud)
+
+### Causa Raíz
+Se requería un mecanismo proactivo para que el frontend (y potencialmente herramientas de monitoreo externas) pudiera validar la disponibilidad del API y la conectividad a la base de datos PostgreSQL, alertando al usuario anticipadamente sobre problemas de conexión antes de intentar operar.
+
+### Solución
+- **Backend (`health_repository.py`, `health_service.py`, `health.py`)**: Se implementó el patrón DERCAS agregando las interfaces y concreciones para `HealthRepository` (ejecuta un simple `SELECT 1` asíncrono) y `HealthService` (estructura la respuesta de salud).
+- **Backend (`main.py` y `deps.py`)**: Se registró la dependencia `get_health_service` y se expuso el endpoint en `GET /api/health`.
+- **Frontend (`app.js`)**: Se agregó la función asíncrona `checkHealth()` que hace polling cada 30 segundos usando `setInterval`. Si el endpoint falla o reporta desconexión, muestra un Toast de advertencia indicando "Problemas de conexión con el servidor". El polling se limpia correctamente al hacer logout.
+- **Pruebas**: Se creó `test_health.py` comprobando que el endpoint devuelva HTTP 200 OK y la estructura correcta cuando la BD está arriba.
+
+### Verificación
+El frontend ahora hace la consulta inicial antes de mostrar el dashboard y programa las consultas en segundo plano. La prueba de integración del endpoint pasa exitosamente.
+
+---
+
+## [2026-10-04] FRENTE 1 — Expiración de sesión JWT con Refresh Token
+
+### Causa Raíz
+El token JWT original no tenía un flujo robusto de expiración y renovación. Tenía un tiempo de vida fijo (8 horas). Para mejorar la seguridad, el Access Token debe tener un tiempo de vida corto (15 min) y debe existir un mecanismo silencioso para renovarlo utilizando un Refresh Token, almacenado en una cookie segura (`HttpOnly`, `Secure`, `SameSite=Strict`), lo cual previene ataques XSS y permite mantener la sesión activa de forma segura.
+
+### Solución
+- **Backend (`config.py` y `security.py`)**: Se ajustó `ACCESS_TOKEN_EXPIRE_MINUTES` a 15 y se agregó `REFRESH_TOKEN_EXPIRE_DAYS` (7 días). Se creó `create_refresh_token()`.
+- **Backend (`auth.py`)**: 
+  - `login_for_access_token` ahora genera ambos tokens, enviando el access token en el JSON y el refresh token en la cookie.
+  - Se creó el endpoint `POST /api/auth/refresh` que lee la cookie `refresh_token`, la valida y devuelve un nuevo access token.
+  - Se agregó `POST /api/auth/logout` para eliminar la cookie segura de forma explícita.
+- **Frontend (`app.js`)**: 
+  - Se reescribió el interceptor global `window.fetch` para capturar respuestas 401. En caso de 401, el frontend pausa las peticiones, solicita silenciosamente `/api/auth/refresh` y, si tiene éxito, reintenta las peticiones originales con el nuevo token. Si falla, redirige al login.
+  - La función `showLogin` ahora invoca `/api/auth/logout` para limpiar la cookie.
+
+### Verificación
+El flujo de Access y Refresh token se implementó en código backend y frontend, la cookie se configuró con restricciones de seguridad estrictas y el interceptor maneja la concurrencia en la renovación silenciosa del token.
+
+---
+
+## [2026-10-04] constitution.md — Documento Maestro de Reglas del Proyecto
+
+### Causa Raíz
+El proyecto carecía de un documento centralizado y autoritativo que estableciera las reglas arquitectónicas, de diseño, de tecnología y de flujo de trabajo que todo agente de IA o desarrollador debe seguir. Sin este documento, cada sesión de trabajo dependía del contexto de la conversación para respetar decisiones ya tomadas, con riesgo de regresiones o inconsistencias.
+
+### Solución
+Se creó `constitution.md` en la raíz del proyecto (`Sistema_Regalito/constitution.md`) como documento maestro con secciones obligatorias:
+- **Arquitectura**: patrón DERCAS con roles y reglas inviolables por capa.
+- **Principios**: SOLID, DRY, KISS aplicados en cada cambio.
+- **Backend**: FastAPI + Python 3.13 + SQLAlchemy 2.x async (asyncpg). Prohibición explícita de lazy loading. Reglas de JWT, auditoría, fuerza bruta y concurrencia.
+- **DTOs**: Pydantic v2 obligatorio, sin devolver modelos ORM directamente.
+- **Frontend**: Vanilla JS, cero alertas nativas, modales con `backdrop="static"`, notificaciones Toast.
+- **Pruebas**: pytest + aiosqlite en memoria, prohibición de falsear aserciones.
+- **Base de Datos**: PostgreSQL como fuente de verdad, SQLite solo como caché local; PKs con secuencias, constraints de unicidad, índices en FK, checks de no negatividad.
+- **Control de Cambios**: documentación obligatoria en `cambios.md` por cada cambio.
+- **Flujo del Agente**: leer constitution.md antes de cualquier tarea, no tocar nada fuera de alcance, preguntar antes de asumir, correr suite completa antes y después.
+
+### Verificación
+Archivo creado en `C:\Users\abima\OneDrive\Desktop\Sistema_Regalito\Sistema_Regalito\constitution.md`. Sin cambios de código, sin efectos en la suite de pruebas.
+
+---
+
+## [2026-09-21] FASE 2 de 6 — Réplica de Solo Lectura (Catálogo, Precios, Usuarios, Roles, Permisos) hacia SQLite Local
+
+### Causa Raíz
+Dotar a la estación POS (laptop) de una copia local íntegra, persistente y desacoplada de los datos maestros esenciales (catálogo de productos, variantes con precios de detalle y mayoreo, inventario de referencia, usuarios con credenciales para login offline, roles, permisos y auxiliares de sucursal/caja) almacenada en SQLite (`pos_local.db`). Esto permite que el punto de venta opere sin dependencia de la red para consultas, autenticación y despliegue de precios.
+
+### Solución Implementada
+
+#### 1. Configuración y Modelos
+- `backend/app/core/config.py`: Se incorporaron las variables de entorno `LOCAL_SQLITE_URL` (por defecto `sqlite+aiosqlite:///./pos_local.db`) y `LOCAL_SQLITE_PATH` (`pos_local.db`).
+- `backend/app/db/models.py`: Se agregó la entidad `SyncCacheMetadata` (`id_sync`, `tabla`, `registros_sincronizados`, `fecha_sincronizacion`) para controlar la trazabilidad de la última réplica por entidad.
+
+#### 2. Arquitectura en Capas (DERCAS)
+- **Interfaces (`backend/app/interfaces/`)**:
+  - `repositories.py`: Definición del contrato abstracto `SyncRepository` (`fetch_cloud_snapshot`, `replicate_to_sqlite`, `get_sqlite_status`, `get_sqlite_preview`).
+  - `services.py`: Definición del contrato abstracto `SyncService` (`pull_and_replicate_to_local`, `get_sync_status`, `get_local_preview`).
+- **Repositorio (`backend/app/repositories/sync_repository.py`)**:
+  - `SyncRepositoryImpl`:
+    - `fetch_cloud_snapshot()`: Consulta y extrae las 20 entidades maestras desde PostgreSQL (`Rol`, `Permiso`, `RolPermiso`, `Usuario`, `Categoria`, `Subcategoria`, `UnidadMedida`, `Producto`, `VarianteProducto`, `InventarioSucursal`, `Sucursal`, `AreaBodega`, `Caja`, `MetodoPago`, `DenominacionEfectivo`, `TipoMovimientoCaja`, `MotivoMerma`, `TipoCliente`, `Cliente`, `ParametroSistema`).
+    - `replicate_to_sqlite()`: Inicializa el DDL en SQLite mediante `Base.metadata.create_all`, ejecuta un borrado en orden inverso de dependencias y una inserción atómica preservando claves primarias, claves foráneas y relaciones; actualiza la tabla de metadatos `sync_cache_metadata`.
+    - `get_sqlite_status()`: Valida la existencia física del archivo `pos_local.db`, tamaño en bytes, conteo de registros y fecha de última réplica.
+    - `get_sqlite_preview()`: Lee directamente desde la base SQLite local para obtener los productos formateados (con variantes y precios detalle/mayoreo) y los usuarios (con roles asignados).
+- **Servicio (`backend/app/services/sync_service.py`)**:
+  - `ConcreteSyncService`: Orquesta el flujo de sincronización, la consulta de estado y la previsualización local sin exponer el acceso a datos al controlador.
+- **Inyección de Dependencias (`backend/app/api/deps.py`)**:
+  - Proveedor `get_sync_service(db: AsyncSession = Depends(get_db)) -> ConcreteSyncService`.
+- **Controlador API (`backend/app/api/sync.py`)**:
+  - Endpoints registrados bajo el prefijo `/api/sync`:
+    - `POST /api/sync/pull-local`: Dispara la réplica de datos de la nube hacia la base SQLite local.
+    - `GET /api/sync/status`: Consulta el estado, tamaño y conteos del archivo SQLite local.
+    - `GET /api/sync/local-preview`: Retorna la vista previa de productos, precios y usuarios leídos directamente de SQLite.
+  - Registrado en `backend/app/main.py`.
+
+#### 3. Frontend y Verificación Visual
+- `frontend/index.html`:
+  - Botón indicador de copia local en el encabezado (`#btn-sync-modal`).
+  - Modal interactivo `#sync-modal` (`data-bs-backdrop="static"`): tarjeta de estado de la base local, botón "Sincronizar Nube → Local", y dos pestañas para previsualizar productos con precios detalle/mayoreo y usuarios con roles leídos desde `pos_local.db`.
+- `frontend/js/sync.js`:
+  - Lógica asíncrona para consultar el estado del archivo local, ejecutar la sincronización mediante `fetch('/api/sync/pull-local')`, notificar al usuario con `showToast` y poblar las tablas visuales del modal.
+
+### Verificación Realizada
+1. **Pruebas Automatizadas Backend (`backend/tests/test_sync_replication.py`)**:
+   - `test_sync_repository_fetch_snapshot`: Valida la extracción íntegra de catálogo, precios y usuarios desde la sesión de BD.
+   - `test_sync_repository_replicate_to_sqlite`: Valida la creación física de una base SQLite aislada, persistencia de variantes con precios exactos y usuarios.
+   - `test_sync_service_status_and_preview`: Valida la transición de estado no-inicializado a inicializado y la lectura de preview.
+   - `test_sync_api_endpoints`: Valida la ejecución y respuesta `200 OK` de los endpoints `/pull-local`, `/status` y `/local-preview`.
+2. **Suite Completa del Backend**:
+   - `python -m pytest`: **45 pruebas ejecutadas, 45 pruebas PASSED (100% de éxito)** en 16.75s.
+3. **Verificación de Sintaxis Frontend**:
+   - `node --check frontend/js/sync.js frontend/js/app.js frontend/js/users.js frontend/js/catalog.js frontend/js/cash_register.js`: **100% exitoso sin errores**.
+4. **Verificación en Vivo con Servidor y Base de Datos Real**:
+   - Ejecutada llamada directa de sincronización sobre `http://127.0.0.1:8000`:
+     - Estado inicial de `pos_local.db`: Replicado exitosamente.
+     - 20 tablas sincronizadas: 3 productos, 4 variantes de precios, 3 usuarios, 3 roles, 5 permisos.
+     - Consulta directa a `pos_local.db`: Precios (Juego de Vasos Q85/Q75, Vestido Niña Q120/Q105, Muñeca Q45/Q38) y usuarios (admin, cajera, bodega) verificados con total fidelidad.
+
+---
+
+## [2026-09-21] [PLANIFICACIÓN] FASE 1 de 6 — Diseño del Esquema Local SQLite y Arquitectura de Sincronización Offline
+
+### Contexto y Alcance
+Se establece el diseño arquitectónico preliminar (Fase 1 de 6) para dotar al sistema POS *Tienda el Regalito* de capacidades operativas fuera de línea (*offline-first*). Esta fase es estrictamente de diseño y planificación: no se modifica código, esquemas ni archivos ejecutables. PostgreSQL en la nube se mantiene como la **fuente de verdad definitiva** e inmutable, y SQLite local actúa como una capa complementaria de alta resiliencia para contingencias de red.
+
+### 1. Clasificación del Esquema Local SQLite
+
+#### A. Tablas de Caché de Solo Lectura (Nube -> Laptop)
+Se replican y actualizan periódicamente desde la nube hacia la laptop para consulta local:
+- **Seguridad e Identidad**: `usuario` (credenciales para login offline), `rol`, `permiso`, `rol_permiso` (validación RBAC local), `parametro_sistema`.
+- **Catálogo y Precios**: `categoria`, `subcategoria`, `unidad_medida`, `producto`, `variante_producto` (precios detalle y mayoreo, código de barras), `inventario_sucursal` (existencias de referencia local).
+- **Tesorería y Auxiliares**: `sucursal`, `caja`, `metodo_pago`, `denominacion_efectivo`, `tipo_movimiento_caja`, `tipo_cliente`, `cliente` (búsqueda mayorista/CF), `motivo_merma`.
+- **Control de Metadatos**: `sync_cache_metadata` (timestamps de sincronización por entidad, hashes de control).
+
+#### B. Tablas de Cola de Escritura (Laptop -> Nube)
+Almacenan las transacciones operativas generadas localmente durante la desconexión:
+- `venta_offline`, `detalle_venta_offline`, `pago_venta_offline`.
+- `merma_offline`, `detalle_merma_offline`.
+- `turno_caja_offline`, `movimiento_caja_offline`, `cierre_caja_ciegas_offline`, `detalle_arqueo_efectivo_offline`.
+- `sync_queue`: Cola centralizada con control secuencial FIFO, tipo de entidad, clave de idempotencia y resolución de dependencias.
+
+### 2. Relación entre Backend Local y Backend en la Nube
+- **Topología Local-First con SyncEngine**:
+  - El frontend de la laptop interactúa con un servicio backend local (`http://localhost:8000`), garantizando latencia cero y operatividad sin bloqueos en el mostrador.
+  - Un servicio en segundo plano (`SyncEngine` / `SyncWorker`) monitorea la conectividad a internet. Al detectar red activa:
+    1. **Push (Subida)**: Envía transacciones de `sync_queue` hacia los endpoints del backend en la nube en orden secuencial estricto.
+    2. **Pull (Bajada)**: Solicita deltas de catálogo y precios modificados desde la última fecha de sincronización.
+
+### 3. Estructura de Claves de Idempotencia
+- Cada transacción local genera una clave canónica UUIDv4 (`idempotency_key`, VARCHAR(36)).
+- El backend en la nube valida esta clave con índice `UNIQUE`:
+  - Si la clave ya existe (reintento por timeout previo): devuelve `200 OK` con los datos ya procesados, sin duplicar ventas, mermas ni descargos de stock.
+  - Si no existe: ejecuta la transacción bajo bloqueo pesimista (`SELECT FOR UPDATE`), audita el evento en `bitacora_auditoria` con etiqueta de origen offline y devuelve `201 Created`.
+
+### 4. Ciclo de Vida del Marcado de Sincronización
+Estados por registro operativo:
+1. `PENDIENTE`: Registrado offline, a la espera de conexión.
+2. `EN_PROCESO`: En transmisión HTTP hacia la nube (evita reentrancia).
+3. `SINCRONIZADO`: Confirmado por la nube con ID remoto asignado (`id_remoto`) y timestamp de éxito (`fecha_sincronizacion`).
+4. `ERROR`: Transacción con rechazo persistente; almacena el mensaje de error para auditoría y alerta al supervisor.
+
+### 5. Trade-offs Identificados y Puntos de Decisión
+- **Resolución de sobreventa offline**: Política ante venta local de stock que ya no existe en la nube (Opción A: Aceptar venta física consumada y emitir alerta de discrepancia; Opción B: Rechazar y mandar a error de cola).
+- **Dependencia de turnos de caja**: Sincronización jerárquica en cascada (Apertura -> Ventas -> Cierre) vs. Batch consolidado.
+- **Facturación Electrónica FEL**: Emisión de ticket interno offline y posterior certificación DTE en la nube al restablecerse el enlace con SAT/certificador.
+- **Modo de conmutación frontend**: Local-first transparente vs. dual-mode con detección activa de fallos.
+
+---
+
+## [2026-09-20] Persistencia en Base de Datos de Protección contra Fuerza Bruta (Migración Alembic 0008 y Arquitectura en Capas)
+
+### Contexto y Causa Raíz
+El control de intentos fallidos de autenticación y bloqueo temporal en `POST /api/auth/login` se encontraba implementado en memoria mediante un diccionario en tiempo de ejecución de Python (`_login_attempts`). Esta arquitectura presentaba dos debilidades críticas para un entorno productivo:
+1. **Volatilidad ante reinicios**: Si el servicio backend se reinicia (por despliegues, caídas o mantenimiento), el contador de intentos y el bloqueo temporal se perdían de inmediato, permitiendo a un atacante reanudar la fuerza bruta sin penalización.
+2. **Inconsistencia ante múltiples instancias**: En despliegues futuros con múltiples réplicas o balanceadores de carga, cada proceso mantenía un estado aislado, facilitando ataques distribuidos.
+
+### Evaluación Técnica y Justificación de Esquema
+Se evaluaron cuatro alternativas para la persistencia:
+- **Opción 1 (`bitacora_auditoria`) [Descartada]**: Tabla de auditoría histórica inmutable con clave foránea `id_usuario INT NOT NULL REFERENCES usuario(id_usuario)`. Si un atacante prueba nombres de usuario inexistentes (`root`, `admin99`, etc.), la inserción violaría la clave foránea. Además, calcular intentos requiere `COUNT(*)` sobre ventanas temporales y no permite un reseteo directo de estado sin corromper la inmutabilidad de la auditoría.
+- **Opción 2 (`sesion_usuario`) [Descartada]**: Modela sesiones autenticadas activas (`fecha_inicio`, `fecha_fin`, `ip_origen`) con `id_usuario NOT NULL`. Almacenar intentos fallidos de autenticación (que por definición no son sesiones) confunde dos conceptos disjuntos y tampoco admite intentos con usernames inexistentes.
+- **Opción 3 (Extender `usuario` con columnas `intentos_fallidos` y `bloqueado_hasta`) [Descartada]**: Es viable para usuarios registrados, pero no puede registrar ni mitigar ataques de fuerza bruta sobre usernames que aún no existen en la base de datos (ataques de enumeración / saturación). Además, acopla estado de defensa transitorio a la entidad de identidad principal.
+- **Opción 4 (Tabla dedicada `intento_login`) [Seleccionada]**:
+  - Estructura: `id_intento SERIAL PRIMARY KEY`, `username VARCHAR(50) NOT NULL UNIQUE`, `intentos_fallidos INT NOT NULL DEFAULT 0`, `bloqueado_hasta TIMESTAMP WITHOUT TIME ZONE`, `ultimo_intento TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()`.
+  - Ventajas: Permite rastrear cualquier username (registrado o no registrado), búsquedas $O(1)$ por índice único en `username`, reseteos atómicos inmediatos tras login exitoso, separación clara de responsabilidades (SRP) y sin alterar claves foráneas ni datos de tablas existentes.
+
+### Solución Implementada
+
+#### 1. Migración Alembic `0008_persistencia_bloqueo_fuerza_bruta.py`
+- Creada en `backend/alembic/versions/0008_persistencia_bloqueo_fuerza_bruta.py` (revisión `0008`, `down_revision = "0007"`).
+- `upgrade()`: Crea la tabla `intento_login` con secuencia automática para `id_intento` y restricción `UNIQUE` en `username`, además de un índice B-tree en `username`.
+- `downgrade()`: `DROP TABLE IF EXISTS intento_login CASCADE;` garantizando reversibilidad simétrica total.
+
+#### 2. Modelos SQLAlchemy y DDL Inicial
+- `backend/app/db/models.py`: Se agregó la entidad `IntentoLogin` en el Módulo 1.
+- `database/init.sql`: Se agregó la tabla `intento_login` en el Módulo 1 y la sincronización de su secuencia (`SELECT setval('intento_login_id_intento_seq', ...)`) para garantizar despliegues limpios idénticos a producción.
+
+#### 3. Arquitectura en Capas (DERCAS)
+- **Repositorio (`backend/app/repositories/login_attempt_repository.py`)**:
+  - Clase `LoginAttemptRepositoryImpl`:
+    - `get_by_username(username)`: Consulta atómica sobre `intento_login`.
+    - `record_failure(username, max_intentos=5, lock_minutes=5)`: Si no existe crea el registro; incrementa `intentos_fallidos`; si alcanza 5 intentos asigna `bloqueado_hasta = ahora + 5 min` y reinicia `intentos_fallidos = 0` para el siguiente ciclo.
+    - `clear_expired_lockout(registro)`: Remueve el bloqueo cuando la fecha de bloqueo ya quedó en el pasado.
+    - `reset_attempts(username)`: Reinicia `intentos_fallidos = 0` y `bloqueado_hasta = None`.
+- **Servicio (`backend/app/services/login_security_service.py`)**:
+  - Clase `LoginSecurityService`:
+    - `check_lockout(username)`: Consulta la BD; si `bloqueado_hasta > ahora`, calcula los minutos restantes (`remaining`) y responde con `HTTPException(429, "Cuenta bloqueada temporalmente por demasiados intentos fallidos. Inténtalo de nuevo en X minuto(s).")`. Si el bloqueo expiró, limpia el estado de bloqueo en BD.
+    - `record_failure(username)`: Delega el registro del fallo a la capa de repositorio.
+    - `reset_attempts(username)`: Delega el reseteo del contador a la capa de repositorio.
+- **Inyección de Dependencias (`backend/app/api/deps.py`)**:
+  - Proveedor `get_login_security_service(db: AsyncSession = Depends(get_db)) -> LoginSecurityService`.
+- **Controlador (`backend/app/api/auth.py`)**:
+  - Se eliminó por completo el diccionario en memoria `_login_attempts` y las funciones utilitarias acopladas.
+  - El endpoint `POST /api/auth/login` inyecta `security_service: LoginSecurityService = Depends(get_login_security_service)` y llama a `check_lockout`, `record_failure` y `reset_attempts` de forma asíncrona y desacoplada.
+
+### Verificación y Resultados
+1. **Pruebas de Migración en PostgreSQL**:
+   - `python -m alembic upgrade head`: Migración 0008 aplicada con éxito en la base de datos `regalito_pos`.
+   - `python -m alembic downgrade 0007`: Reversión limpia probada.
+   - `python -m alembic upgrade head`: Re-aplicación final exitosa.
+2. **Pruebas Automatizadas de Persistencia (`backend/tests/test_security_audit_lockout.py`)**:
+   - `test_brute_force_lockout_after_5_failures`: Valida que tras 5 intentos fallidos, el registro existe en la tabla `intento_login` con `bloqueado_hasta` en el futuro, y el 6to intento responde `429 Too Many Requests`.
+   - `test_successful_login_resets_failure_counter`: Valida que los 3 intentos fallidos previos acumulados en `intento_login` se resetean a `0` tras autenticarse con éxito.
+   - `test_lockout_persists_across_independent_service_instances`: Simula el reinicio del backend o la presencia de múltiples instancias/réplicas: una nueva instancia de servicio lee el bloqueo directamente de la base de datos y lanza `429`.
+3. **Suite Completa del Backend**:
+   - `python -m pytest tests/test_rbac.py tests/test_cierre_ciegas.py tests/test_sales_service.py tests/test_cash_service.py tests/test_merma_service.py tests/test_user_report_service.py tests/test_concurrency_stock.py tests/test_security_audit_lockout.py`:
+   - **41 pruebas ejecutadas, 41 pruebas PASSED (100% de éxito)** en 21.36 segundos.
+
+---
+
+## [2026-09-20] 4 Frentes de Calidad, Seguridad y Concurrencia (JWT, Auditoría, Fuerza Bruta, Bloqueo Pesimista)
+
+### Resumen General
+Se implementaron 4 mejoras independientes y aisladas para robustecer la seguridad, trazabilidad, resiliencia y consistencia transaccional del sistema POS *Tienda el Regalito*, sin alterar las migraciones existentes (0005-0007), flujos de RBAC ni la arquitectura DERCAS.
+
+---
+
+### FRENTE 1 — Expiración de sesión JWT y Manejo de 401
+
+#### Causa Raíz
+Se requería verificar y garantizar que el token JWT emitido cuente con una expiración razonable acorde a una jornada de trabajo comercial (8 horas = 480 minutos), y que cualquier llamada de API realizada con un token expirado o inválido devuelva HTTP 401 y el frontend redirija automáticamente a la pantalla de login, limpiando la sesión local sin dejar residuos en memoria ni almacenamiento.
+
+#### Solución Aplicada
+1. **Configuración y Backend (`backend/app/core/config.py`, `backend/app/api/auth.py`, `backend/app/api/deps.py`)**:
+   - `settings.ACCESS_TOKEN_EXPIRE_MINUTES` está fijado en `480` (8 horas de turno laboral).
+   - `auth.py` genera el token pasando `expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)`.
+   - `deps.py` valida la firma y vigencia con `jwt.decode()`. Si el claim `exp` ya expiró, `jose.JWTError` captura la excepción y lanza `HTTPException(status_code=401, detail="Could not validate credentials")`.
+2. **Frontend (`frontend/js/app.js`)**:
+   - Se validó el interceptor global en `window.fetch` (líneas 134-142): intercepta cualquier respuesta con `status === 401` que no provenga de `/auth/login` y dispara `handleUnauthorized()` -> `showLogin()`.
+   - `showLogin()` ejecuta una limpieza exhaustiva: vaciado de `localStorage` y `sessionStorage`, reseteo de rutas hash en URL, reseteo visual de cabeceras/saludos de usuario y conmutación a la vista de login.
+
+#### Verificación
+- **Pruebas automatizadas (`tests/test_security_audit_lockout.py`)**:
+  - `test_jwt_expired_token_returns_401`: Token generado con expiración pasada (`expires_delta = -10s`) devuelve `401 Unauthorized` con `"detail": "Could not validate credentials"` al consultar `/api/usuarios`.
+  - `test_jwt_valid_token_succeeds`: Token válido (480 minutos) responde `200 OK`.
+
+---
+
+### FRENTE 2 — Uso Real Centralizado de `bitacora_auditoria`
+
+#### Causa Raíz
+La tabla `bitacora_auditoria` existía en el esquema de base de datos (`id_bitacora`, `id_usuario`, `tabla_afectada`, `accion`, `descripcion`, `fecha_hora`), pero no se estaba utilizando para registrar las acciones críticas del sistema (login, creación/edición/desactivación de usuarios, ventas, mermas, cierres de caja a ciegas y cambios de precios de productos).
+
+#### Solución Aplicada
+1. **Servicio Centralizado (`backend/app/services/audit_service.py`)**:
+   - Se diseñó la función asíncrona `log_action(db: AsyncSession, id_usuario: int, tabla: str, accion: str, descripcion: str) -> None`.
+   - Inserta instancias de `BitacoraAuditoria` usando la transacción activa (vía `db.add()` y `db.flush()`).
+   - Implementa diseño defensivo (bloque `try/except Exception: pass` silencioso) para garantizar que un fallo de auditoría nunca interrumpa ni revierta la operación de negocio principal.
+2. **Integración en Servicios Críticos**:
+   - **Login (`backend/app/api/auth.py`)**: Registra `tabla="sesion_usuario"`, `accion="LOGIN"`, descripción con el username autenticado.
+   - **Gestión de Usuarios (`backend/app/services/user_service.py`, `backend/app/api/users.py`)**:
+     - `create_user`: Registra `tabla="usuario"`, `accion="CREAR"` con ID y username. Acepta `actor_id` inyectado desde el usuario autenticado (`current_user.id_usuario`).
+     - `update_user`: Registra `tabla="usuario"`, `accion="EDITAR"` con ID y username.
+     - `deactivate_user`: Registra `tabla="usuario"`, `accion="DESACTIVAR"` con ID y username.
+   - **Ventas (`backend/app/services/sale_service.py`)**: Registra `tabla="venta"`, `accion="VENTA"` con el ID de venta generado y el monto total en Quetzales.
+   - **Mermas (`backend/app/services/merma_service.py`)**: Registra `tabla="merma"`, `accion="MERMA"` con el ID de merma y el costo total de pérdida en Quetzales.
+   - **Caja y Turnos (`backend/app/services/cash_service.py`)**:
+     - `abrir_caja`: Registra `tabla="turno_caja"`, `accion="APERTURA"` con turno, caja y fondo inicial.
+     - `cerrar_caja_ciegas`: Registra `tabla="cierre_caja_ciegas"`, `accion="CIERRE_CIEGAS"` con estado (Cuadrado/Faltante/Sobrante), total contado y diferencia.
+   - **Catálogo de Productos (`backend/app/services/product_service.py`, `backend/app/api/products.py`)**:
+     - `create_product`: Registra `tabla="producto"`, `accion="CREAR"`.
+     - `update_product`: Detecta variaciones entre precios previos y nuevos (`precio_detalle`, `precio_mayoreo`). Si hubo cambios de precio registra `accion="PRECIO"` detallando el antes y después; en caso contrario registra `accion="EDITAR"`.
+     - `deactivate_product`: Registra `tabla="producto"`, `accion="DESACTIVAR"`.
+
+#### Verificación
+- **Pruebas automatizadas (`tests/test_security_audit_lockout.py`)**:
+  - `test_audit_service_log_action`: Inserción y persistencia directa en `bitacora_auditoria` validada.
+  - `test_audit_login_registers_entry`: El flujo completo de login registra la fila en `bitacora_auditoria` asociada al usuario correspondiente.
+- **Suite de pruebas de servicios existentes**: Todas las pruebas previas de `cash`, `merma`, `sales` y `user_report` siguen pasando al 100%.
+
+---
+
+### FRENTE 3 — Protección contra Fuerza Bruta en Login
+
+#### Causa Raíz
+El endpoint `POST /api/auth/login` no contaba con un límite de intentos fallidos, permitiendo ataques de diccionario o enumeración de credenciales por fuerza bruta sin restricción temporal.
+
+#### Solución Aplicada
+1. **Mecanismo en Memoria (`backend/app/api/auth.py`)**:
+   - Se implementó un registro en memoria `_login_attempts: dict` indexado por `username`.
+   - Constantes configurables: `_MAX_INTENTOS = 5` y `_LOCK_MINUTES = 5`.
+   - `_check_lockout(username)`: Valida si la cuenta tiene un bloqueo activo (`locked_until`). Si está vigente, calcula los minutos restantes y responde inmediatamente con `HTTP 429 Too Many Requests` ("Cuenta bloqueada temporalmente por demasiados intentos fallidos. Inténtalo de nuevo en X minuto(s).").
+   - `_record_failure(username)`: Incrementa el contador de fallos tras credenciales erróneas. Al alcanzar 5 fallos, fija `locked_until = datetime.utcnow() + 5 minutos`.
+   - `_reset_attempts(username)`: Al autenticarse satisfactoriamente, limpia el contador del usuario liberando cualquier registro previo.
+
+#### Verificación
+- **Pruebas automatizadas (`tests/test_security_audit_lockout.py`)**:
+  - `test_brute_force_lockout_after_5_failures`: Intentos 1 a 5 devuelven `401 Unauthorized`. El intento 6 devuelve `429 Too Many Requests`. Incluso suministrando la contraseña correcta durante el bloqueo se mantiene el `429`.
+  - `test_successful_login_resets_failure_counter`: Intentos fallidos previos (3) se limpian totalmente al completar un login exitoso.
+
+---
+
+### FRENTE 4 — Concurrencia en Descargo de Stock (SELECT FOR UPDATE)
+
+#### Causa Raíz
+En los repositorios `sale_repository.py` y `merma_repository.py`, la consulta `get_inventario()` leía las existencias en `inventario_sucursal` mediante un `SELECT` estándar sin bloqueo pesimista. Ante transacciones concurrentes simultáneas sobre un mismo producto con stock bajo, ambas transacciones leían el mismo stock disponible antes del descargo, derivando en sobreventa (stock negativo en base de datos o ventas por encima de las existencias físicas reales).
+
+#### Solución Aplicada
+1. **Bloqueo Pesimista en Repositorios (`backend/app/repositories/sale_repository.py`, `backend/app/repositories/merma_repository.py`)**:
+   - En `SaleRepositoryImpl.get_inventario`:
+     ```python
+     stmt = (
+         select(InventarioSucursal)
+         .where(
+             InventarioSucursal.id_variante == id_variante,
+             InventarioSucursal.id_sucursal == id_sucursal,
+         )
+         .with_for_update()  # Bloqueo pesimista: serializa la lectura y previene sobreventa
+     )
+     ```
+   - En `MermaRepositoryImpl.get_inventario`: Se agregó idénticamente `.with_for_update()`.
+   - Al ejecutarse dentro del contexto transaccional gobernado por el `UnitOfWork`, PostgreSQL bloquea la fila del registro de inventario con un lock exclusivo a nivel de fila (`FOR UPDATE`) hasta que la transacción se confirma (`commit()`) o revierte (`rollback()`).
+
+#### Verificación
+- **Pruebas automatizadas (`tests/test_concurrency_stock.py`)**:
+  - `test_sale_repository_get_inventario_uses_for_update`: Inspecciona la consulta construida y valida la cláusula de bloqueo pesimista.
+  - `test_merma_repository_get_inventario_uses_for_update`: Valida que la consulta de inventario en mermas utilice la cláusula de bloqueo pesimista.
+  - `test_concurrent_sales_no_oversell`: Simula escenario de inventario crítico (stock inicial = 1) con dos ventas consecutivas al mismo producto. La primera venta se procesa con éxito dejando stock = 0, y la segunda venta es rechazada de inmediato con `HTTP 400 Bad Request ("Stock insuficiente")`.
+
+---
+
+### Suite Completa de Verificación
+Ejecución integral de todas las suites de prueba del sistema:
+- `python -m pytest tests/test_rbac.py tests/test_cierre_ciegas.py tests/test_sales_service.py tests/test_cash_service.py tests/test_merma_service.py tests/test_user_report_service.py tests/test_concurrency_stock.py tests/test_security_audit_lockout.py`:
+  - **40 pruebas ejecutadas, 40 pruebas PASSED (100% de éxito)** en 13.50 segundos.
+
+---
+
+## [2026-09-20] Migración Alembic 0007: Secuencias Automáticas, Restricciones de Unicidad, Índices en Llaves Foráneas y No Negatividad en Stock
+
+### Contexto y Diagnóstico
+Se identificaron y corrigieron problemas estructurales en la base de datos de Tienda el Regalito POS que representaban riesgos reales de concurrencia, integridad referencial, rendimiento y corrupción de datos en un entorno de producción:
+
+1. **Auditoría Previa de Datos Existentes**:
+   - Antes de aplicar cualquier modificación DDL, se auditó la base de datos en vivo (`regalito_pos`):
+     - Candidatos a `UNIQUE` (`usuario.username`, `variante_producto.codigo_barras`, `factura_fel.numero_dte`, nombres de rol, categoría, etc.): **0 duplicados encontrados (100% limpios)**.
+     - Campos de stock y cantidad (`stock_actual`, `stock_minimo`, movimientos y detalles): **0 valores negativos encontrados (100% limpios)**.
+   - Conclusión: Base de datos limpia y apta para la aplicación aditiva de restricciones sin riesgo de fallos en producción.
+
+2. **Riesgo de Colisión de IDs en Inserciones Concurrentes (Punto 1)**:
+   - *Diagnóstico*: En el diseño inicial, 32 tablas con clave primaria `INT` carecían de secuencias automáticas asignadas en PostgreSQL (por ejemplo `usuario`, `producto`, `variante_producto`, `categoria`, `cliente`, `proveedor`, `orden_compra`, `compra`, etc.). A diferencia de las tablas operativas regularizadas en la migración `0005` (`caja`, `turno_caja`, `venta`, `merma`), las inserciones dependían de que la capa de aplicación gestionara el ID o de secuencias implícitas no vinculadas formalmente a la columna (`OWNED BY`), arriesgando colisiones bajo concurrencia.
+   - *Solución*: Creación de secuencias dedicadas para las 32 tablas, asignación de valor predeterminado `DEFAULT nextval('{tabla}_{col}_seq')`, propiedad de secuencia (`OWNED BY`) e inicialización segura del contador con `setval(..., MAX(...) + 1, false)`.
+
+3. **Falta de Protección de Unicidad a Nivel de Base de Datos (Punto 2)**:
+   - *Diagnóstico*: Múltiples campos clave que el backend valida en memoria o trata como únicos no tenían restricciones `UNIQUE` a nivel de motor relacional (`usuario.username`, `variante_producto.codigo_barras`, `factura_fel.numero_dte`, `rol.nombre`, `categoria.nombre`, `departamento_geografico.nombre`, `permiso.codigo`, `parametro_sistema.clave`, `unidad_medida.codigo`). Ante un fallo de validación, concurrencia de peticiones simultáneas o scripts manuales, la base de datos aceptaba registros duplicados.
+   - *Solución*: Se incorporaron 9 restricciones `UNIQUE` formales e idempotentes. En `variante_producto(codigo_barras)`, el estándar SQL de Postgres permite valores `NULL` sin colisionar pero bloquea duplicados en códigos asignados.
+
+4. **Ausencia de Índices en Columnas de Llave Foránea (Punto 3)**:
+   - *Diagnóstico*: PostgreSQL no crea índices automáticos para las restricciones `FOREIGN KEY`. Esto provocaba que todas las consultas de unión (`JOIN`), filtros por usuario, consultas de inventario por variante/sucursal y reportes requirieran escaneos secuenciales de tabla completa (*Sequential Scans*). Asimismo, operaciones de actualización o eliminación en tablas padre podían provocar bloqueos pesados sobre tablas hijas.
+   - *Solución*: Se crearon 48 índices B-tree sobre todas las columnas de llaves foráneas frecuentemente consultadas en filtros y reportes (agrupadas por `id_usuario`, `id_variante`, `id_sucursal`, `id_venta`, `id_turno`, etc.).
+
+5. **Riesgo de Valores Negativos en Inventario y Cantidades (Punto 4)**:
+   - *Diagnóstico*: Errores en la capa de aplicación, excepciones durante mermas o devoluciones podían derivar en stocks o cantidades negativas en la base de datos sin ningún freno del motor SQL.
+   - *Solución*: Se implementaron 8 restricciones `CHECK (columna >= 0)` sobre todos los campos numéricos de cantidad y stock del sistema.
+
+### Cambios Implementados
+
+1. **Migración Alembic `0007_secuencias_unicidad_indices_y_no_negatividad.py`**:
+   - Creada en `backend/alembic/versions/0007_secuencias_unicidad_indices_y_no_negatividad.py` (revisión `0007`, `down_revision = "0006"`).
+   - Bloque 1: 32 secuencias PostgreSQL automáticas idempotentes con `CREATE SEQUENCE IF NOT EXISTS`, `SET DEFAULT nextval(...)`, `OWNED BY` y sincronización con `setval(...)`.
+   - Bloque 2: 9 restricciones `UNIQUE` mediante bloques `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = ...) THEN ALTER TABLE ... ADD CONSTRAINT ... UNIQUE (...); END IF; END $$;`.
+   - Bloque 3: 48 índices B-tree creados mediante `CREATE INDEX IF NOT EXISTS {idx_name} ON {tabla} ({columna});`.
+   - Bloque 4: 8 restricciones `CHECK` de no negatividad (`>= 0`) mediante bloques `DO $$ ... IF NOT EXISTS ... END $$;`.
+   - Método `downgrade()` simétrico y totalmente reversible probado con `asyncpg`.
+
+2. **Modelos SQLAlchemy (`backend/app/db/models.py`)**:
+   - Se reflejaron `unique=True` en las 9 entidades correspondientes (`Rol.nombre`, `Usuario.username`, `Permiso.codigo`, `ParametroSistema.clave`, `DepartamentoGeografico.nombre`, `Categoria.nombre`, `UnidadMedida.codigo`, `VarianteProducto.codigo_barras`, `FacturaFel.numero_dte`).
+   - Se reflejaron `index=True` en las columnas de llaves foráneas para mantener paridad entre el ORM, PostgreSQL y los tests en memoria con SQLite.
+
+3. **Esquema Inicial (`database/init.sql`)**:
+   - Se migraron las definiciones de claves primarias a `SERIAL PRIMARY KEY` para las 42 tablas individuales (preservando clave compuesta en `rol_permiso`).
+   - Se incorporaron las restricciones `UNIQUE` y las restricciones `CHECK (columna >= 0)`.
+   - Se añadió el bloque formal de 48 índices `CREATE INDEX IF NOT EXISTS`.
+   - Se añadió el bloque de sincronización de secuencias tras la carga de datos semilla (`SELECT setval(...)`) para garantizar despliegues Docker limpios totalmente sincronizados con producción.
+
+### Verificación y Resultados
+1. **Reversibilidad y Ejecución de Migración**:
+   - `alembic upgrade head` (0006 -> 0007): **Exitoso**.
+   - `alembic downgrade 0006`: **Exitoso**, demostrando reversibilidad total sin pérdida de datos.
+   - `alembic upgrade head` (re-aplicación a 0007): **Exitoso**.
+2. **Pruebas de Restricciones e Integridad en PostgreSQL**:
+   - Auto-incremento sin ID: confirmado (`INSERT INTO categoria` asigna automáticamente el siguiente ID secuencial sin colisión).
+   - Rechazo de duplicados: confirmado (inserción de `username = 'admin'` rechazada con `IntegrityError / UniqueViolation`).
+   - Rechazo de stock negativo: confirmado (inserción de `stock_actual = -5` rechazada con `IntegrityError / CheckViolation`).
+3. **Validación de `init.sql`**:
+   - Ejecución completa y dry-run de `database/init.sql` en base de datos limpia de PostgreSQL sin errores sintácticos.
+4. **Suite Completa Pytest del Backend**:
+   - `python -m pytest tests/test_rbac.py tests/test_cierre_ciegas.py tests/test_sales_service.py tests/test_cash_service.py tests/test_merma_service.py tests/test_user_report_service.py`: **31/31 pruebas PASSED (100% de éxito)**.
+5. **Suites de Regresión Frontend**:
+   - `test_form_validations.js`: **8/8 pruebas PASSED (100%)**.
+   - `test_4_fixes.js`: **4/4 pruebas PASSED (100%)**.
+   - `test_logout_flow.js`: **4/4 pruebas PASSED (100%)**.
+
+---
+
+## [2026-09-20] Migración Alembic 0006: Restricciones de Dominio para Estados, Ampliación de Campos de Texto y Evaluación de Zonas Horarias
+
+### Contexto y Diagnóstico
+Se solicitó la aplicación de tres mejoras de calidad no urgentes en la base de datos de Tienda el Regalito POS, bajo la premisa estricta de no representar riesgo de romper datos o funcionalidad existente:
+
+1. **Restricciones en columnas de tipo `estado` (Punto 1)**:
+   - *Diagnóstico*: En el esquema original, diez tablas poseían columnas `estado VARCHAR(20)` como texto libre sin validación a nivel de motor SQL. Existía el riesgo latente de registrar estados inconsistentes, erróneos o con errores tipográficos (ej. "activo", "inactiva", "Pendinte").
+   - *Directriz*: Limitar los valores permitidos únicamente a los que el sistema realmente utiliza hoy, **sin cambiar el tipo de dato de la columna** (manteniendo `VARCHAR(20)` y evitando `ENUM` de Postgres, que requeriría `ALTER TYPE`, bloquearía transacciones DDL y dificultaría migraciones futuras).
+   - *Revisión de valores en uso*: Se identificaron los dominios reales actuales:
+     - `rol`: `'Activo'`, `'Inactivo'`
+     - `usuario`: `'Activo'`, `'Inactivo'`
+     - `sucursal`: `'Activo'`, `'Inactivo'`
+     - `categoria`: `'Activo'`, `'Inactivo'`
+     - `producto`: `'Activo'`, `'Inactivo'`
+     - `caja`: `'Activa'`, `'Inactiva'`, `'Activo'`, `'Inactivo'` (variantes por compatibilidad con seeds y repositorios legacy)
+     - `turno_caja`: `'Abierto'`, `'Cerrado'`, `'Abierta'`, `'Cerrada'` (variantes de género admitidas)
+     - `venta`: `'Completada'`, `'Anulada'`
+     - `orden_compra`: `'Emitida'`, `'Recibida'`, `'Cancelada'`
+     - `alerta_stock`: `'Pendiente'`, `'Atendida'`, `'Descartada'`
+
+2. **Ampliación de campos de texto libre para observaciones y descripciones (Punto 2)**:
+   - *Diagnóstico*: Múltiples columnas críticas de texto libre estaban restringidas a `VARCHAR(255)`. Se detectó un riesgo real de desbordamiento en tiempo de ejecución en `cash_service.py` (L200), donde el sistema antepone automáticamente metadatos en notas de turno de caja (`f"Cierre a ciegas: {estado_cierre} (Dif: Q{diferencia:.2f}). {obs_limpia or ''}"`). Si el usuario ingresaba observaciones detalladas, la concatenación excedía fácilmente los 255 caracteres, disparando una excepción `DataError: value too long for type character varying(255)` de PostgreSQL y bloqueando el cierre de caja.
+   - *Solución*: Ampliar las 5 columnas de texto libre a tipo `TEXT`, sin límite artificial de 255 caracteres y sin sobrecosto de almacenamiento en PostgreSQL.
+
+3. **Evaluación de Fechas, Horas y Zona Horaria (Punto 3)**:
+   - *Diagnóstico técnico*: El driver asíncrono `asyncpg` utilizado por SQLAlchemy en el backend (`postgresql+asyncpg://...`) impone una regla estricta: si una columna es de tipo `TIMESTAMP WITH TIME ZONE` (`TIMESTAMPTZ`), rechaza de inmediato cualquier objeto Python naive (`TypeError: a datetime.datetime object with a tzinfo is required`).
+   - *Evaluación de impacto*: Actualmente todos los servicios y modelos del sistema generan marcas de tiempo con `datetime.now()` (naive) y el esquema utiliza `TIMESTAMP WITHOUT TIME ZONE`. Cambiar a `TIMESTAMPTZ` rompería instantáneamente todas las operaciones de escritura en producción salvo que se refactorizara el 100% de los servicios, modelos y esquemas Pydantic.
+   - *Contexto operacional*: Tienda el Regalito opera actualmente dentro de Guatemala (`America/Guatemala`, UTC-6 fijo sin horario de verano), por lo que las marcas de tiempo locales son perfectamente deterministas y unívocas.
+   - *Decisión*: Preservar `TIMESTAMP WITHOUT TIME ZONE` para cumplir rigurosamente con la instrucción de "no implementar cambios que rompan compatibilidad o representen riesgo".
+
+### Cambios Implementados
+
+1. **Migración Alembic `0006_restricciones_estado_y_ampliacion_textos.py`**:
+   - Creada en `backend/alembic/versions/0006_restricciones_estado_y_ampliacion_textos.py` (revisión `0006`, `down_revision = "0005"`).
+   - Incorpora 10 restricciones `CHECK` idempotentes mediante bloques `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = ...) THEN ALTER TABLE ... ADD CONSTRAINT ... CHECK (...); END IF; END $$;`.
+   - Modifica a tipo `TEXT` las siguientes 5 columnas:
+     - `producto.descripcion`
+     - `cierre_caja_ciegas.observaciones`
+     - `turno_caja.notas`
+     - `merma.observaciones`
+     - `bitacora_auditoria.descripcion`
+   - Función `downgrade()` completa y simétrica que revierte las columnas a `VARCHAR(255)` y elimina las 10 restricciones `CHECK` con `DROP CONSTRAINT IF EXISTS`.
+
+2. **Modelos SQLAlchemy (`backend/app/db/models.py`)**:
+   - Se importó el tipo `Text` desde `sqlalchemy`.
+   - Se actualizaron las definiciones de los modelos a `Column(Text, ...)` en `Producto.descripcion`, `CierreCajaCiegas.observaciones`, `TurnoCaja.notas`, `Merma.observaciones` y `BitacoraAuditoria.descripcion`.
+
+3. **Esquema Inicial (`database/init.sql`)**:
+   - Sincronización íntegra de las 10 restricciones `CHECK` en las sentencias `CREATE TABLE` correspondientes.
+   - Actualización de las 5 columnas a `TEXT` para garantizar coherencia en despliegues desde cero (Database-First con Docker Compose).
+
+### Verificación y Resultados
+1. **Verificación de Modelos y Migración Alembic**:
+   - La migración es sintáctica y conceptualmente limpia, y se integra de forma continua a la cadena `0001 -> 0002 -> 0003 -> 0004 -> 0005 -> 0006`.
+2. **Suite Completa de Pruebas Pytest del Backend**:
+   - `python -m pytest tests/test_rbac.py tests/test_cierre_ciegas.py tests/test_sales_service.py tests/test_cash_service.py tests/test_merma_service.py`: **26/26 pruebas PASSED (100%)**.
+   - `python -m pytest tests/test_user_report_service.py`: **5/5 pruebas PASSED (100%)**.
+   - Total backend: **31/31 pruebas exitosas sin ninguna regresión**.
+3. **Suites de Pruebas Frontend**:
+   - `scratch/test_form_validations.js`: **8/8 pruebas PASSED (100%)**.
+   - `scratch/test_4_fixes.js`: **4/4 pruebas PASSED (100%)**.
+   - `scratch/test_logout_flow.js`: **4/4 pruebas PASSED (100%)**.
+
+---
 
 ## [2026-09-18] Corrección Definitiva del Bug de Validación en Cascada por Desplazamiento de Layout (DOM Layout Shift) en Navegador
 
@@ -1248,3 +2163,27 @@ Se desarrolló el módulo de **Productos** y el mantenimiento de **Categorías**
 - Recrear el volumen de Postgres (`docker-compose down -v && docker-compose up -d db`) para aplicar `init.sql` actualizado.
 - Considerar migraciones versionadas con Alembic para entornos con datos existentes.
 - El frontend (`frontend/js/app.js`) aún usa el formato previo de producto; debe actualizarse para enviar `category_id`/`sku`.
+
+### Módulo de Reportes y Estadísticas (Completado)
+- Aplicado SDD y TDD de manera estricta para el filtrado de reportes por fecha.
+- Creada capa DERCAS (Schema, Repository, Service, Controller) para exportar reportes a Excel y CSV utilizando `openpyxl` y `csv`.
+- Validado el RBAC usando `require_admin` en el controlador y verificaciones profundas en el servicio, bloqueando con HTTP 403 a roles no autorizados.
+- Todas las pruebas de `test_reportes_service.py` pasan al 100% resolviendo el esquema completo de dependencias en base de datos.
+
+## Corrección: Módulo de Inventario en blanco (2026-10-05)
+
+### Problema
+- Al seleccionar "Inventario / Bodega" en la barra lateral, la zona del sistema aparecía en blanco.
+
+### Causa raíz
+- En `frontend/index.html` faltaba el `</div>` de cierre del contenedor `reportes-view` (abierto en la línea ~712). Esto hacía que `inventory-view` y `configuracion-view` quedaran **anidados dentro** de `reportes-view`.
+- Al navegar, `renderView()` oculta todos los `[data-main-view]` con `d-none`; como el padre `reportes-view` seguía con `d-none`, el inventario (hijo) permanecía oculto aunque se le quitara `d-none` a su propio contenedor.
+- Se agregó el `</div>` faltante tras el cierre de la tarjeta de Reportes, dejando a `reportes-view`, `inventory-view` y `configuracion-view` como hermanos directos.
+
+### Archivos modificados
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | Se agregó el `</div>` de cierre que faltaba para el contenedor `reportes-view`; balance de `<div>` restaurado (359 abren / 359 cierran). |
+
+### Nota
+- `reportes-view`, `inventory-view` y `configuracion-view` ya no quedan anidados entre sí; el enrutamiento SPA de `app.js` funciona sin cambios adicionales.

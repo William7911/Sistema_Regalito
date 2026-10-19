@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List
 from app.schemas import schemas
+from app.schemas.dashboard_schema import DashboardResumenResponse
 
 
 class RoleService(ABC):
@@ -188,4 +189,60 @@ class CashRegisterService(ABC):
 
     @abstractmethod
     async def list_cajas(self, include_inactive: bool = False) -> List[schemas.CajaOut]:
+        ...
+
+
+class SyncService(ABC):
+    """Contrato del servicio de sincronización offline y réplica de datos maestros."""
+
+    @abstractmethod
+    async def pull_and_replicate_to_local(self) -> dict:
+        ...
+
+    @abstractmethod
+    async def get_sync_status(self) -> dict:
+        ...
+
+    @abstractmethod
+    async def get_local_preview(self) -> dict:
+        ...
+
+
+class HealthService(ABC):
+    """Contrato del servicio de Health Check."""
+
+    @abstractmethod
+    async def check_health(self) -> dict:
+        ...
+
+
+class DashboardService(ABC):
+    """Contrato del servicio de métricas del Panel Principal."""
+
+    @abstractmethod
+    async def get_resumen(self) -> DashboardResumenResponse:
+        ...
+
+
+class FelService(ABC):
+    """Contrato del servicio de Facturación Electrónica en Línea (FEL)."""
+
+    @abstractmethod
+    async def emitir_factura(
+        self,
+        *,
+        id_venta: int,
+        total,
+        nit_receptor: str,
+        nombre_receptor: str = "",
+        items: Optional[list] = None,
+    ):
+        ...
+
+    @abstractmethod
+    async def reintentar_certificacion(self, id_venta: int):
+        ...
+
+    @abstractmethod
+    async def listar_pendientes(self, limit: int = 100):
         ...

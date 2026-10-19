@@ -14,7 +14,7 @@ class Rol(Base):
     __tablename__ = "rol"
 
     id_rol = Column(Integer, primary_key=True)
-    nombre = Column(String(50), nullable=False)
+    nombre = Column(String(50), nullable=False, unique=True)
     descripcion = Column(String(150), nullable=True)
     estado = Column(String(20), nullable=False)
 
@@ -25,9 +25,9 @@ class Usuario(Base):
     __tablename__ = "usuario"
 
     id_usuario = Column(Integer, primary_key=True)
-    id_rol = Column(Integer, ForeignKey("rol.id_rol"), nullable=False)
+    id_rol = Column(Integer, ForeignKey("rol.id_rol"), nullable=False, index=True)
     nombre_completo = Column(String(100), nullable=False)
-    username = Column(String(50), nullable=False)
+    username = Column(String(50), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
     estado = Column(String(20), nullable=False)
     fecha_creacion = Column(DateTime, server_default=func.now(), nullable=False)
@@ -40,7 +40,7 @@ class Permiso(Base):
 
     id_permiso = Column(Integer, primary_key=True)
     modulo = Column(String(50), nullable=False)
-    codigo = Column(String(50), nullable=False)
+    codigo = Column(String(50), nullable=False, unique=True)
     descripcion = Column(String(150), nullable=True)
 
     roles = relationship("RolPermiso", back_populates="permiso")
@@ -60,7 +60,7 @@ class SesionUsuario(Base):
     __tablename__ = "sesion_usuario"
 
     id_sesion = Column(Integer, primary_key=True)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     fecha_inicio = Column(DateTime, nullable=False)
     fecha_fin = Column(DateTime, nullable=True)
     ip_origen = Column(String(45), nullable=True)
@@ -72,10 +72,10 @@ class BitacoraAuditoria(Base):
     __tablename__ = "bitacora_auditoria"
 
     id_bitacora = Column(Integer, primary_key=True)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     tabla_afectada = Column(String(50), nullable=False)
     accion = Column(String(20), nullable=False)
-    descripcion = Column(String(255), nullable=False)
+    descripcion = Column(Text, nullable=False)
     fecha_hora = Column(DateTime, nullable=False)
 
     usuario = relationship("Usuario")
@@ -85,8 +85,27 @@ class ParametroSistema(Base):
     __tablename__ = "parametro_sistema"
 
     id_parametro = Column(Integer, primary_key=True)
-    clave = Column(String(50), nullable=False)
+    clave = Column(String(50), nullable=False, unique=True)
     valor = Column(String(255), nullable=False)
+
+
+class IntentoLogin(Base):
+    __tablename__ = "intento_login"
+
+    id_intento = Column(Integer, primary_key=True)
+    username = Column(String(50), nullable=False, unique=True, index=True)
+    intentos_fallidos = Column(Integer, nullable=False, default=0)
+    bloqueado_hasta = Column(DateTime, nullable=True)
+    ultimo_intento = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+
+
+class SyncCacheMetadata(Base):
+    __tablename__ = "sync_cache_metadata"
+
+    id_sync = Column(Integer, primary_key=True)
+    tabla = Column(String(50), nullable=False, unique=True, index=True)
+    registros_sincronizados = Column(Integer, nullable=False, default=0)
+    fecha_sincronizacion = Column(DateTime, nullable=False, default=func.now())
 
 
 # ============================================================================
@@ -110,7 +129,7 @@ class AreaBodega(Base):
     __tablename__ = "area_bodega"
 
     id_area = Column(Integer, primary_key=True)
-    id_sucursal = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False)
+    id_sucursal = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False, index=True)
     nombre_area = Column(String(50), nullable=False)
 
     sucursal = relationship("Sucursal", back_populates="areas")
@@ -120,7 +139,7 @@ class DepartamentoGeografico(Base):
     __tablename__ = "departamento_geografico"
 
     id_departamento = Column(Integer, primary_key=True)
-    nombre = Column(String(50), nullable=False)
+    nombre = Column(String(50), nullable=False, unique=True)
 
     municipios = relationship("Municipio", back_populates="departamento")
 
@@ -129,7 +148,7 @@ class Municipio(Base):
     __tablename__ = "municipio"
 
     id_municipio = Column(Integer, primary_key=True)
-    id_departamento = Column(Integer, ForeignKey("departamento_geografico.id_departamento"), nullable=False)
+    id_departamento = Column(Integer, ForeignKey("departamento_geografico.id_departamento"), nullable=False, index=True)
     nombre = Column(String(50), nullable=False)
 
     departamento = relationship("DepartamentoGeografico", back_populates="municipios")
@@ -149,8 +168,8 @@ class Cliente(Base):
     __tablename__ = "cliente"
 
     id_cliente = Column(Integer, primary_key=True)
-    id_tipo_cliente = Column(Integer, ForeignKey("tipo_cliente.id_tipo_cliente"), nullable=False)
-    id_municipio = Column(Integer, ForeignKey("municipio.id_municipio"), nullable=True)
+    id_tipo_cliente = Column(Integer, ForeignKey("tipo_cliente.id_tipo_cliente"), nullable=False, index=True)
+    id_municipio = Column(Integer, ForeignKey("municipio.id_municipio"), nullable=True, index=True)
     nit = Column(String(15), nullable=False)
     nombre_comercial = Column(String(120), nullable=False)
     direccion = Column(String(200), nullable=True)
@@ -164,7 +183,7 @@ class ClienteContacto(Base):
     __tablename__ = "cliente_contacto"
 
     id_contacto = Column(Integer, primary_key=True)
-    id_cliente = Column(Integer, ForeignKey("cliente.id_cliente"), nullable=False)
+    id_cliente = Column(Integer, ForeignKey("cliente.id_cliente"), nullable=False, index=True)
     telefono = Column(String(20), nullable=True)
     correo = Column(String(100), nullable=True)
 
@@ -179,7 +198,7 @@ class Categoria(Base):
     __tablename__ = "categoria"
 
     id_categoria = Column(Integer, primary_key=True)
-    nombre = Column(String(50), nullable=False)
+    nombre = Column(String(50), nullable=False, unique=True)
     estado = Column(String(20), nullable=False)
 
     subcategorias = relationship("Subcategoria", back_populates="categoria")
@@ -189,7 +208,7 @@ class Subcategoria(Base):
     __tablename__ = "subcategoria"
 
     id_subcategoria = Column(Integer, primary_key=True)
-    id_categoria = Column(Integer, ForeignKey("categoria.id_categoria"), nullable=False)
+    id_categoria = Column(Integer, ForeignKey("categoria.id_categoria"), nullable=False, index=True)
     nombre = Column(String(50), nullable=False)
 
     categoria = relationship("Categoria", back_populates="subcategorias")
@@ -200,7 +219,7 @@ class UnidadMedida(Base):
     __tablename__ = "unidad_medida"
 
     id_unidad = Column(Integer, primary_key=True)
-    codigo = Column(String(10), nullable=False)
+    codigo = Column(String(10), nullable=False, unique=True)
     descripcion = Column(String(50), nullable=False)
 
     productos = relationship("Producto", back_populates="unidad")
@@ -210,10 +229,10 @@ class Producto(Base):
     __tablename__ = "producto"
 
     id_producto = Column(Integer, primary_key=True)
-    id_subcategoria = Column(Integer, ForeignKey("subcategoria.id_subcategoria"), nullable=False)
-    id_unidad = Column(Integer, ForeignKey("unidad_medida.id_unidad"), nullable=False)
+    id_subcategoria = Column(Integer, ForeignKey("subcategoria.id_subcategoria"), nullable=False, index=True)
+    id_unidad = Column(Integer, ForeignKey("unidad_medida.id_unidad"), nullable=False, index=True)
     nombre = Column(String(100), nullable=False)
-    descripcion = Column(String(255), nullable=True)
+    descripcion = Column(Text, nullable=True)
     imagen_url = Column(String(255), nullable=True)
     estado = Column(String(20), nullable=False)
     fecha_creacion = Column(DateTime, server_default=func.now(), nullable=False)
@@ -227,8 +246,8 @@ class VarianteProducto(Base):
     __tablename__ = "variante_producto"
 
     id_variante = Column(Integer, primary_key=True)
-    id_producto = Column(Integer, ForeignKey("producto.id_producto"), nullable=False)
-    codigo_barras = Column(String(50), nullable=True)
+    id_producto = Column(Integer, ForeignKey("producto.id_producto"), nullable=False, index=True)
+    codigo_barras = Column(String(50), nullable=True, unique=True)
     talla = Column(String(20), nullable=True)
     color = Column(String(30), nullable=True)
     precio_detalle = Column(Numeric(10, 2), nullable=False)
@@ -243,9 +262,9 @@ class InventarioSucursal(Base):
     __tablename__ = "inventario_sucursal"
 
     id_inventario = Column(Integer, primary_key=True)
-    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False)
-    id_sucursal = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False)
-    id_area = Column(Integer, ForeignKey("area_bodega.id_area"), nullable=True)
+    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False, index=True)
+    id_sucursal = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False, index=True)
+    id_area = Column(Integer, ForeignKey("area_bodega.id_area"), nullable=True, index=True)
     stock_actual = Column(Integer, nullable=False)
     stock_minimo = Column(Integer, nullable=False)
     fecha_actualizacion = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
@@ -260,8 +279,8 @@ class HistorialPrecio(Base):
     __tablename__ = "historial_precio"
 
     id_historial = Column(Integer, primary_key=True)
-    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     precio_anterior = Column(Numeric(10, 2), nullable=False)
     precio_nuevo = Column(Numeric(10, 2), nullable=False)
     fecha_modificacion = Column(DateTime, nullable=False)
@@ -274,7 +293,7 @@ class AlertaStock(Base):
     __tablename__ = "alerta_stock"
 
     id_alerta = Column(Integer, primary_key=True)
-    id_inventario = Column(Integer, ForeignKey("inventario_sucursal.id_inventario"), nullable=False)
+    id_inventario = Column(Integer, ForeignKey("inventario_sucursal.id_inventario"), nullable=False, index=True)
     mensaje = Column(String(150), nullable=False)
     fecha_generacion = Column(DateTime, nullable=False)
     estado = Column(String(20), nullable=False)
@@ -297,10 +316,10 @@ class Merma(Base):
     __tablename__ = "merma"
 
     id_merma = Column(Integer, primary_key=True)
-    id_sucursal = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_sucursal = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     fecha_merma = Column(DateTime, nullable=False)
-    observaciones = Column(String(255), nullable=True)
+    observaciones = Column(Text, nullable=True)
 
     sucursal = relationship("Sucursal")
     usuario = relationship("Usuario")
@@ -311,9 +330,9 @@ class DetalleMerma(Base):
     __tablename__ = "detalle_merma"
 
     id_detalle_merma = Column(Integer, primary_key=True)
-    id_merma = Column(Integer, ForeignKey("merma.id_merma"), nullable=False)
-    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False)
-    id_motivo = Column(Integer, ForeignKey("motivo_merma.id_motivo"), nullable=False)
+    id_merma = Column(Integer, ForeignKey("merma.id_merma"), nullable=False, index=True)
+    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False, index=True)
+    id_motivo = Column(Integer, ForeignKey("motivo_merma.id_motivo"), nullable=False, index=True)
     cantidad = Column(Integer, nullable=False)
     costo_perdida = Column(Numeric(10, 2), nullable=False)
 
@@ -326,9 +345,9 @@ class TrasladoInventario(Base):
     __tablename__ = "traslado_inventario"
 
     id_traslado = Column(Integer, primary_key=True)
-    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False)
-    id_sucursal_origen = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False)
-    id_sucursal_destino = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False)
+    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False, index=True)
+    id_sucursal_origen = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False, index=True)
+    id_sucursal_destino = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False, index=True)
     cantidad = Column(Integer, nullable=False)
     fecha_traslado = Column(DateTime, nullable=False)
 
@@ -345,7 +364,7 @@ class Caja(Base):
     __tablename__ = "caja"
 
     id_caja = Column(Integer, primary_key=True)
-    id_sucursal = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False)
+    id_sucursal = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False, index=True)
     descripcion = Column(String(50), nullable=False)
     estado = Column(String(20), nullable=False)
 
@@ -357,14 +376,14 @@ class TurnoCaja(Base):
     __tablename__ = "turno_caja"
 
     id_turno = Column(Integer, primary_key=True)
-    id_caja = Column(Integer, ForeignKey("caja.id_caja"), nullable=False)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_caja = Column(Integer, ForeignKey("caja.id_caja"), nullable=False, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     monto_apertura = Column(Numeric(10, 2), nullable=False)
     fecha_apertura = Column(DateTime, nullable=False)
     fecha_cierre = Column(DateTime, nullable=True)
     estado = Column(String(20), nullable=False)
     monto_cierre = Column(Numeric(10, 2), nullable=True)
-    notas = Column(String(255), nullable=True)
+    notas = Column(Text, nullable=True)
 
     caja = relationship("Caja", back_populates="turnos")
     usuario = relationship("Usuario")
@@ -381,9 +400,9 @@ class MovimientoCaja(Base):
     __tablename__ = "movimiento_caja"
 
     id_movimiento = Column(Integer, primary_key=True)
-    id_turno = Column(Integer, ForeignKey("turno_caja.id_turno"), nullable=False)
-    id_tipo_movimiento = Column(Integer, ForeignKey("tipo_movimiento_caja.id_tipo_movimiento"), nullable=False)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_turno = Column(Integer, ForeignKey("turno_caja.id_turno"), nullable=False, index=True)
+    id_tipo_movimiento = Column(Integer, ForeignKey("tipo_movimiento_caja.id_tipo_movimiento"), nullable=False, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     monto = Column(Numeric(10, 2), nullable=False)
     justificacion = Column(String(255), nullable=False)
     fecha_hora = Column(DateTime, nullable=False)
@@ -397,13 +416,13 @@ class CierreCajaCiegas(Base):
     __tablename__ = "cierre_caja_ciegas"
 
     id_cierre = Column(Integer, primary_key=True)
-    id_turno = Column(Integer, ForeignKey("turno_caja.id_turno"), nullable=False)
-    id_usuario_cajero = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
-    id_usuario_supervisor = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_turno = Column(Integer, ForeignKey("turno_caja.id_turno"), nullable=False, index=True)
+    id_usuario_cajero = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
+    id_usuario_supervisor = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     total_contado_ciegas = Column(Numeric(10, 2), nullable=False)
     total_calculado_sistema = Column(Numeric(10, 2), nullable=False)
     diferencia = Column(Numeric(10, 2), nullable=False)
-    observaciones = Column(String(255), nullable=True)
+    observaciones = Column(Text, nullable=True)
     fecha_cierre = Column(DateTime, nullable=False)
 
     turno = relationship("TurnoCaja")
@@ -424,8 +443,8 @@ class DetalleArqueoEfectivo(Base):
     __tablename__ = "detalle_arqueo_efectivo"
 
     id_detalle_arqueo = Column(Integer, primary_key=True)
-    id_cierre = Column(Integer, ForeignKey("cierre_caja_ciegas.id_cierre"), nullable=False)
-    id_denominacion = Column(Integer, ForeignKey("denominacion_efectivo.id_denominacion"), nullable=False)
+    id_cierre = Column(Integer, ForeignKey("cierre_caja_ciegas.id_cierre"), nullable=False, index=True)
+    id_denominacion = Column(Integer, ForeignKey("denominacion_efectivo.id_denominacion"), nullable=False, index=True)
     cantidad_piezas = Column(Integer, nullable=False)
     subtotal = Column(Numeric(10, 2), nullable=False)
 
@@ -448,9 +467,9 @@ class Venta(Base):
     __tablename__ = "venta"
 
     id_venta = Column(Integer, primary_key=True)
-    id_turno = Column(Integer, ForeignKey("turno_caja.id_turno"), nullable=False)
-    id_cliente = Column(Integer, ForeignKey("cliente.id_cliente"), nullable=True)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_turno = Column(Integer, ForeignKey("turno_caja.id_turno"), nullable=False, index=True)
+    id_cliente = Column(Integer, ForeignKey("cliente.id_cliente"), nullable=True, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     fecha_venta = Column(DateTime, nullable=False)
     subtotal = Column(Numeric(10, 2), nullable=False)
     descuento_total = Column(Numeric(10, 2), nullable=False)
@@ -469,8 +488,8 @@ class DetalleVenta(Base):
     __tablename__ = "detalle_venta"
 
     id_detalle_venta = Column(Integer, primary_key=True)
-    id_venta = Column(Integer, ForeignKey("venta.id_venta"), nullable=False)
-    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False)
+    id_venta = Column(Integer, ForeignKey("venta.id_venta"), nullable=False, index=True)
+    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False, index=True)
     cantidad = Column(Integer, nullable=False)
     precio_unitario = Column(Numeric(10, 2), nullable=False)
     descuento_item = Column(Numeric(10, 2), nullable=False)
@@ -484,8 +503,8 @@ class PagoVenta(Base):
     __tablename__ = "pago_venta"
 
     id_pago = Column(Integer, primary_key=True)
-    id_venta = Column(Integer, ForeignKey("venta.id_venta"), nullable=False)
-    id_metodo_pago = Column(Integer, ForeignKey("metodo_pago.id_metodo_pago"), nullable=False)
+    id_venta = Column(Integer, ForeignKey("venta.id_venta"), nullable=False, index=True)
+    id_metodo_pago = Column(Integer, ForeignKey("metodo_pago.id_metodo_pago"), nullable=False, index=True)
     monto_recibido = Column(Numeric(10, 2), nullable=False)
     vuelto_entregado = Column(Numeric(10, 2), nullable=False)
 
@@ -497,14 +516,15 @@ class FacturaFel(Base):
     __tablename__ = "factura_fel"
 
     id_factura = Column(Integer, primary_key=True)
-    id_venta = Column(Integer, ForeignKey("venta.id_venta"), nullable=False)
-    numero_autorizacion_sat = Column(String(50), nullable=False)
-    serie = Column(String(20), nullable=False)
-    numero_dte = Column(String(30), nullable=False)
-    fecha_certificacion = Column(DateTime, nullable=False)
+    id_venta = Column(Integer, ForeignKey("venta.id_venta"), nullable=False, index=True)
+    numero_autorizacion_sat = Column(String(50), nullable=True)
+    serie = Column(String(20), nullable=True)
+    numero_dte = Column(String(30), nullable=True, unique=True)
+    fecha_certificacion = Column(DateTime, nullable=True)
     nit_receptor = Column(String(15), nullable=False)
     nombre_receptor = Column(String(120), nullable=False)
     total_facturado = Column(Numeric(10, 2), nullable=False)
+    estado = Column(String(20), nullable=False, server_default="Certificada")
 
     venta = relationship("Venta", back_populates="factura")
 
@@ -531,8 +551,8 @@ class OrdenCompra(Base):
     __tablename__ = "orden_compra"
 
     id_orden = Column(Integer, primary_key=True)
-    id_proveedor = Column(Integer, ForeignKey("proveedor.id_proveedor"), nullable=False)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_proveedor = Column(Integer, ForeignKey("proveedor.id_proveedor"), nullable=False, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     fecha_emision = Column(Date, nullable=False)
     total_estimado = Column(Numeric(10, 2), nullable=False)
     estado = Column(String(20), nullable=False)
@@ -547,8 +567,8 @@ class DetalleOrdenCompra(Base):
     __tablename__ = "detalle_orden_compra"
 
     id_detalle_orden = Column(Integer, primary_key=True)
-    id_orden = Column(Integer, ForeignKey("orden_compra.id_orden"), nullable=False)
-    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False)
+    id_orden = Column(Integer, ForeignKey("orden_compra.id_orden"), nullable=False, index=True)
+    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False, index=True)
     cantidad_pedida = Column(Integer, nullable=False)
     costo_pactado = Column(Numeric(10, 2), nullable=False)
 
@@ -560,9 +580,9 @@ class Compra(Base):
     __tablename__ = "compra"
 
     id_compra = Column(Integer, primary_key=True)
-    id_orden = Column(Integer, ForeignKey("orden_compra.id_orden"), nullable=True)
-    id_proveedor = Column(Integer, ForeignKey("proveedor.id_proveedor"), nullable=False)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_orden = Column(Integer, ForeignKey("orden_compra.id_orden"), nullable=True, index=True)
+    id_proveedor = Column(Integer, ForeignKey("proveedor.id_proveedor"), nullable=False, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     numero_factura_proveedor = Column(String(50), nullable=False)
     fecha_ingreso = Column(Date, nullable=False)
     subtotal_mercaderia = Column(Numeric(10, 2), nullable=False)
@@ -580,11 +600,27 @@ class DetalleCompra(Base):
     __tablename__ = "detalle_compra"
 
     id_detalle_compra = Column(Integer, primary_key=True)
-    id_compra = Column(Integer, ForeignKey("compra.id_compra"), nullable=False)
-    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False)
+    id_compra = Column(Integer, ForeignKey("compra.id_compra"), nullable=False, index=True)
+    id_variante = Column(Integer, ForeignKey("variante_producto.id_variante"), nullable=False, index=True)
     cantidad_recibida = Column(Integer, nullable=False)
     costo_unitario = Column(Numeric(10, 2), nullable=False)
     subtotal = Column(Numeric(10, 2), nullable=False)
 
     compra = relationship("Compra", back_populates="detalles")
     variante = relationship("VarianteProducto")
+
+
+class SyncQueue(Base):
+    __tablename__ = "sync_queue"
+
+    id_sync = Column(Integer, primary_key=True)
+    idempotency_key = Column(String(36), unique=True, nullable=False, index=True)
+    entidad = Column(String(50), nullable=False)
+    entidad_id = Column(Integer, nullable=False)
+    operacion = Column(String(20), nullable=False)
+    payload = Column(Text, nullable=False)
+    estado = Column(String(20), nullable=False, default="PENDIENTE")
+    intentos = Column(Integer, default=0)
+    ultimo_error = Column(Text, nullable=True)
+    creado_en = Column(DateTime, default=func.now())
+    actualizado_en = Column(DateTime, default=func.now(), onupdate=func.now())

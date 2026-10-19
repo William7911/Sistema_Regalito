@@ -350,3 +350,81 @@ table thead:not([class*="thead-"]) th.sortable .sort-icon {
     transform: translateY(-2px);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
+
+/* ---------------------------------------------------------------------------
+ * Login: Botón mostrar/ocultar contraseña y desactivar ícono nativo
+ * --------------------------------------------------------------------------- */
+
+/* Desactivar ícono nativo de Microsoft Edge / Internet Explorer (REGLAS SEPARADAS) */
+input[type="password"]::-ms-reveal {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+input[type="password"]::-ms-clear {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+#login-pass::-ms-reveal {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+#login-pass::-ms-clear {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* WebKit / Chromium autofill/credential icons */
+#login-pass::-webkit-credentials-auto-fill-button {
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    right: 0 !important;
+}
+
+.btn-toggle-password {
+    cursor: pointer;
+    border-left: none !important;
+    background-color: #fff !important;
+    transition: color 0.15s ease, background-color 0.15s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.btn-toggle-password:hover i {
+    color: var(--color-teal) !important;
+}
+.btn-toggle-password:active {
+    background-color: #f8f9fa !important;
+}
+.btn-toggle-password:focus,
+.btn-toggle-password:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Mantener el foco limpio en el input-group de login */
+#form-login .input-group:focus-within {
+    border-radius: 0.375rem;
+    box-shadow: 0 0 0 0.2rem rgba(13, 115, 119, 0.2);
+}
+#form-login .input-group:focus-within .input-group-text,
+#form-login .input-group:focus-within .form-control {
+    border-color: var(--color-teal) !important;
+}
+#form-login .input-group .form-control:focus {
+    box-shadow: none !important;
+}
