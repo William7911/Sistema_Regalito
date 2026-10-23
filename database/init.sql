@@ -423,11 +423,15 @@ CREATE TABLE detalle_compra (
 
 CREATE TABLE IF NOT EXISTS visita_seguimiento (
     id_visita SERIAL PRIMARY KEY,
-    id_cliente INT NOT NULL REFERENCES cliente(id_cliente),
+    id_cliente INT REFERENCES cliente(id_cliente),
     id_usuario INT NOT NULL REFERENCES usuario(id_usuario),
     fecha_visita DATE NOT NULL,
+    lugar VARCHAR(150),
+    nombre_representante VARCHAR(150),
+    cargo_representante VARCHAR(100),
+    calificacion_general SMALLINT CHECK (calificacion_general BETWEEN 1 AND 5),
     observaciones TEXT,
-    estado VARCHAR(20) NOT NULL DEFAULT 'Pendiente' CHECK (estado IN ('Pendiente','Completada','Cancelada')),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Borrador' CHECK (estado IN ('Borrador','Pendiente','Completada','Cancelada')),
     fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -435,8 +439,10 @@ CREATE TABLE IF NOT EXISTS visita_modulo_evaluacion (
     id_modulo_eval SERIAL PRIMARY KEY,
     id_visita INT NOT NULL REFERENCES visita_seguimiento(id_visita) ON DELETE CASCADE,
     nombre_modulo VARCHAR(100) NOT NULL,
+    resultado VARCHAR(20) CHECK (resultado IN ('Conforme','Modificar','Agregar')),
     calificacion SMALLINT CHECK (calificacion BETWEEN 1 AND 10),
-    comentario TEXT
+    comentario TEXT,
+    CONSTRAINT uq_visita_modulo UNIQUE (id_visita, nombre_modulo)
 );
 
 -- ============================================================================

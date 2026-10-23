@@ -3,6 +3,49 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Módulo de Visitas de Seguimiento y Evaluación (Dueño del Negocio) con Reporte PDF y RBAC
+
+### Causa Raíz / Requerimiento
+1. **Verificaciones Previas de Migraciones y Semilla**:
+   - Comprobación de migraciones 0013 y 0014 en PostgreSQL real (`regalito_pos` en puerto 5433): ejecución de `alembic upgrade head`, `downgrade -1` y `upgrade head`.
+   - Comprobación de paridad de esquema contra `database/init.sql` aplicado sobre una base de datos vacía (`test_init_db`).
+   - Verificación de conteos de tablas de prueba E2E (`merma: 0`, `detalle_merma: 0`, `traslado_inventario: 0`, `orden_compra: 0`, `alerta_stock: 1`), confirmando persistencia exclusiva de datos semilla.
+2. **Formulario de Visita de Seguimiento y Evaluación**:
+   - Módulo adaptado para que el dueño del negocio / representante pueda registrar periódicamente evaluaciones del sistema sin asistencia técnica.
+   - Datos generales: fecha, lugar/sucursal, nombre del representante, cargo, calificación general (1 a 5 estrellas) y observaciones generales.
+   - Evaluación estructurada de 10 módulos estándar del sistema: `POS/Ventas`, `Inventario`, `Compras`, `Caja`, `Usuarios`, `Catálogos`, `Reportes`, `Configuración`, `Clientes` y `Facturación`.
+   - Cada módulo evaluado mediante opciones `Conforme` (verde), `Modificar` (amarillo) o `Agregar` (azul), con campo de comentario/observación puntual y restricción de unicidad por visita.
+   - Soporte para ciclo de vida con estado `Borrador` y `Completada`.
+   - Resumen ejecutivo en pantalla con tarjetas de métricas por resultado.
+   - Exportación y descarga directa de informe oficial en PDF (`reportlab`) con cabecera corporativa, metadatos, tabla de módulos evaluados y sección de firmas.
+3. **Seguridad, Auditoría y RBAC**:
+   - Permiso requerido: `VISITA_REGISTRAR` (asignado al rol Administradora).
+   - Usuarios no autorizados (Cajera): opción de menú oculta en frontend, bloqueo de navegación directa en SPA y rechazo con HTTP 403 Forbidden en el backend.
+   - Trazabilidad en `bitacora_auditoria` con verbos `CREAR` (al guardar borrador) y `EDITAR` (al actualizar o completar visita).
+
+### Solución Implementada
+1. **Base de Datos y Migración** ([`backend/alembic/versions/0015_visita_seguimiento_formulario.py`](../backend/alembic/versions/0015_visita_seguimiento_formulario.py), [`database/init.sql`](../database/init.sql), [`backend/app/db/models.py`](../backend/app/db/models.py)):
+   - Columna `id_cliente` en `visita_seguimiento` modificada a nullable (`nullable=True`).
+   - Columnas añadidas a `visita_seguimiento`: `lugar` (VARCHAR 150), `nombre_representante` (VARCHAR 150), `cargo_representante` (VARCHAR 100), `calificacion_general` (SMALLINT CHECK 1..5).
+   - Columna añadida a `visita_modulo_evaluacion`: `resultado` (VARCHAR 20).
+   - Restricción de unicidad `uq_visita_modulo` en `(id_visita, nombre_modulo)`.
+2. **Arquitectura DERCAS Backend**:
+   - Schemas ([`backend/app/schemas/visita_schema.py`](../backend/app/schemas/visita_schema.py)): `ModuloEvaluacionInput`, `ModuloEvaluacionOut`, `VisitaCreate`, `VisitaUpdate`, `VisitaOut`, `VisitaResumen`.
+   - Repositorio ([`backend/app/repositories/visita_repository.py`](../backend/app/repositories/visita_repository.py)): `VisitaRepositoryImpl` con `create`, `get_by_id`, `list_all`, `update` y `sync_modulos`.
+   - Integración en `UnitOfWork` ([`backend/app/api/deps.py`](../backend/app/api/deps.py)) y `TestUnitOfWork` ([`backend/tests/conftest.py`](../backend/tests/conftest.py)).
+   - Servicio ([`backend/app/services/visita_service.py`](../backend/app/services/visita_service.py)): `ConcreteVisitaService` con `guardar_borrador`, `actualizar_borrador`, `completar_visita`, `obtener_visita`, `listar_visitas`, `generar_pdf` con ReportLab y registro en `bitacora_auditoria`.
+   - Router API ([`backend/app/api/visitas.py`](../backend/app/api/visitas.py)): endpoints `GET /api/visitas`, `GET /{id}`, `POST /borrador`, `PUT /{id}/borrador`, `POST /{id}/completar`, `POST /completar` y `GET /{id}/pdf`.
+   - Registro en FastAPI ([`backend/app/main.py`](../backend/app/main.py)).
+3. **Frontend Interactivo y Accesible**:
+   - Navegación lateral en [`frontend/index.html`](../frontend/index.html) con ítem `Visitas de Seguimiento` (`data-module-item="visitas"`).
+   - Contenedor `#visitas-view` con 3 secciones: Formulario de Evaluación (`#visitas-form-section`), Resumen Ejecutivo (`#visitas-summary-section`) e Historial de Visitas (`#visitas-history-section`).
+   - Controlador [`frontend/js/visitas.js`](../frontend/js/visitas.js): renderizado dinámico de los 10 módulos, gestión de borradores y finalización, visualización del resumen con conteo reactivo de conformes/modificar/agregar, y descarga directa de PDF.
+   - Seguridad en [`frontend/js/app.js`](../frontend/js/app.js): integración en `mainViews`, `moduleAllowed`, `opItems`, `canAccessView`, `renderView` y `moduleLabels`.
+4. **Pruebas y Verificación**:
+   - Backend Pytest: 8 nuevas pruebas en `backend/tests/test_visita_service.py` y `backend/tests/test_visita_api.py`.
+   - Total suite: 265 pruebas aprobadas (0 fallidas).
+   - E2E Playwright: 17 verificaciones automatizadas en `scratch/verify_visitas_browser.py` cubriendo creación de borrador, evaluación de módulos, finalización, métricas de resumen, generación de PDF, historial y bloqueo 403 / vista oculta para Cajera.
+
 ## [2026-10-23] Proceso 4: Módulo Integral de Traslados entre Sucursales (Envío, Tránsito, Recepción, Cancelación y Trazabilidad)
 
 ### Causa Raíz / Requerimiento

@@ -178,6 +178,11 @@
                         <i class="bi bi-arrow-left-right me-2"></i> Traslados
                     </a>
                 </li>
+                <li data-module-item="visitas">
+                    <a href="#" id="nav-visitas" class="nav-link text-white-50 sidebar-link" data-nav="visitas" onclick="navigateTo('visitas'); return false;">
+                        <i class="bi bi-clipboard2-check-fill me-2"></i> Visitas de Seguimiento
+                    </a>
+                </li>
 
                 <li class="nav-item mt-3" data-section="administracion">
                     <span class="text-uppercase text-muted-teal small fw-bold px-3">— ADMINISTRACIÓN —</span>
@@ -2029,6 +2034,280 @@
                 </div>
             </div>
 
+            <!-- Visitas de Seguimiento Module View -->
+            <div id="visitas-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="visitas">
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h4 class="fw-bold mb-1">Visitas de Seguimiento y Evaluación</h4>
+                            <span id="visita-current-id-badge" class="badge bg-secondary d-none">Borrador</span>
+                        </div>
+                        <p class="text-muted small mb-0">Formulario simplificado para el dueño del negocio: evaluación por módulos y generación de reporte PDF</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <button id="btn-visitas-historial" class="btn btn-outline-secondary"><i class="bi bi-clock-history me-1"></i> Historial</button>
+                        <button id="btn-visitas-nueva" class="btn btn-teal"><i class="bi bi-plus-lg me-1"></i> Nueva Visita</button>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 1: FORMULARIO DE EVALUACIÓN -->
+                <div id="visitas-form-section">
+                    <!-- Datos Generales -->
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-header bg-white border-bottom py-3">
+                            <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-person-badge me-2 text-teal"></i>1. Datos de la Visita y Representante</h6>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-3">
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label text-muted small fw-semibold mb-1">Fecha de la Visita *</label>
+                                    <input type="date" id="visita-fecha" class="form-control">
+                                </div>
+                                <div class="col-12 col-md-5">
+                                    <label class="form-label text-muted small fw-semibold mb-1">Lugar / Sucursal</label>
+                                    <input type="text" id="visita-lugar" class="form-control" placeholder="Ej. Tienda Central Panajachel">
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label text-muted small fw-semibold mb-1">Calificación General (1 a 5 estrellas)</label>
+                                    <select id="visita-calificacion-general" class="form-select">
+                                        <option value="">Seleccionar calificación</option>
+                                        <option value="5">★★★★★ - Excelente (5/5)</option>
+                                        <option value="4">★★★★☆ - Muy Bueno (4/5)</option>
+                                        <option value="3">★★★☆☆ - Aceptable (3/5)</option>
+                                        <option value="2">★★☆☆☆ - Requiere Mejoras (2/5)</option>
+                                        <option value="1">★☆☆☆☆ - Deficiente (1/5)</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label text-muted small fw-semibold mb-1">Nombre del Representante / Propietario(a) *</label>
+                                    <input type="text" id="visita-nombre-rep" class="form-control" placeholder="Ej. Doña Silvia González">
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label text-muted small fw-semibold mb-1">Cargo o Puesto del Representante</label>
+                                    <input type="text" id="visita-cargo-rep" class="form-control" placeholder="Ej. Dueña / Administradora General">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label text-muted small fw-semibold mb-1">Observaciones Generales de la Visita</label>
+                                    <textarea id="visita-observaciones" class="form-control" rows="2" placeholder="Comentarios generales, acuerdos de seguimiento o peticiones especiales..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Evaluación de los 10 Módulos -->
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-grid-3x3-gap me-2 text-teal"></i>2. Evaluación por Módulo del Sistema</h6>
+                            <span class="text-muted small">10 módulos evaluables</span>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="alert alert-light border small text-muted mb-3 d-flex align-items-center gap-2">
+                                <i class="bi bi-info-circle text-teal fs-5"></i>
+                                <span>Para cada módulo, marque: 
+                                    <strong class="text-success">Conforme</strong> si satisface las necesidades, 
+                                    <strong class="text-warning text-dark">Modificar</strong> si requiere ajustes puntuales, o 
+                                    <strong class="text-primary">Agregar</strong> si se requieren funciones adicionales.
+                                </span>
+                            </div>
+
+                            <!-- Listado dinámico de los 10 módulos -->
+                            <div id="visitas-modulos-container"></div>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Acciones del Formulario -->
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-body p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <button type="button" id="btn-visita-reset" class="btn btn-outline-secondary">
+                                    <i class="bi bi-x-circle me-1"></i> Limpiar Formulario
+                                </button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" id="btn-visita-save-draft" class="btn btn-outline-teal">
+                                    <i class="bi bi-save me-1"></i> Guardar Borrador
+                                </button>
+                                <button type="button" id="btn-visita-complete" class="btn btn-success fw-bold px-4">
+                                    <i class="bi bi-check-circle me-1"></i> Finalizar y Generar Resumen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 2: RESUMEN Y FICHA DE LA VISITA -->
+                <div id="visitas-summary-section" class="d-none">
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <h5 class="fw-bold mb-0 text-dark">Resumen Ejecutivo de Visita <span id="summary-visita-id" class="text-teal"></span></h5>
+                                <span class="badge bg-success" id="summary-estado">Completada</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" id="btn-summary-download-pdf" class="btn btn-danger fw-semibold">
+                                    <i class="bi bi-file-earmark-pdf me-1"></i> Descargar Reporte PDF
+                                </button>
+                                <button type="button" class="btn btn-outline-teal" onclick="document.getElementById('btn-visitas-nueva').click()">
+                                    <i class="bi bi-plus-lg me-1"></i> Nueva Evaluación
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <!-- Métricas del Resumen -->
+                            <div class="row g-3 mb-4 text-center">
+                                <div class="col">
+                                    <div class="p-3 bg-light rounded-3 border">
+                                        <div class="small text-muted fw-semibold">Módulos Totales</div>
+                                        <div class="fs-4 fw-bold text-dark" id="summary-kpi-total">10</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="p-3 bg-success-subtle rounded-3 border border-success-subtle">
+                                        <div class="small text-success fw-semibold">Conformes</div>
+                                        <div class="fs-4 fw-bold text-success" id="summary-kpi-conformes">0</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="p-3 bg-warning-subtle rounded-3 border border-warning-subtle">
+                                        <div class="small text-warning-emphasis fw-semibold">A Modificar</div>
+                                        <div class="fs-4 fw-bold text-warning-emphasis" id="summary-kpi-modificar">0</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="p-3 bg-primary-subtle rounded-3 border border-primary-subtle">
+                                        <div class="small text-primary fw-semibold">Por Agregar</div>
+                                        <div class="fs-4 fw-bold text-primary" id="summary-kpi-agregar">0</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="p-3 bg-light rounded-3 border">
+                                        <div class="small text-muted fw-semibold">Sin Evaluar</div>
+                                        <div class="fs-4 fw-bold text-muted" id="summary-kpi-pendientes">0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Datos de la Visita -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-12 col-md-6">
+                                    <ul class="list-group list-group-flush border rounded-3">
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span class="text-muted">Fecha de Visita:</span>
+                                            <strong id="summary-fecha">-</strong>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span class="text-muted">Lugar:</span>
+                                            <strong id="summary-lugar">-</strong>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span class="text-muted">Representante / Dueño:</span>
+                                            <strong id="summary-representante">-</strong>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <ul class="list-group list-group-flush border rounded-3">
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span class="text-muted">Cargo:</span>
+                                            <strong id="summary-cargo">-</strong>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span class="text-muted">Calificación General:</span>
+                                            <strong id="summary-calificacion" class="text-warning-emphasis">-</strong>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span class="text-muted">Registrado Por:</span>
+                                            <strong id="summary-evaluador">-</strong>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Tabla de Detalle por Módulo -->
+                            <h6 class="fw-bold text-dark mb-2">Evaluación Detallada por Módulo</h6>
+                            <div class="table-responsive mb-4">
+                                <table class="table table-sm table-hover align-middle border">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 50px;">#</th>
+                                            <th style="width: 200px;">Módulo</th>
+                                            <th style="width: 150px;">Resultado</th>
+                                            <th>Observación / Comentario</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="summary-modulos-table-body"></tbody>
+                                </table>
+                            </div>
+
+                            <!-- Observaciones Generales -->
+                            <div class="p-3 bg-light rounded-3 border">
+                                <h6 class="fw-bold mb-1 text-dark">Observaciones Generales:</h6>
+                                <p class="mb-0 text-muted" id="summary-observaciones">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 3: HISTORIAL DE VISITAS -->
+                <div id="visitas-history-section" class="d-none">
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-body">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label text-muted small fw-semibold mb-1">Fecha Desde</label>
+                                    <input type="date" id="visitas-filter-desde" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label text-muted small fw-semibold mb-1">Fecha Hasta</label>
+                                    <input type="date" id="visitas-filter-hasta" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label text-muted small fw-semibold mb-1">Estado</label>
+                                    <select id="visitas-filter-estado" class="form-select form-select-sm">
+                                        <option value="">Todos los estados</option>
+                                        <option value="Borrador">Borrador</option>
+                                        <option value="Completada">Completada</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-3 d-flex gap-2">
+                                    <button id="btn-visitas-filtrar" class="btn btn-sm btn-teal flex-grow-1"><i class="bi bi-funnel me-1"></i> Filtrar</button>
+                                    <button id="btn-visitas-limpiar" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Limpiar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm rounded-4">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table align-middle table-hover mb-0" id="tabla-visitas">
+                                    <thead class="thead-users">
+                                        <tr>
+                                            <th style="width: 70px;"># ID</th>
+                                            <th>Fecha</th>
+                                            <th>Representante</th>
+                                            <th>Cargo</th>
+                                            <th class="text-center">Calificación</th>
+                                            <th class="text-center">Estado</th>
+                                            <th class="text-end pe-3">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="visitas-table-body"></tbody>
+                                </table>
+                            </div>
+                            <div id="visitas-empty" class="text-center text-muted py-5 d-none">
+                                <i class="bi bi-clipboard2-check fs-1 d-block mb-2 opacity-50"></i>
+                                <span>No se encontraron visitas de seguimiento registradas</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <span id="visitas-total-info" class="text-muted small">Total: 0 visitas</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Compras Module View -->
             <!-- Mermas Module View -->
             <div id="mermas-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="mermas">
@@ -2101,7 +2380,6 @@
                 </div>
             </div>
 
-            <!-- Compras Module View -->
             <!-- Compras Module View -->
             <div id="compras-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="compras">
                 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -3184,6 +3462,7 @@
     <script src="js/historial.js?v=1.0"></script>
     <script src="js/mermas.js"></script>
     <script src="js/traslados.js?v=1.0"></script>
+    <script src="js/visitas.js?v=1.0"></script>
 
     <!-- Modales Bloque 2: Sucursales, Áreas, Subcategorías, Unidades -->
     <!-- Modal: Formulario Sucursal -->

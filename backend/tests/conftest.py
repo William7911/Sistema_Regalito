@@ -31,6 +31,9 @@ class TestUnitOfWork:
 
         from app.repositories.traslado_repository import TrasladoRepositoryImpl
         self.traslados = TrasladoRepositoryImpl(db)
+
+        from app.repositories.visita_repository import VisitaRepositoryImpl
+        self.visitas = VisitaRepositoryImpl(db)
         
         from app.repositories.reporte_repository import ReporteRepositoryImpl
         self.reportes = ReporteRepositoryImpl(db)

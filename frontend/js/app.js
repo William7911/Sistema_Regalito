@@ -5,7 +5,7 @@ const systemModule = document.getElementById('system-module');
 
 // Array of all auth views to easily hide them
 const authViews = ['view-login', 'view-recover', 'view-verify', 'view-reset'];
-const mainViews = ['dashboard', 'pos', 'users', 'roles', 'clients', 'bitacora', 'historial', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras', 'mermas', 'traslados'];
+const mainViews = ['dashboard', 'pos', 'users', 'roles', 'clients', 'bitacora', 'historial', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras', 'mermas', 'traslados', 'visitas'];
 let currentView = null;
 
 // ---------------------------------------------------------------------------
@@ -253,6 +253,7 @@ function applyRoleRestrictions() {
         compras: isUserAdmin || window.hasPermission('COMPRA_EMITIR_ORDEN') || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         mermas: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         traslados: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
+        visitas: isUserAdmin || window.hasPermission('VISITA_REGISTRAR'),
         cash: isUserAdmin || role === 'Cajero',
         caja: isUserAdmin || role === 'Cajero',
         users: isUserAdmin,
@@ -273,7 +274,7 @@ function applyRoleRestrictions() {
     });
 
     // 2. Sidebar Section Headers
-    const opItems = document.querySelectorAll('[data-module-item="pos"], [data-module-item="inventory"], [data-module-item="compras"], [data-module-item="cash"], [data-module-item="mermas"], [data-module-item="traslados"]');
+    const opItems = document.querySelectorAll('[data-module-item="pos"], [data-module-item="inventory"], [data-module-item="compras"], [data-module-item="cash"], [data-module-item="mermas"], [data-module-item="traslados"], [data-module-item="visitas"]');
     const opVisible = Array.from(opItems).some(el => !el.classList.contains('d-none'));
     const opSection = document.querySelector('[data-section="operacion"]');
     if (opSection) opSection.classList.toggle('d-none', !opVisible);
@@ -315,6 +316,7 @@ function canAccessView(viewKey) {
     if (viewKey === 'compras') return window.hasPermission('COMPRA_EMITIR_ORDEN') || window.hasPermission('INV_INGRESAR_MERCADERIA');
     if (viewKey === 'mermas') return window.hasPermission('INV_INGRESAR_MERCADERIA');
     if (viewKey === 'traslados') return window.hasPermission('INV_INGRESAR_MERCADERIA');
+    if (viewKey === 'visitas') return window.hasPermission('VISITA_REGISTRAR');
     if (viewKey === 'cash' || viewKey === 'caja') return role === 'Cajero';
     if (viewKey === 'catalog') return role === 'Bodeguero';
     if (viewKey === 'clients') return window.hasPermission('CLIENTE_ADMIN');
@@ -437,6 +439,9 @@ function renderView(viewKey) {
     if (viewKey === 'traslados' && typeof window.showTrasladosModule === 'function') {
         window.showTrasladosModule();
     }
+    if (viewKey === 'visitas' && typeof window.showVisitasModule === 'function') {
+        window.showVisitasModule();
+    }
 }
 
 // Navega a un módulo actualizando el hash de la URL sin recargar la página.
@@ -512,6 +517,7 @@ const moduleLabels = {
     historial: 'Historial de Precios',
     mermas: 'Mermas',
     traslados: 'Traslados',
+    visitas: 'Visitas de Seguimiento',
 };
 
 // Abre un módulo desde el dashboard o navegación lateral

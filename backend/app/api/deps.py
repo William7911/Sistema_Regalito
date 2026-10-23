@@ -92,6 +92,11 @@ class UnitOfWork:
     def traslados(self):
         from app.repositories.traslado_repository import TrasladoRepositoryImpl
         return TrasladoRepositoryImpl(self.db)
+
+    @property
+    def visitas(self):
+        from app.repositories.visita_repository import VisitaRepositoryImpl
+        return VisitaRepositoryImpl(self.db)
         
     @property
     def reportes(self):

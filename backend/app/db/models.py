@@ -664,9 +664,13 @@ class VisitaSeguimiento(Base):
     __tablename__ = "visita_seguimiento"
 
     id_visita = Column(Integer, primary_key=True)
-    id_cliente = Column(Integer, ForeignKey("cliente.id_cliente"), nullable=False, index=True)
+    id_cliente = Column(Integer, ForeignKey("cliente.id_cliente"), nullable=True, index=True)
     id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     fecha_visita = Column(Date, nullable=False)
+    lugar = Column(String(150), nullable=True)
+    nombre_representante = Column(String(150), nullable=True)
+    cargo_representante = Column(String(100), nullable=True)
+    calificacion_general = Column(SmallInteger, nullable=True)
     observaciones = Column(Text, nullable=True)
     estado = Column(String(20), nullable=False, default="Pendiente")
     fecha_creacion = Column(DateTime, server_default=func.now(), default=datetime.utcnow, nullable=False)
@@ -683,9 +687,14 @@ class VisitaSeguimiento(Base):
 class VisitaModuloEvaluacion(Base):
     __tablename__ = "visita_modulo_evaluacion"
 
+    __table_args__ = (
+        UniqueConstraint("id_visita", "nombre_modulo", name="uq_visita_modulo"),
+    )
+
     id_modulo_eval = Column(Integer, primary_key=True)
     id_visita = Column(Integer, ForeignKey("visita_seguimiento.id_visita", ondelete="CASCADE"), nullable=False, index=True)
     nombre_modulo = Column(String(100), nullable=False)
+    resultado = Column(String(20), nullable=True)
     calificacion = Column(SmallInteger, nullable=True)
     comentario = Column(Text, nullable=True)
 
