@@ -3,6 +3,64 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Despliegue de Producción con un Solo Comando (Docker Compose, Auto-Migraciones, Dependencias Fijas y Paridad de Base de Datos)
+
+### Causa Raíz / Requerimiento
+1. **Despliegue Autónomo y Reproducible en Producción**:
+   - Resolver dependencias faltantes e incompletas al clonar el repositorio en entornos limpios (`relation "sync_queue" does not exist`, dependencias de ReportLab/Alembic ausentes en `requirements.txt`, ausencia de registro en `alembic_version`).
+   - Permitir que el sistema arranque completamente operativo mediante un solo comando (`docker compose -f docker-compose.prod.yml up -d --build` o `iniciar.bat`) sin requerir intervenciones manuales previas (cargar SQL manualmente, ejecutar stamp de Alembic, etc.).
+2. **Paridad de Esquema y Migración Idempotente**:
+   - Sincronizar las 48 tablas de `backend/app/db/models.py` con `database/init.sql`, agregando `sync_cache_metadata` y `sync_queue` con sus índices y secuencias.
+   - Crear la migración `0016_sync_tables.py` de forma 100% idempotente (utilizando `sa.inspect` para crear las tablas únicamente si no existen y eliminarlas en downgrade).
+3. **Orquestación y Auto-Migración al Arrancar**:
+   - Configurar `docker-compose.prod.yml` montando `init.sql` en `/docker-entrypoint-initdb.d/init.sql:ro`.
+   - Incorporar `healthcheck` en el servicio `db` mediante `pg_isready` y configurar `depends_on: db: condition: service_healthy` en el backend.
+   - Implementar el script `backend/app/db/auto_migrate.py` e integrarlo en el `CMD` de `Dockerfile`, detectando si la base viene de `init.sql` para ejecutar `alembic stamp head` o si tiene versiones previas para ejecutar `alembic upgrade head`, seguro de repetir en cada reinicio.
+4. **Fijación de Versiones de Dependencias**:
+   - Relevar todos los imports de `backend/app` y fijar versiones exactas en `backend/requirements.txt` (incluyendo `fastapi`, `uvicorn`, `bcrypt==4.0.1`, `reportlab==5.1.0`, `alembic==1.20.0`, `httpx==0.28.1`, `openpyxl==3.1.5`, etc.).
+   - Separar librerías de pruebas (`pytest`, `pytest-asyncio`, `aiosqlite`) en `backend/requirements-dev.txt` para mantener la imagen de producción limpia y ligera.
+5. **Comando de Actualización en Caliente para Producción Existente**:
+   - Diseñar y validar sobre copia de respaldo el comando SQL idempotente para crear las tablas faltantes en bases de datos activas sin pérdida ni alteración de datos existentes.
+6. **Documentación, Script de Arranque y Gitignore**:
+   - Redactar `README.md` detallado con pasos de clonación, variables, levantamiento, URL y credenciales de usuarios semilla con advertencia de seguridad.
+   - Crear `iniciar.bat` con rutas relativas (`%~dp0`) que no borra volúmenes.
+   - Excluir `respaldos/`, `.env` y `scratch/` en `.gitignore`.
+
+### Solución Implementada
+1. **Base de Datos y Migraciones** ([`database/init.sql`](../database/init.sql), [`backend/alembic/versions/0016_sync_tables.py`](../backend/alembic/versions/0016_sync_tables.py)):
+   - Se añadieron `sync_cache_metadata` y `sync_queue` a `database/init.sql` con sus índices y secuencias.
+   - Se creó la migración Alembic `0016_sync_tables.py` con verificación de existencia de tablas antes de crearlas o eliminarlas.
+2. **Backend y Auto-Migración** ([`backend/app/db/auto_migrate.py`](../backend/app/db/auto_migrate.py), [`backend/Dockerfile`](../backend/Dockerfile)):
+   - Script `auto_migrate.py` que verifica conectividad a la base de datos con reintentos exponenciales, evalúa la presencia de la tabla `usuario` y `alembic_version`, ejecuta `alembic stamp head` si proviene de `init.sql`, o `alembic upgrade head` si ya existe versión o está vacía.
+   - Actualizado el `CMD` en `Dockerfile` para ejecutar `python -m app.db.auto_migrate && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4`.
+3. **Orquestación Docker Compose** ([`docker-compose.prod.yml`](../docker-compose.prod.yml)):
+   - Montaje de `init.sql` en `/docker-entrypoint-initdb.d/init.sql:ro`.
+   - Healthcheck en `db` (`pg_isready -U ... -d ...`).
+   - Dependencia condicionada `depends_on: db: condition: service_healthy` en `backend`.
+   - Variables de puertos y nombres parametrizadas con valores por defecto para permitir pruebas aisladas sin colisiones.
+4. **Dependencias y Entorno** ([`backend/requirements.txt`](../backend/requirements.txt), [`backend/requirements-dev.txt`](../backend/requirements-dev.txt), [`.gitignore`](../.gitignore)):
+   - Versiones fijas de producción con `bcrypt==4.0.1`, excluyendo librerías de pruebas.
+   - `.gitignore` actualizado con regla para `respaldos/`.
+5. **Guía de Despliegue y Automatización** ([`README.md`](../README.md), [`iniciar.bat`](../iniciar.bat)):
+   - Documentación exhaustiva en `README.md`.
+   - Script por lotes `iniciar.bat` para Windows con rutas relativas y preservación de volúmenes.
+
+### Verificación
+- **Prueba en Clon Temporal Aislado (`-p regalito_test`)**:
+  - Levantamiento autónomo con un solo comando sin intervención manual.
+  - Servicio web responde HTTP 200 en `http://localhost:9095/`.
+  - Inicio de sesión en `/api/auth/login` con credenciales `admin` / `admin123` exitoso (token JWT emitido con claims y permisos completos).
+  - Paridad de tablas: 49 tablas en total (48 de aplicación + `alembic_version`).
+  - Conteos semilla verificados: 3 usuarios, 22 departamentos geográficos y 338 municipios.
+  - `alembic_version` verificado en `0016`.
+  - Logs de backend y base de datos limpios y sin errores.
+  - Eliminación segura del entorno temporal (`docker compose -p regalito_test down -v`) preservando intacta la producción real.
+- **Validación de Comando de Respaldo**:
+  - Probado en base de datos clonada de respaldo (`regalito_backup_test`); creación exitosa e idempotente de tablas e índices y actualización a `0016` con integridad total de datos existentes.
+- **Suite de Pruebas Pytest**: **276 pruebas aprobadas, 0 fallidas**.
+
+---
+
 ## [2026-10-23] Reportes Paso 1: Módulo de Reportes de Usuarios y Clientes (Filtros, Fichas en Modal, Exportación PDF con ReportLab y Registro en Historial de Precios)
 
 ### Causa Raíz / Requerimiento

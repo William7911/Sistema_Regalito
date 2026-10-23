@@ -446,6 +446,34 @@ CREATE TABLE IF NOT EXISTS visita_modulo_evaluacion (
 );
 
 -- ============================================================================
+-- MÓDULO 9: SINCRONIZACIÓN Y CONTINGENCIA OFFLINE
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS sync_cache_metadata (
+    id_sync SERIAL PRIMARY KEY,
+    tabla VARCHAR(50) NOT NULL UNIQUE,
+    registros_sincronizados INT NOT NULL DEFAULT 0,
+    fecha_sincronizacion TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sync_cache_metadata_tabla ON sync_cache_metadata (tabla);
+
+CREATE TABLE IF NOT EXISTS sync_queue (
+    id_sync SERIAL PRIMARY KEY,
+    idempotency_key VARCHAR(36) NOT NULL UNIQUE,
+    entidad VARCHAR(50) NOT NULL,
+    entidad_id INT NOT NULL,
+    operacion VARCHAR(20) NOT NULL,
+    payload TEXT NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+    intentos INT DEFAULT 0,
+    ultimo_error TEXT,
+    creado_en TIMESTAMP DEFAULT NOW(),
+    actualizado_en TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_idempotency ON sync_queue (idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_estado ON sync_queue (estado);
+
+-- ============================================================================
 -- ÍNDICES PARA LLAVES FORÁNEAS (OPTIMIZACIÓN DE CONSULTAS Y REPORTES)
 -- ============================================================================
 
@@ -1053,6 +1081,9 @@ SELECT setval('proveedor_id_proveedor_seq', COALESCE((SELECT MAX(id_proveedor) F
 SELECT setval('visita_seguimiento_id_visita_seq', COALESCE((SELECT MAX(id_visita) FROM visita_seguimiento), 0) + 1, false);
 SELECT setval('visita_modulo_evaluacion_id_modulo_eval_seq', COALESCE((SELECT MAX(id_modulo_eval) FROM visita_modulo_evaluacion), 0) + 1, false);
 
+
+SELECT setval('sync_cache_metadata_id_sync_seq', COALESCE((SELECT MAX(id_sync) FROM sync_cache_metadata), 0) + 1, false);
+SELECT setval('sync_queue_id_sync_seq', COALESCE((SELECT MAX(id_sync) FROM sync_queue), 0) + 1, false);
 
 -- ============================================================================
 -- NOTA DE DESPLIEGUE

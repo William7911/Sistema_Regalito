@@ -1,18 +1,23 @@
 services:
   db:
     image: postgres:15-alpine
-    container_name: regalito_db_prod
+    container_name: ${PROD_CONTAINER_PREFIX:-regalito}_db_prod
     restart: always
     environment:
       POSTGRES_USER: ${DB_USER:-regalito_admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-Regalito_2026}
       POSTGRES_DB: ${DB_NAME:-regalito_pos}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata_prod:/var/lib/postgresql/data
-      # Si tienes un script de inicialización, puedes montarlo aquí:
-      # - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-regalito_admin} -d ${DB_NAME:-regalito_pos}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - regalito_net
 
@@ -20,7 +25,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: regalito_backend_prod
+    container_name: ${PROD_CONTAINER_PREFIX:-regalito}_backend_prod
     restart: always
     env_file:
       - .env
@@ -28,18 +33,17 @@ services:
       - DATABASE_URL=postgresql://${DB_USER:-regalito_admin}:${DB_PASSWORD:-Regalito_2026}@db:5432/${DB_NAME:-regalito_pos}
       - ENVIRONMENT=production
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - regalito_net
 
   frontend_nginx:
     image: nginx:alpine
-    container_name: regalito_frontend_prod
+    container_name: ${PROD_CONTAINER_PREFIX:-regalito}_frontend_prod
     restart: always
     ports:
-      - "9090:80"
-      # Si se añade SSL en el futuro, exponer el 443
-      # - "443:443"
+      - "${WEB_PORT:-9090}:80"
     volumes:
       # Montar la carpeta del frontend
       - ./frontend:/usr/share/nginx/html:ro
@@ -52,9 +56,9 @@ services:
 
 volumes:
   pgdata_prod:
-    name: regalito_pgdata_prod
+    name: ${PGDATA_VOLUME:-regalito_pgdata_prod}
 
 networks:
   regalito_net:
-    name: regalito_network
+    name: ${NETWORK_NAME:-regalito_network}
     driver: bridge
