@@ -3,6 +3,55 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Reportes Paso 1: Módulo de Reportes de Usuarios y Clientes (Filtros, Fichas en Modal, Exportación PDF con ReportLab y Registro en Historial de Precios)
+
+### Causa Raíz / Requerimiento
+1. **Verificaciones Previas de Migración 0015 en PostgreSQL Real**:
+   - Ejecución en PostgreSQL real (`regalito_pos` en puerto 5433) de `alembic downgrade -1` (a 0014) y `upgrade head` (a 0015).
+   - Comprobación de paridad de esquema contra `database/init.sql` aplicado sobre una base de datos vacía (`test_init_db`).
+   - Confirmación de persistencia de registros de `visita_seguimiento` y `visita_modulo_evaluacion` tras el ciclo de migración.
+   - Limpieza completa de registros temporales de prueba.
+2. **Módulo de Reportes (Paso 1: Usuarios y Clientes)**:
+   - Patrón unificado: Reporte general en HTML con filtros dinámicos (`estado`, `fecha_desde`, `fecha_hasta`) -> Reporte específico -> Ficha detallada en modal -> Exportación a PDF con ReportLab.
+   - **Reporte de Usuarios**: Listado filtrable, ficha modal con nombre completo, username, rol, estado y fecha de creación; exportación en PDF de la ficha individual y exportaciones del listado en PDF, Excel y CSV.
+   - **Reporte de Clientes**: Listado filtrable, ficha modal con NIT, nombre comercial, tipo de cliente, ubicación geográfica (departamento, municipio, dirección), contactos (teléfonos y correos), estado y fecha de creación; exportación en PDF de la ficha y del listado en PDF, Excel y CSV.
+3. **Seguridad y Control de Acceso (RBAC)**:
+   - Permiso requerido: `REPORTE_VER`.
+   - Restricción estricta para usuarios sin dicho permiso (ej. Cajera): enlace y sección de reportes ocultos en la interfaz y respuesta HTTP 403 Forbidden en la API.
+4. **Verificación de Historial de Precios en Catálogo**:
+   - Comprobación mediante prueba automatizada en navegador de que la modificación del precio de venta de un producto desde la pantalla del catálogo se registra fielmente en la tabla `historial_precio` con usuario auditor, precio anterior y precio nuevo.
+
+### Solución Implementada
+1. **Backend — Schemas y Repositorios** ([`backend/app/schemas/reportes_schema.py`](../backend/app/schemas/reportes_schema.py), [`backend/app/repositories/reporte_repository.py`](../backend/app/repositories/reporte_repository.py)):
+   - Se crearon DTOs `UsuarioReporteDTO`, `ClienteReporteDTO` y `ReporteExportadoDTO`.
+   - Métodos en `ReporteRepositoryImpl`: `get_usuarios_reporte`, `get_usuario_by_id`, `get_clientes_reporte`, `get_cliente_by_id` con filtros `func.lower(estado)`, `func.date(fecha_creacion)` y `selectinload` de relaciones `rol`, `tipo_cliente`, `municipio`, `municipio.departamento` y `contactos`.
+2. **Backend — Servicio y Exportación PDF** ([`backend/app/services/reporte_service.py`](../backend/app/services/reporte_service.py)):
+   - Generación de reportes tabulares y fichas individuales en PDF utilizando ReportLab (`SimpleDocTemplate`, `Table`, `Paragraph`, `getSampleStyleSheet`).
+   - Generación de PDFs para ficha individual de Usuario y ficha individual de Cliente con estilos corporativos.
+   - Generación de PDF de listado filtrado para Usuarios y Clientes.
+   - Mantenimiento de descargas existentes en formato Excel (`openpyxl`) y CSV.
+3. **Backend — API y Endpoints** ([`backend/app/api/reportes.py`](../backend/app/api/reportes.py)):
+   - Endpoints `/api/reportes/usuarios`, `/api/reportes/usuarios/pdf`, `/api/reportes/usuarios/{id_usuario}`, `/api/reportes/usuarios/{id_usuario}/pdf`.
+   - Endpoints `/api/reportes/clientes`, `/api/reportes/clientes/pdf`, `/api/reportes/clientes/{id_cliente}`, `/api/reportes/clientes/{id_cliente}/pdf`.
+   - Endpoints para Excel y CSV (`/excel`, `/csv`).
+   - Todos los endpoints protegidos con `require_permission("REPORTE_VER")`.
+4. **Frontend — Vistas, Pestañas, Modales y Controladores** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/reportes.js`](../frontend/js/reportes.js), [`frontend/js/app.js`](../frontend/js/app.js), [`frontend/js/catalog.js`](../frontend/js/catalog.js)):
+   - Pestañas interactivas en `#reportes-view`: Consolidado, Reporte de Usuarios, Reporte de Clientes.
+   - Filtros por estado y fechas desde/hasta con botones "Filtrar" y "Limpiar".
+   - Modales de ficha `#modal-reporte-ficha-usuario` y `#modal-reporte-ficha-cliente` con botón "Descargar Ficha en PDF".
+   - Botones de exportación de listado: "Descargar PDF", "Descargar Excel", "Descargar CSV".
+   - Control de navegación RBAC en `app.js` verificando permiso `REPORTE_VER` o rol Administrador.
+   - Corrección de ámbito léxico de variables de stock en `catalog.js`.
+5. **Pruebas Automatizadas y Verificación E2E**:
+   - Backend Pytest: 11 nuevas pruebas unitarias y de integración en `backend/tests/test_reportes_especificos_service.py` y `backend/tests/test_reportes_api.py`.
+   - E2E Playwright: 31 verificaciones automatizadas en `scratch/verify_reportes_browser.py` cubriendo inicio de sesión, listados, filtros, apertura de modales de ficha, descarga de PDF de ficha, exportaciones de listados (PDF, Excel, CSV), cambio de precio en pantalla de catálogo y verificación en `historial_precio`, y bloqueo HTTP 403 / vistas ocultas para el rol Cajera.
+
+### Verificación
+- **Pytest**: **276 pruebas aprobadas, 0 fallidas** (incremento de 11 pruebas respecto a las 265 previas).
+- **Playwright (Navegador real)**: **31/31 checks exitosos**.
+
+---
+
 ## [2026-10-23] Módulo de Visitas de Seguimiento y Evaluación (Dueño del Negocio) con Reporte PDF y RBAC
 
 ### Causa Raíz / Requerimiento

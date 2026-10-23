@@ -262,7 +262,7 @@ function applyRoleRestrictions() {
         catalog: isUserAdmin || role === 'Bodeguero',
         bitacora: isUserAdmin || window.hasPermission('BITACORA_CONSULTAR'),
         historial: isUserAdmin || window.hasPermission('REPORTE_VER'),
-        reportes: isUserAdmin,
+        reportes: isUserAdmin || window.hasPermission('REPORTE_VER'),
         configuracion: isUserAdmin,
     };
 
@@ -324,7 +324,7 @@ function canAccessView(viewKey) {
     if (viewKey === 'roles') return false;
     if (viewKey === 'bitacora') return window.hasPermission('BITACORA_CONSULTAR');
     if (viewKey === 'historial') return window.hasPermission('REPORTE_VER');
-    if (viewKey === 'reportes') return false;
+    if (viewKey === 'reportes') return window.hasPermission('REPORTE_VER');
 
     return false;
 }

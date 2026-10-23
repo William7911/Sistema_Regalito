@@ -792,20 +792,22 @@ async function saveProduct(event) {
     }
 
     // 8. Stock Actual (PROBLEMA 2 - Cero fallback destructivo, obligatorio)
+    let numStock = 0;
     if (rawStock === '' || rawStock === null || rawStock === undefined) {
         applyFieldError('stock_actual', 'Este campo es obligatorio.');
     } else {
-        const numStock = parseInt(rawStock, 10);
+        numStock = parseInt(rawStock, 10);
         if (isNaN(numStock) || numStock < 0) {
             applyFieldError('stock_actual', 'El stock inicial debe ser 0 o superior.');
         }
     }
 
     // 9. Stock Mínimo (PROBLEMA 2 - Cero fallback destructivo, obligatorio)
+    let numStockMin = 0;
     if (rawStockMin === '' || rawStockMin === null || rawStockMin === undefined) {
         applyFieldError('stock_minimo', 'Este campo es obligatorio.');
     } else {
-        const numStockMin = parseInt(rawStockMin, 10);
+        numStockMin = parseInt(rawStockMin, 10);
         if (isNaN(numStockMin) || numStockMin < 0) {
             applyFieldError('stock_minimo', 'El stock mínimo debe ser 0 o superior.');
         }

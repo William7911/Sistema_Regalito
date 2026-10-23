@@ -1807,84 +1807,222 @@
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h4 class="fw-bold mb-1">Reportes y Estadísticas</h4>
-                        <p class="text-muted small mb-0">Consolidado de ventas, mermas e ingresos por periodo</p>
+                        <p class="text-muted small mb-0">Consolidado general y reportes específicos con fichas descargables</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
                     </div>
                 </div>
 
-                <!-- Filtros Inteligentes -->
-                <div class="d-flex gap-2 flex-wrap align-items-center mb-4 p-3 bg-white rounded-4 shadow-sm border-0">
-                    <div class="input-group" style="max-width: 250px;">
-                        <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Desde</span>
-                        <input type="date" id="filter-reportes-from" class="form-control form-control-sm border-start-0 ps-0" title="Fecha desde">
-                    </div>
-                    <div class="input-group" style="max-width: 250px;">
-                        <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
-                        <input type="date" id="filter-reportes-to" class="form-control form-control-sm border-start-0 ps-0" title="Fecha hasta">
-                    </div>
-                    <button id="btn-filter-reportes" class="btn btn-celeste ms-2"><i class="bi bi-funnel"></i> Consultar</button>
-                    
-                    <div class="ms-auto d-flex gap-2">
-                        <button id="btn-export-excel" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
-                        <button id="btn-export-csv" class="btn btn-outline-secondary"><i class="bi bi-filetype-csv me-1"></i> CSV</button>
-                    </div>
-                </div>
+                <!-- Tabs de Navegación -->
+                <ul class="nav nav-pills mb-4" id="reportes-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="tab-reporte-consolidado" data-bs-toggle="pill" data-bs-target="#content-reporte-consolidado" type="button" role="tab">
+                            <i class="bi bi-graph-up me-1"></i> Consolidado Operativo
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-reporte-usuarios" data-bs-toggle="pill" data-bs-target="#content-reporte-usuarios" type="button" role="tab">
+                            <i class="bi bi-people me-1"></i> Reporte de Usuarios
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-reporte-clientes" data-bs-toggle="pill" data-bs-target="#content-reporte-clientes" type="button" role="tab">
+                            <i class="bi bi-person-lines-fill me-1"></i> Reporte de Clientes
+                        </button>
+                    </li>
+                </ul>
 
-                <!-- Resumen Rápido -->
-                <div class="row g-4 mb-4" id="reportes-summary-cards">
-                    <div class="col-md-4">
-                        <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2"><i class="bi bi-graph-up-arrow me-2 text-success"></i>Total Ventas</h6>
-                                <h3 class="fw-bold mb-0 text-dark" id="reportes-total-ventas">Q 0.00</h3>
-                                <small class="text-muted" id="reportes-count-ventas">0 registros</small>
+                <div class="tab-content" id="reportes-tab-content">
+                    <!-- Tab 1: Consolidado Operativo -->
+                    <div class="tab-pane fade show active" id="content-reporte-consolidado" role="tabpanel">
+                        <!-- Filtros Inteligentes -->
+                        <div class="d-flex gap-2 flex-wrap align-items-center mb-4 p-3 bg-white rounded-4 shadow-sm border-0">
+                            <div class="input-group" style="max-width: 250px;">
+                                <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Desde</span>
+                                <input type="date" id="filter-reportes-from" class="form-control form-control-sm border-start-0 ps-0" title="Fecha desde">
+                            </div>
+                            <div class="input-group" style="max-width: 250px;">
+                                <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
+                                <input type="date" id="filter-reportes-to" class="form-control form-control-sm border-start-0 ps-0" title="Fecha hasta">
+                            </div>
+                            <button id="btn-filter-reportes" class="btn btn-celeste ms-2"><i class="bi bi-funnel"></i> Consultar</button>
+                            
+                            <div class="ms-auto d-flex gap-2">
+                                <button id="btn-export-excel" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
+                                <button id="btn-export-csv" class="btn btn-outline-secondary"><i class="bi bi-filetype-csv me-1"></i> CSV</button>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2"><i class="bi bi-graph-down-arrow me-2 text-danger"></i>Total Mermas</h6>
-                                <h3 class="fw-bold mb-0 text-dark" id="reportes-total-mermas">Q 0.00</h3>
-                                <small class="text-muted" id="reportes-count-mermas">0 registros</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-2"><i class="bi bi-box-arrow-in-right me-2 text-teal"></i>Total Compras (Ingresos)</h6>
-                                <h3 class="fw-bold mb-0 text-dark" id="reportes-total-compras">Q 0.00</h3>
-                                <small class="text-muted" id="reportes-count-compras">0 registros</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Tabla Responsiva Preview -->
-                <div class="card border-0 shadow-sm rounded-4">
-                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
-                        <h6 class="fw-bold"><i class="bi bi-table me-2"></i>Vista Previa de Ventas Recientes</h6>
+                        <!-- Resumen Rápido -->
+                        <div class="row g-4 mb-4" id="reportes-summary-cards">
+                            <div class="col-md-4">
+                                <div class="card border-0 shadow-sm rounded-4 h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-2"><i class="bi bi-graph-up-arrow me-2 text-success"></i>Total Ventas</h6>
+                                        <h3 class="fw-bold mb-0 text-dark" id="reportes-total-ventas">Q 0.00</h3>
+                                        <small class="text-muted" id="reportes-count-ventas">0 registros</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-0 shadow-sm rounded-4 h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-2"><i class="bi bi-graph-down-arrow me-2 text-danger"></i>Total Mermas</h6>
+                                        <h3 class="fw-bold mb-0 text-dark" id="reportes-total-mermas">Q 0.00</h3>
+                                        <small class="text-muted" id="reportes-count-mermas">0 registros</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-0 shadow-sm rounded-4 h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-muted mb-2"><i class="bi bi-box-arrow-in-right me-2 text-teal"></i>Total Compras (Ingresos)</h6>
+                                        <h3 class="fw-bold mb-0 text-dark" id="reportes-total-compras">Q 0.00</h3>
+                                        <small class="text-muted" id="reportes-count-compras">0 registros</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tabla Responsiva Preview -->
+                        <div class="card border-0 shadow-sm rounded-4">
+                            <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                                <h6 class="fw-bold"><i class="bi bi-table me-2"></i>Vista Previa de Ventas Recientes</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table align-middle table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th>Estado</th>
+                                                <th>Vendedor</th>
+                                                <th class="text-end">Subtotal</th>
+                                                <th class="text-end">Descuento</th>
+                                                <th class="text-end">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reportes-table-body">
+                                            <tr><td colspan="6" class="text-center text-muted py-4">Seleccione un rango de fechas y haga clic en "Consultar"</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table align-middle table-hover mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Fecha</th>
-                                        <th>Estado</th>
-                                        <th>Vendedor</th>
-                                        <th class="text-end">Subtotal</th>
-                                        <th class="text-end">Descuento</th>
-                                        <th class="text-end">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="reportes-table-body">
-                                    <tr><td colspan="6" class="text-center text-muted py-4">Seleccione un rango de fechas y haga clic en "Consultar"</td></tr>
-                                </tbody>
-                            </table>
+
+                    <!-- Tab 2: Reporte de Usuarios -->
+                    <div class="tab-pane fade" id="content-reporte-usuarios" role="tabpanel">
+                        <!-- Filtros Usuarios -->
+                        <div class="d-flex gap-2 flex-wrap align-items-center mb-4 p-3 bg-white rounded-4 shadow-sm border-0">
+                            <div style="min-width: 160px;">
+                                <select id="filter-rep-usuarios-estado" class="form-select form-select-sm" title="Filtrar por estado">
+                                    <option value="">Todos los estados</option>
+                                    <option value="activo">Activos</option>
+                                    <option value="inactivo">Inactivos</option>
+                                </select>
+                            </div>
+                            <div class="input-group" style="max-width: 220px;">
+                                <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Desde</span>
+                                <input type="date" id="filter-rep-usuarios-desde" class="form-control form-control-sm border-start-0 ps-0" title="Fecha creación desde">
+                            </div>
+                            <div class="input-group" style="max-width: 220px;">
+                                <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
+                                <input type="date" id="filter-rep-usuarios-hasta" class="form-control form-control-sm border-start-0 ps-0" title="Fecha creación hasta">
+                            </div>
+                            <button id="btn-filter-rep-usuarios" class="btn btn-celeste btn-sm ms-2"><i class="bi bi-funnel"></i> Filtrar</button>
+                            
+                            <div class="ms-auto d-flex gap-2">
+                                <button id="btn-export-usuarios-pdf" class="btn btn-outline-danger btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i> PDF</button>
+                                <button id="btn-export-usuarios-excel" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
+                                <button id="btn-export-usuarios-csv" class="btn btn-outline-secondary btn-sm"><i class="bi bi-filetype-csv me-1"></i> CSV</button>
+                            </div>
+                        </div>
+
+                        <!-- Tabla Usuarios -->
+                        <div class="card border-0 shadow-sm rounded-4">
+                            <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-people me-2"></i>Listado de Usuarios</h6>
+                                <span id="badge-total-usuarios" class="badge bg-light text-dark border">0 usuarios</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table align-middle table-hover mb-0" id="table-reporte-usuarios">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Usuario</th>
+                                                <th>Nombre Completo</th>
+                                                <th>Rol</th>
+                                                <th>Estado</th>
+                                                <th>Fecha Creación</th>
+                                                <th class="text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reportes-usuarios-tbody">
+                                            <tr><td colspan="7" class="text-center text-muted py-4">Haga clic en "Filtrar" para cargar usuarios...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Reporte de Clientes -->
+                    <div class="tab-pane fade" id="content-reporte-clientes" role="tabpanel">
+                        <!-- Filtros Clientes -->
+                        <div class="d-flex gap-2 flex-wrap align-items-center mb-4 p-3 bg-white rounded-4 shadow-sm border-0">
+                            <div style="min-width: 160px;">
+                                <select id="filter-rep-clientes-estado" class="form-select form-select-sm" title="Filtrar por estado">
+                                    <option value="">Todos los estados</option>
+                                    <option value="activo">Activos</option>
+                                    <option value="inactivo">Inactivos</option>
+                                </select>
+                            </div>
+                            <div class="input-group" style="max-width: 220px;">
+                                <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Desde</span>
+                                <input type="date" id="filter-rep-clientes-desde" class="form-control form-control-sm border-start-0 ps-0" title="Fecha creación desde">
+                            </div>
+                            <div class="input-group" style="max-width: 220px;">
+                                <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
+                                <input type="date" id="filter-rep-clientes-hasta" class="form-control form-control-sm border-start-0 ps-0" title="Fecha creación hasta">
+                            </div>
+                            <button id="btn-filter-rep-clientes" class="btn btn-celeste btn-sm ms-2"><i class="bi bi-funnel"></i> Filtrar</button>
+                            
+                            <div class="ms-auto d-flex gap-2">
+                                <button id="btn-export-clientes-pdf" class="btn btn-outline-danger btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i> PDF</button>
+                                <button id="btn-export-clientes-excel" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
+                                <button id="btn-export-clientes-csv" class="btn btn-outline-secondary btn-sm"><i class="bi bi-filetype-csv me-1"></i> CSV</button>
+                            </div>
+                        </div>
+
+                        <!-- Tabla Clientes -->
+                        <div class="card border-0 shadow-sm rounded-4">
+                            <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-person-lines-fill me-2"></i>Listado de Clientes</h6>
+                                <span id="badge-total-clientes" class="badge bg-light text-dark border">0 clientes</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table align-middle table-hover mb-0" id="table-reporte-clientes">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>NIT</th>
+                                                <th>Nombre Comercial / Razón</th>
+                                                <th>Tipo</th>
+                                                <th>Estado</th>
+                                                <th>Fecha Creación</th>
+                                                <th class="text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reportes-clientes-tbody">
+                                            <tr><td colspan="7" class="text-center text-muted py-4">Haga clic en "Filtrar" para cargar clientes...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4391,5 +4529,102 @@
         </div>
     </div>
 
+    <!-- Modal Ficha de Usuario -->
+    <div class="modal fade" id="modal-reporte-ficha-usuario" tabindex="-1" aria-labelledby="modalReporteFichaUsuarioLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-primary-subtle rounded-top-4 px-4 py-3">
+                    <h5 class="modal-title fw-bold text-primary" id="modalReporteFichaUsuarioLabel">
+                        <i class="bi bi-person-badge-fill me-2"></i>Ficha del Usuario
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <input type="hidden" id="ficha-usuario-id">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">Nombre de Usuario:</span>
+                            <span class="fw-semibold" id="ficha-usuario-username">-</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">Nombre Completo:</span>
+                            <span class="fw-semibold" id="ficha-usuario-nombre">-</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">Rol Asignado:</span>
+                            <span class="badge bg-secondary" id="ficha-usuario-rol">-</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">Estado:</span>
+                            <span class="badge bg-success" id="ficha-usuario-estado">-</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">Fecha de Creación:</span>
+                            <span class="fw-medium text-dark" id="ficha-usuario-fecha">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-danger" id="btn-ficha-usuario-pdf">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Exportar a PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ficha de Cliente -->
+    <div class="modal fade" id="modal-reporte-ficha-cliente" tabindex="-1" aria-labelledby="modalReporteFichaClienteLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-info-subtle rounded-top-4 px-4 py-3">
+                    <h5 class="modal-title fw-bold text-dark" id="modalReporteFichaClienteLabel">
+                        <i class="bi bi-person-lines-fill me-2 text-teal"></i>Ficha del Cliente
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <input type="hidden" id="ficha-cliente-id">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">NIT:</span>
+                            <span class="fw-bold text-dark" id="ficha-cliente-nit">-</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">Nombre Comercial / Razón:</span>
+                            <span class="fw-semibold" id="ficha-cliente-nombre">-</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">Tipo de Cliente:</span>
+                            <span class="badge bg-info text-dark" id="ficha-cliente-tipo">-</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2">
+                            <span class="text-muted small d-block mb-1">Ubicación Geográfica:</span>
+                            <div class="p-2 bg-light rounded text-dark small" id="ficha-cliente-ubicacion">-</div>
+                        </div>
+                        <div class="list-group-item px-0 py-2">
+                            <span class="text-muted small d-block mb-1">Contactos Registrados:</span>
+                            <div class="p-2 bg-light rounded text-dark small" id="ficha-cliente-contactos">-</div>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">Estado:</span>
+                            <span class="badge bg-success" id="ficha-cliente-estado">-</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                            <span class="text-muted small">Fecha de Creación:</span>
+                            <span class="fw-medium text-dark" id="ficha-cliente-fecha">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-danger" id="btn-ficha-cliente-pdf">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Exportar a PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
