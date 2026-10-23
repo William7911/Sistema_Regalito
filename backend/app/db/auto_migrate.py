@@ -82,3 +82,4 @@ def run_auto_migrate():
 
 if __name__ == "__main__":
     run_auto_migrate()
+

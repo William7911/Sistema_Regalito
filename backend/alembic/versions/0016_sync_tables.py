@@ -61,3 +61,4 @@ def downgrade() -> None:
         op.drop_table("sync_queue")
     if "sync_cache_metadata" in tables:
         op.drop_table("sync_cache_metadata")
+
