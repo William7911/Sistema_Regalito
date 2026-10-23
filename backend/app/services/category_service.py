@@ -4,6 +4,7 @@ from app.db.models import Categoria
 from app.interfaces.repositories import CategoryRepository
 from app.interfaces.services import CategoryService
 from app.schemas import schemas
+from app.services.audit_service import log_action
 
 
 class ConcreteCategoryService(CategoryService):
@@ -22,17 +23,22 @@ class ConcreteCategoryService(CategoryService):
             raise HTTPException(status_code=404, detail="Categoría no encontrada")
         return schemas.CategoriaOut.model_validate(categoria)
 
-    async def create_category(self, data: schemas.CategoriaCreate) -> schemas.CategoriaOut:
+    async def create_category(self, data: schemas.CategoriaCreate, actor_id: int = 0) -> schemas.CategoriaOut:
         existing = await self.repository.get_by_name(data.nombre.strip())
         if existing:
             raise HTTPException(status_code=400, detail="Ya existe una categoría con ese nombre")
         categoria = Categoria(nombre=data.nombre.strip(), estado="Activo")
         await self.repository.create(categoria)
+        if actor_id:
+            await log_action(
+                self.repository.db, id_usuario=actor_id, accion="CREATE", tabla="categoria",
+                descripcion=f"Creó categoría '{categoria.nombre}' (ID: {categoria.id_categoria})",
+            )
         await self.repository.commit()
         return schemas.CategoriaOut.model_validate(categoria)
 
     async def update_category(
-        self, category_id: int, data: schemas.CategoriaUpdate
+        self, category_id: int, data: schemas.CategoriaUpdate, actor_id: int = 0
     ) -> schemas.CategoriaOut:
         categoria = await self.repository.get_by_id(category_id)
         if not categoria:
@@ -48,15 +54,25 @@ class ConcreteCategoryService(CategoryService):
             categoria.estado = data.estado.strip()
 
         await self.repository.update(categoria)
+        if actor_id:
+            await log_action(
+                self.repository.db, id_usuario=actor_id, accion="UPDATE", tabla="categoria",
+                descripcion=f"Actualizó categoría '{categoria.nombre}' (ID: {category_id})",
+            )
         await self.repository.commit()
         return schemas.CategoriaOut.model_validate(categoria)
 
-    async def deactivate_category(self, category_id: int) -> schemas.CategoriaOut:
+    async def deactivate_category(self, category_id: int, actor_id: int = 0) -> schemas.CategoriaOut:
         """Eliminación lógica (soft delete)."""
         categoria = await self.repository.get_by_id(category_id)
         if not categoria:
             raise HTTPException(status_code=404, detail="Categoría no encontrada")
         categoria.estado = "Inactivo"
         await self.repository.update(categoria)
+        if actor_id:
+            await log_action(
+                self.repository.db, id_usuario=actor_id, accion="DEACTIVATE", tabla="categoria",
+                descripcion=f"Desactivó categoría '{categoria.nombre}' (ID: {category_id})",
+            )
         await self.repository.commit()
         return schemas.CategoriaOut.model_validate(categoria)

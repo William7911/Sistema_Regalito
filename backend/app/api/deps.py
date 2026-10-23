@@ -158,6 +158,21 @@ class UnitOfWork:
         from app.repositories.catalogo_repository import MunicipioRepository
         return MunicipioRepository(self.db)
 
+    @property
+    def permisos(self):
+        from app.repositories.catalogo_repository import PermisoRepository
+        return PermisoRepository(self.db)
+
+    @property
+    def bitacora(self):
+        from app.repositories.catalogo_repository import BitacoraRepository
+        return BitacoraRepository(self.db)
+
+    @property
+    def historial_precios(self):
+        from app.repositories.catalogo_repository import HistorialPrecioRepository
+        return HistorialPrecioRepository(self.db)
+
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
@@ -322,3 +337,13 @@ def get_inventory_service(db: AsyncSession = Depends(get_db)):
 def get_cliente_service(db: AsyncSession = Depends(get_db)):
     from app.services.cliente_service import ConcreteClienteService
     return ConcreteClienteService(UnitOfWork(db))
+
+
+def get_bitacora_service(db: AsyncSession = Depends(get_db)):
+    from app.services.bitacora_service import ConcreteBitacoraService
+    return ConcreteBitacoraService(UnitOfWork(db))
+
+
+def get_historial_precio_service(db: AsyncSession = Depends(get_db)):
+    from app.services.historial_precio_service import ConcreteHistorialPrecioService
+    return ConcreteHistorialPrecioService(UnitOfWork(db))

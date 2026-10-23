@@ -1,7 +1,7 @@
 from typing import Optional, List
 from fastapi import HTTPException, status
 from datetime import datetime
-from app.db.models import Producto, VarianteProducto, InventarioSucursal
+from app.db.models import Producto, VarianteProducto, InventarioSucursal, HistorialPrecio
 from app.interfaces.repositories import ProductRepository
 from app.interfaces.services import ProductService
 from app.schemas import schemas
@@ -241,6 +241,15 @@ class ConcreteProductService(ProductService):
                     partes_precio.append(f"precio_detalle: Q{precio_detalle_prev:.2f}→Q{nuevo_det:.2f}")
                 if nuevo_may != precio_mayoreo_prev:
                     partes_precio.append(f"precio_mayoreo: Q{precio_mayoreo_prev:.2f}→Q{nuevo_may:.2f}")
+                # Registrar en historial_precio el cambio de precio de detalle
+                if nuevo_det != precio_detalle_prev:
+                    self.products.db.add(HistorialPrecio(
+                        id_variante=variante_nueva.id_variante,
+                        id_usuario=actor_id,
+                        precio_anterior=precio_detalle_prev,
+                        precio_nuevo=nuevo_det,
+                        fecha_modificacion=datetime.utcnow(),
+                    ))
             accion = "PRECIO" if partes_precio else "EDITAR"
             desc = f"Editó producto '{updated.nombre}' (ID {product_id})."
             if partes_precio:

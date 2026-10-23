@@ -27,6 +27,18 @@ class RoleService(ABC):
     async def deactivate_role(self, role_id: int) -> schemas.Role:
         ...
 
+    @abstractmethod
+    async def list_permisos(self):
+        ...
+
+    @abstractmethod
+    async def get_rol_permisos(self, role_id: int) -> list:
+        ...
+
+    @abstractmethod
+    async def update_rol_permisos(self, role_id: int, codigos: list, actor_id: int = 0) -> list:
+        ...
+
 
 class DepartmentService(ABC):
     """Contrato de la lógica de negocio de Departamentos."""

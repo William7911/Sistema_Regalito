@@ -2,6 +2,7 @@ from typing import Dict, Any
 from fastapi import HTTPException
 from app.api.deps import UnitOfWork
 from app.db.models import Usuario
+from app.services.audit_service import log_action
 
 class ConfiguracionService:
     def __init__(self, uow: UnitOfWork):
@@ -30,5 +31,10 @@ class ConfiguracionService:
 
         for clave, valor in parametros.items():
             await self.uow.configuracion.actualizar_valor(clave, valor)
-            
+
+        await log_action(
+            self.uow.db, id_usuario=usuario_actual.id_usuario, accion="UPDATE",
+            tabla="parametro_sistema",
+            descripcion="Actualizó configuración: " + ", ".join(sorted(parametros.keys())),
+        )
         await self.uow.commit()

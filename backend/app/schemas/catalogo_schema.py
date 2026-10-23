@@ -597,6 +597,11 @@ class RolPermisoAssign(BaseModel):
     id_permiso: int
 
 
+class RolePermisosUpdate(BaseModel):
+    """Cuerpo para reemplazar los permisos asignados a un rol."""
+    codigos: List[str] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # BitacoraAuditoria (solo lectura)
 # ---------------------------------------------------------------------------
@@ -608,6 +613,7 @@ class BitacoraOut(BaseModel):
     accion: str
     descripcion: str
     fecha_hora: datetime
+    usuario_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -638,11 +644,16 @@ class HistorialPrecioOut(BaseModel):
     precio_anterior: Decimal
     precio_nuevo: Decimal
     fecha_modificacion: datetime
+    producto_id: Optional[int] = None
+    producto_nombre: Optional[str] = None
+    variante_codigo_barras: Optional[str] = None
+    usuario_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class HistorialPrecioFilter(BaseModel):
+    id_producto: Optional[int] = None
     id_variante: Optional[int] = None
     id_usuario: Optional[int] = None
     fecha_desde: Optional[datetime] = None

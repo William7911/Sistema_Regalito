@@ -51,6 +51,16 @@ class TestUnitOfWork:
         self.departamentos_geo = DepartamentoRepository(db)
         self.municipios = MunicipioRepository(db)
 
+        from app.repositories.catalogo_repository import (
+            PermisoRepository, BitacoraRepository, HistorialPrecioRepository,
+        )
+        self.permisos = PermisoRepository(db)
+        self.bitacora = BitacoraRepository(db)
+        self.historial_precios = HistorialPrecioRepository(db)
+
+        from app.repositories.configuracion_repository import ConfiguracionRepositoryImpl
+        self.configuracion = ConfiguracionRepositoryImpl(db)
+
     async def commit(self):
         await self.db.commit()
 

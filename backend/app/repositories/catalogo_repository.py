@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.db.models import (
     TipoCliente, Cliente, ClienteContacto,
     Sucursal, AreaBodega,
-    Subcategoria, UnidadMedida, Producto, InventarioSucursal,
+    Subcategoria, UnidadMedida, Producto, VarianteProducto, InventarioSucursal,
     MotivoMerma, DetalleMerma, MetodoPago,
     Proveedor, OrdenCompra,
     DepartamentoGeografico, Municipio,
@@ -1197,14 +1197,16 @@ class BitacoraRepository:
         if accion:
             conds.append(BitacoraAuditoria.accion == accion.upper())
         if fecha_desde:
-            conds.append(BitacoraAuditoria.fecha_hora >= fecha_desde)
+            conds.append(func.date(BitacoraAuditoria.fecha_hora) >= fecha_desde.date())
         if fecha_hasta:
-            conds.append(BitacoraAuditoria.fecha_hora <= fecha_hasta)
+            conds.append(func.date(BitacoraAuditoria.fecha_hora) <= fecha_hasta.date())
         return conds
 
     async def search(self, id_usuario=None, tabla=None, accion=None, fecha_desde=None, fecha_hasta=None, limit=50, offset=0) -> List[BitacoraAuditoria]:
         conds = self._build_filters(id_usuario, tabla, accion, fecha_desde, fecha_hasta)
-        stmt = select(BitacoraAuditoria)
+        stmt = select(BitacoraAuditoria).options(
+            selectinload(BitacoraAuditoria.usuario)
+        )
         if conds:
             stmt = stmt.where(and_(*conds))
         stmt = stmt.order_by(BitacoraAuditoria.fecha_hora.desc()).limit(limit).offset(offset)
@@ -1228,30 +1230,41 @@ class HistorialPrecioRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def _build_filters(self, id_variante=None, id_usuario=None, fecha_desde=None, fecha_hasta=None):
+    def _build_filters(self, id_producto=None, id_variante=None, id_usuario=None, fecha_desde=None, fecha_hasta=None):
         conds = []
         if id_variante is not None:
             conds.append(HistorialPrecio.id_variante == id_variante)
         if id_usuario is not None:
             conds.append(HistorialPrecio.id_usuario == id_usuario)
         if fecha_desde:
-            conds.append(HistorialPrecio.fecha_modificacion >= fecha_desde)
+            conds.append(func.date(HistorialPrecio.fecha_modificacion) >= fecha_desde.date())
         if fecha_hasta:
-            conds.append(HistorialPrecio.fecha_modificacion <= fecha_hasta)
-        return conds
+            conds.append(func.date(HistorialPrecio.fecha_modificacion) <= fecha_hasta.date())
+        return conds, id_producto
 
-    async def search(self, id_variante=None, id_usuario=None, fecha_desde=None, fecha_hasta=None, limit=50, offset=0) -> List[HistorialPrecio]:
-        conds = self._build_filters(id_variante, id_usuario, fecha_desde, fecha_hasta)
-        stmt = select(HistorialPrecio)
+    async def search(self, id_producto=None, id_variante=None, id_usuario=None, fecha_desde=None, fecha_hasta=None, limit=50, offset=0) -> List[HistorialPrecio]:
+        conds, id_producto = self._build_filters(id_producto, id_variante, id_usuario, fecha_desde, fecha_hasta)
+        stmt = select(HistorialPrecio).options(
+            selectinload(HistorialPrecio.variante).selectinload(VarianteProducto.producto),
+            selectinload(HistorialPrecio.usuario),
+        )
+        if id_producto is not None:
+            stmt = stmt.join(VarianteProducto, HistorialPrecio.id_variante == VarianteProducto.id_variante).where(
+                VarianteProducto.id_producto == id_producto
+            )
         if conds:
             stmt = stmt.where(and_(*conds))
         stmt = stmt.order_by(HistorialPrecio.fecha_modificacion.desc()).limit(limit).offset(offset)
         res = await self.db.execute(stmt)
         return list(res.scalars().all())
 
-    async def count(self, id_variante=None, id_usuario=None, fecha_desde=None, fecha_hasta=None) -> int:
-        conds = self._build_filters(id_variante, id_usuario, fecha_desde, fecha_hasta)
+    async def count(self, id_producto=None, id_variante=None, id_usuario=None, fecha_desde=None, fecha_hasta=None) -> int:
+        conds, id_producto = self._build_filters(id_producto, id_variante, id_usuario, fecha_desde, fecha_hasta)
         stmt = select(func.count()).select_from(HistorialPrecio)
+        if id_producto is not None:
+            stmt = stmt.join(VarianteProducto, HistorialPrecio.id_variante == VarianteProducto.id_variante).where(
+                VarianteProducto.id_producto == id_producto
+            )
         if conds:
             stmt = stmt.where(and_(*conds))
         res = await self.db.execute(stmt)

@@ -9,6 +9,7 @@ from app.schemas.compras_schema import (
     OrdenCompraCreate, IngresoMercaderiaCreate
 )
 from app.core.permissions import check_user_permission
+from app.services.audit_service import log_action
 
 class ConcreteComprasService:
     """Servicio para Módulo de Compras (DERCAS).
@@ -66,6 +67,10 @@ class ConcreteComprasService:
         )
 
         orden_creada = await self.uow.compras.create_orden(orden, detalles_model)
+        await log_action(
+            self.uow.db, id_usuario=user_id, accion="CREATE", tabla="orden_compra",
+            descripcion=f"Emisión de orden de compra (ID: {orden_creada.id_orden}) al proveedor {data.id_proveedor} por Q{total_estimado}",
+        )
         await self.uow.commit()
         return orden_creada
 

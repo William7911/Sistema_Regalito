@@ -3,6 +3,64 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Fase 2 — Bloque 4: Permisos por Rol, Bitácora de Auditoría y Historial de Precios
+
+### Causa Raíz / Requerimiento
+1. **Permisos y rol-permiso**: pantalla dentro de **Roles** para marcar qué permisos tiene cada rol (CRUD de roles + panel de permisos con checkboxes agrupados por módulo).
+2. **Bitácora de auditoría**: pantalla de **solo consulta** con filtros (usuario, tabla, acción, rango de fechas) protegida con el permiso `BITACORA_CONSULTAR`. Además, detectar qué **servicios de escritura NO registraban** en `bitacora_auditoria` y corregirlos.
+3. **Historial de precios**: consulta de **solo lectura** por producto o variante, y asegurar que los cambios de precio queden registrados en `historial_precio`.
+
+### Solución Implementada
+
+**Backend — Permisos y rol-permiso** ([`backend/app/api/roles.py`](../backend/app/api/roles.py), [`backend/app/services/role_service.py`](../backend/app/services/role_service.py)):
+- `GET /api/roles/permisos/catalogo` lista todos los permisos (`PermisoOut`).
+- `GET /api/roles/{id}/permisos` devuelve los códigos asignados al rol.
+- `PUT /api/roles/{id}/permisos` (body `{codigos: [...]}`) reemplaza el conjunto de permisos del rol (quita removidos y agrega nuevos dentro del mismo UoW), validando códigos inexistentes (400) y rol inexistente (404).
+- El `UnitOfWork` de [`backend/app/api/deps.py`](../backend/app/api/deps.py) expone `permisos`; `RoleService` ampliado en [`backend/app/interfaces/services.py`](../backend/app/interfaces/services.py).
+- Schema `RolePermisosUpdate` en [`backend/app/schemas/catalogo_schema.py`](../backend/app/schemas/catalogo_schema.py).
+
+**Backend — Bitácora de auditoría** ([`backend/app/api/bitacora.py`](../backend/app/api/bitacora.py), [`backend/app/services/bitacora_service.py`](../backend/app/services/bitacora_service.py)):
+- `GET /api/bitacora` con filtros `id_usuario`, `tabla`, `accion`, `fecha_desde`, `fecha_hasta`, `limit`, `offset`; protegida con `require_permission("BITACORA_CONSULTAR")`. Consulta de solo lectura.
+- `BitacoraOut` ahora incluye `usuario_nombre` (eager load de `usuario` en [`backend/app/repositories/catalogo_repository.py`](../backend/app/repositories/catalogo_repository.py)); los rangos de fecha se comparan por día (`func.date`) para que el filtro "hasta" sea inclusivo.
+
+**Backend — Historial de precios** ([`backend/app/api/historial_precios.py`](../backend/app/api/historial_precios.py), [`backend/app/services/historial_precio_service.py`](../backend/app/services/historial_precio_service.py)):
+- `GET /api/historial-precios` con filtros `id_producto`, `id_variante`, `id_usuario`, fechas, paginación; protegida con `require_permission("REPORTE_VER")`.
+- `HistorialPrecioRepository` filtra por producto (JOIN con `variante_producto`) y expone `producto_nombre`, `variante_codigo_barras`, `usuario_nombre`.
+- El servicio de producto [`backend/app/services/product_service.py`](../backend/app/services/product_service.py) ahora **inserta en `historial_precio`** cuando cambia `precio_detalle` en `update_product`.
+
+**Corrección de auditoría en servicios de escritura que NO registraban**:
+- `role_service`: `create_role`, `update_role`, `deactivate_role` y `update_rol_permisos` ahora llaman a `log_action`.
+- `category_service`: `create_category`, `update_category`, `deactivate_category` (reciben `actor_id`; el controlador [`backend/app/api/categories.py`](../backend/app/api/categories.py) lo envía).
+- `department_service`: `create_department`, `update_department` (controlador [`backend/app/api/departments.py`](../backend/app/api/departments.py) envía `actor_id`).
+- `configuracion_service`: `actualizar_configuracion` registra `parametro_sistema`.
+- `compra_service`: `crear_orden` registra `orden_compra` (el ingreso ya registraba `INGRESO_COMPRA`).
+
+**Frontend** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/roles.js`](../frontend/js/roles.js), [`frontend/js/bitacora.js`](../frontend/js/bitacora.js), [`frontend/js/historial.js`](../frontend/js/historial.js), [`frontend/js/app.js`](../frontend/js/app.js)):
+- Nueva vista **Roles y Permisos** (`#roles-view`): tabla de roles con CRUD y botón "Permisos" que abre el modal `#role-permisos-modal` con todos los permisos agrupados por módulo como checkboxes, guardando vía `PUT`.
+- Nueva vista **Bitácora** (`#bitacora-view`): solo lectura con filtros (usuario, tabla, acción con datalist, fechas) y paginación.
+- Nueva vista **Historial de Precios** (`#historial-view`): solo lectura filtrable por producto (dropdown) o variante (código de barras/SKU) y fechas, con paginación.
+- RBAC: roles solo para `Administradora`; bitácora exige `BITACORA_CONSULTAR`; historial exige `REPORTE_VER` (`canAccessView`, `applyRoleRestrictions`, `mainViews`, `renderView`).
+
+**Pruebas nuevas (26)**:
+- [`backend/tests/test_permisos_service.py`](../backend/tests/test_permisos_service.py) (8): listado, lectura/asignación/reemplazo de permisos por rol, limpieza total, 400 código inexistente, 404 rol, bitácora de rol.
+- [`backend/tests/test_bloque4_api.py`](../backend/tests/test_bloque4_api.py) (9): catálogo de permisos, get/update rol-permiso, 404/400/403, bitácora con filtros y **403 sin `BITACORA_CONSULTAR`**, POST no permitido.
+- [`backend/tests/test_historial_precio_api.py`](../backend/tests/test_historial_precio_api.py) (4): **403 sin `REPORTE_VER`**, filtros por producto/variante/fechas, y registro en `historial_precio` al actualizar precio de producto.
+- [`backend/tests/test_auditoria_fix.py`](../backend/tests/test_auditoria_fix.py) (8): bitácora generada por categoría (crear/editar/desactivar), departamento (crear/editar), rol_permiso, orden de compra y configuración.
+- `TestUnitOfWork` de [`backend/tests/conftest.py`](../backend/tests/conftest.py) ampliado con `permisos`, `bitacora`, `historial_precios` y `configuracion`.
+
+**Evidencia de navegador (Playwright)** ([`scratch/seed_b4_e2e.py`](../scratch/seed_b4_e2e.py), [`scratch/verify_bloque4_browser.py`](../scratch/verify_bloque4_browser.py)):
+- Admin: lista 3 roles, abre panel de permisos, marca/desmarca y guarda (toast), API refleja el cambio; bitácora muestra registros y filtra por tabla; historial filtra por SKU y por producto.
+- Cajera (no administradora): Roles/Bitácora/Historial ocultos en el menú, vista forzada bloqueada, `/api/bitacora` y `/api/roles/permisos/catalogo` responden **403**.
+
+### Verificación
+- `python -m pytest -q` en `backend/`: **221 passed, 0 failed** (195 previos + 26 nuevos).
+- Playwright Chromium headless (`scratch/verify_bloque4_browser.py`): **14/14 comprobaciones correctas** (admin y no admin).
+- `node --check` sobre los 16 archivos JS del frontend: 0 errores; balance de `<div>` en `frontend/index.html`: 877/877.
+- Rutas registradas en OpenAPI: `/api/roles/permisos/catalogo`, `/api/roles/{role_id}/permisos`, `/api/bitacora`, `/api/historial-precios`.
+- `scratch/` permanece ignorado por git (`.gitignore`), los scripts de prueba siembran en SQLite de prueba y no tocan la BD de desarrollo.
+
+---
+
 ## [2026-10-23] Fase 2 — Bloque 3: Saneamiento de Datos Geográficos (338 Municipios), Paridad init.sql, Estados de Orden de Compra y Verificación de Secretos
 
 ### Causa Raíz / Requerimiento

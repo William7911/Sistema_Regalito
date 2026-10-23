@@ -57,7 +57,7 @@ async def create_department(
     service: ConcreteDepartmentService = Depends(get_department_service),
     current_user: Usuario = Depends(require_admin),
 ):
-    return await service.create_department(payload)
+    return await service.create_department(payload, actor_id=current_user.id_usuario)
 
 
 @router.put(
@@ -71,7 +71,7 @@ async def update_department(
     service: ConcreteDepartmentService = Depends(get_department_service),
     current_user: Usuario = Depends(require_admin),
 ):
-    return await service.update_department(department_id, payload)
+    return await service.update_department(department_id, payload, actor_id=current_user.id_usuario)
 
 
 @router.delete(
