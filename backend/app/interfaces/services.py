@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import Optional, List, Any
 from app.schemas import schemas
 from app.schemas.dashboard_schema import DashboardResumenResponse
 
@@ -51,6 +51,10 @@ class DepartmentService(ABC):
 
     @abstractmethod
     async def deactivate_department(self, department_id: int) -> schemas.Department:
+        ...
+
+    @abstractmethod
+    async def list_municipios(self, department_id: Optional[int] = None) -> List[Any]:
         ...
 
 

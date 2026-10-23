@@ -3,7 +3,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from app.api import auth, cash_register, catalogos, categories, compras, dashboard, departments, mermas, products, roles, sales, users, sync, health, reportes, configuracion, inventory, facturacion
+from app.api import auth, cash_register, catalogos, catalogos_generales, categories, compras, dashboard, departments, mermas, products, roles, sales, users, sync, health, reportes, configuracion, inventory, facturacion, clientes, tipos_cliente
 from app.db.database import engine, Base
 import logging
 import os
@@ -78,9 +78,12 @@ app.include_router(mermas.router, prefix="/api/mermas", tags=["mermas"])
 app.include_router(categories.router, prefix="/api/categorias", tags=["categorias"])
 app.include_router(products.router, prefix="/api/productos", tags=["productos"])
 app.include_router(catalogos.router, prefix="/api/catalogos", tags=["catalogos"])
+app.include_router(catalogos_generales.router, prefix="/api/catalogos", tags=["catalogos"])
 app.include_router(roles.router, prefix="/api/roles", tags=["roles"])
 app.include_router(departments.router, prefix="/api/departamentos", tags=["departamentos"])
 app.include_router(users.router, prefix="/api/usuarios", tags=["usuarios"])
+app.include_router(clientes.router, prefix="/api/clientes", tags=["clientes"])
+app.include_router(tipos_cliente.router, prefix="/api/tipos-cliente", tags=["tipos-cliente"])
 app.include_router(compras.router, prefix="/api/compras", tags=["compras"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(health.router, prefix="/api/health", tags=["health"])

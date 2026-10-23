@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 from decimal import Decimal
 from app.db.models import (
     Categoria, Subcategoria, UnidadMedida, Sucursal, AreaBodega,
@@ -55,6 +55,11 @@ class DepartmentRepository(ABC):
     @abstractmethod
     async def update(self, department: DepartamentoGeografico) -> DepartamentoGeografico:
         ...
+
+    @abstractmethod
+    async def list_municipios(self, department_id: Optional[int] = None) -> List[Any]:
+        ...
+
 
 
 class UserRepository(ABC):

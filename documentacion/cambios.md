@@ -5,13 +5,263 @@ Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `
 
 
 
-## [2026-10-18] Auditoría de Estado: Módulos I, II y III (BD y Capas DERCAS)
+## [2026-10-22] Fase 2 — Bloque 3: Resolución de Pendientes (Git por Bloque, Desglose 194 Tests, Desactivación Segura y Limpieza E2E)
+
+### Causa Raíz / Requerimiento
+1. **Git por Bloques**: Organizar el historial de trabajo en commits claros por bloque (Bloque 0, Bloque 1, Bloque 2, Bloque 3), excluyendo archivos scratch y credenciales.
+2. **Desglose de Pruebas Pytest**: Reportar la recolección exacta (`pytest --collect-only -q`) agrupada por archivo con sus conteos individuales y total verificado (194 pruebas).
+3. **Desactivación Segura con Conteo**: Demostrar con pruebas que proveedores con órdenes de compra abiertas, métodos de pago usados en ventas y departamentos con municipios activos no se pueden desactivar (HTTP 400 con conteo de dependencias).
+4. **Limpieza de Datos E2E**: Confirmar que los scripts `scratch/seed_b3_e2e.py` y `scratch/verify_bloque3_browser.py` limpian los registros generados durante la prueba de navegador, dejando la base de datos únicamente con los datos semilla.
+
+### Solución Implementada
+1. **Commits en Git**:
+   - Bloque 0 (`bc2af2f`): Migraciones 0010/0011, `init.sql`, modelos base y reescritura de tests a español.
+   - Bloque 1 (`4258f75`): Clientes, tipos de cliente, contactos dinámicos, ficha, filtros y validación POS.
+   - Bloque 2 (`ece6333`): Sucursales, áreas de bodega, subcategorías y unidades de medida.
+   - Bloque 3 (en curso): Motivos de merma, métodos de pago, proveedores, departamentos y municipios.
+   - Directorio `scratch/` agregado a `.gitignore`.
+2. **Desglose 194 Tests**:
+   - Verificado con `pytest --collect-only -q`: exactamente 194 pruebas en 29 archivos de test (0 fallos).
+3. **Validación de Desactivación Segura con Conteo**:
+   - Repositorio y Servicio ([`backend/app/services/catalogo_general_service.py`](../backend/app/services/catalogo_general_service.py)):
+     - Proveedores: `count_ordenes_activas` lanza HTTP 400 con `"hay {n} orden(es) de compra emitida(s) activa(s)"`.
+     - Métodos de pago: `count_pagos_ventas_completadas` lanza HTTP 400 con `"hay {n} pago(s) de ventas completadas asociado(s)"`.
+     - Departamentos: `count_municipios_activos` lanza HTTP 400 con `"hay {n} municipio(s) activo(s) asociado(s)"`.
+   - Pruebas en [`backend/tests/test_catalogo_bloque3_service.py`](../backend/tests/test_catalogo_bloque3_service.py): afirmaciones explícitas de conteo validadas (`hay 1 orden(es)`, `hay 1 pago(s)`, `hay 1 municipio(s)`).
+4. **Limpieza en Scripts E2E**:
+   - [`scratch/verify_bloque3_browser.py`](../scratch/verify_bloque3_browser.py): función `cleanup_e2e()` añadida en el bloque `finally:`, eliminando los registros de prueba creados (`Flores E2E`, `Petén E2E`, `Dulcería La Luna`, `Tarjeta Débito`, `Caducidad Controlada Edit`).
+   - Verificación vía SELECT post-ejecución: 100% de tablas confirmadas en estado semilla (motivos: 2, métodos: 2, proveedores: 1, departamentos: 2, municipios: 3).
+
+### Verificación
+- `pytest -q`: **194 passed, 0 failed**.
+- Pruebas de desactivación segura: 3/3 pasando con conteo exacto verificado.
+- Playwright Chromium Headless: 27/27 comprobaciones aprobadas.
+- Base de datos E2E: SELECT confirma únicamente registros semilla.
+
+---
+
+## [2026-10-22] Fase 2 — Bloque 3 (Parte 2): Catálogos Motivos de Merma, Métodos de Pago, Proveedores, Departamentos y Municipios
+
+### Causa Raíz / Requerimiento
+1. Completar el mantenimiento de Bloque 3 (Motivos de Merma, Métodos de Pago, Proveedores, Departamentos y Municipios) con validación real en navegador (Playwright).
+2. **Usuario NO administrador**: la prueba de navegador debe incluir un rol no-admin (cajera y bodeguero) para validar que los combos ligeros cargan (HTTP 200) y que los intentos de escritura muestran el toast de error **403** con el detalle del backend, así como el toast **400** con conteo al intentar desactivar una sucursal con áreas de bodega activas.
+3. **Revisión de regla de negocio**: revalidar que desactivar una sucursal con áreas de bodega activas queda bloqueado (HTTP 400 con conteo).
+
+### Solución Implementada
+1. **Fix de IDs de modal de confirmación** ([`frontend/js/catalog.js`](../frontend/js/catalog.js)): `toggleB3Status`/`confirmB3Deactivate` construían IDs en plural (`confirm-motivos-deactivate-modal`) mientras el HTML usa IDs en singular (`confirm-motivo-deactivate-modal`). Se añadió la clave `singular` a `B3_CONFIG` y se usó en la construcción de los ID de confirmación; sin esto el modal de confirmación nunca se abría en la UI.
+2. **Creadas evidencias de navegador** en [`scratch/verify_bloque3_browser.py`](../scratch/verify_bloque3_browser.py) y [`scratch/seed_b3_e2e.py`](../scratch/seed_b3_e2e.py):
+   - Semilla SQLite (roles 1 Administradora / 2 Cajero / 3 Bodeguero, usuarios `admin`, `cajera`, `bodega`, permiso `CATALOGO_ADMIN` solo en rol 1, catálogos B3 y sucursal con área activa).
+   - Levanta uvicorn contra SQLite y valida en Chromium headless: CRUD completo de las 5 entidades (crear, ficha, editar, desactivar/reactivar, exportar CSV/Excel), dropdown dependiente departamento→municipio, y **sin alert()/confirm() nativos** (todo por toast/modal estático).
+   - Como **cajera** (no-admin): los 5 combos responden 200 y un POST de catálogo devuelve **403** con `detail` de `CATALOGO_ADMIN`.
+   - Como **bodeguero** (no-admin): al escribir desde la UI se muestra el **toast 403** con el detalle del backend.
+   - Como **admin**: desactivar la sucursal con área activa dispara el **toast 400** con el conteo (`"...hay 1 área(s) de bodega activa(s) asociada(s)"`).
+
+### Verificación
+- Playwright Chromium headless (`scratch/verify_bloque3_browser.py`): **27/27 comprobaciones exitosas** para Bloque 3, incluyendo los escenarios no-admin (combos 200 + POST 403 + toast de bodeguero) y la desactivación segura de sucursal con áreas activas (toast 400 con conteo).
+- `python -m pytest -q` en `backend/`: **194 passed, 0 failed** (medido sobre el árbol actual).
+- Corrección de cifra: la entrada anterior (Bloque 2 pendientes) citaba "186 previos / 190 passed" como total; eso **no es reproducible** contra el repositorio. El desglose verificado al día de hoy es: baseline committeado 82 + Bloque 0 (28) = 110 + Bloque 1 clientes (16) = 126 + Bloque 2 (37 hoy, 20 en aprobación) + Bloque 3 (29) + `test_sales_service` (+2) = **194**. El delta aprobado 148 → 194 es **+46** (17 de Bloque 2 ampliado + 29 de Bloque 3), no "38".
+- Regla de negocio confirmada (ya implementada en [`backend/app/services/catalogo_service.py`](../backend/app/services/catalogo_service.py):138-150 y cubierta por pruebas): desactivar una sucursal con áreas de bodega activas responde 400 y no cambia el estado.
+
+---
+
+## [2026-10-22] Fase 2 — Bloque 2: Pendientes resueltos (lectura de combos para no-admin, desactivación segura, enlaces relativos)
+
+### Causa Raíz / Requerimiento
+1. **Permisos de lectura**: solo el rol Administradora (rol 1) posee `CATALOGO_ADMIN`, pero los combos de sucursales, áreas de bodega, subcategorías y unidades de medida que consumen los módulos de **Productos**, **Inventario** y **POS** deben seguir cargando para usuarios NO admin (roles *Cajera* y *Bodega*). Solo las operaciones de escritura (POST/PUT/DELETE) y las exportaciones exigen `CATALOGO_ADMIN`; la lectura de combos no.
+2. **Desactivación segura**: no debe permitirse desactivar una sucursal, área de bodega, subcategoría o unidad de medida que tenga productos o inventario activos asociados. La API debe responder **HTTP 400** con un mensaje claro que indique **cuántos registros dependen**.
+3. **Enlaces de documentación**: sustituir cualquier enlace absoluto local que apunte a `c:/...` en `documentacion/cambios.md` por rutas relativas.
+
+### Solución Implementada
+1. **Lectura de combos sin `CATALOGO_ADMIN`** (ya existente y verificada): los endpoints ligeros `GET /api/catalogos/{sucursales|areas|subcategorias|unidades}` están protegidos únicamente con `get_current_user` (autenticación), nunca con `require_permission("CATALOGO_ADMIN")`. El mismo servicio serializador es consumido por el formulario de productos, filtros de inventario y POS (`frontend/js/catalog.js` → `populateSubcategorias/Unidades/Sucursales/Areas` sobre `CATALOGOS_API`).
+   - **Refuerzo de pruebas** ([`backend/tests/test_catalogo_bloque2_api.py`](../backend/tests/test_catalogo_bloque2_api.py)): la prueba de combos ahora se parametriza con **dos roles no-admin** (`Cajera` y `Bodega`) y **afirma el contenido de los 4 combos** (incluida el área, que antes no se sembraba ni se validaba). La prueba de 403 de CRUD también se parametriza para ambos roles.
+2. **Desactivación segura** (ya implementada en servicio y repositorio, ahora con cobertura API completa):
+   - Repositorio ([`backend/app/repositories/catalogo_repository.py`](../backend/app/repositories/catalogo_repository.py)): `SucursalRepository.count_inventario_activo`, `AreaBodegaRepository.count_inventario_activo`, `SubcategoriaRepository.count_productos_activos`, `UnidadMedidaRepository.count_productos_activos` (COUNTs SQL asíncronos con `select(func.count())`).
+   - Servicio ([`backend/app/services/catalogo_service.py`](../backend/app/services/catalogo_service.py)): tanto `deactivate_*` como `update_*` con `estado="Inactivo"` validan las dependencias y lanzan `HTTPException(400, "...hay {n} registro(s)...")` sin cambiar el estado.
+   - **Pruebas API nuevas** en `test_catalogo_bloque2_api.py`: `test_desactivar_area_bodega_con_inventario_activo_retorna_400` y `test_desactivar_unidad_medida_con_producto_activo_retorna_400`, completando la cobertura HTTP de las 4 entidades (sucursal y subcategoría ya existían).
+3. **Enlaces relativos**: verificación exhaustiva con `Select-String`/grep: **cero ocurrencias de `file://`** en `documentacion/` y en todo el repositorio; los enlaces del documento ya son relativos (`../backend/...`, `../frontend/...`, `../database/...`).
+
+### Verificación
+- `python -m pytest -q` en `backend/`: **190 passed, 0 failed** (186 previos + 4 nuevos: 2 por la parametrización de roles no-admin en combos y CRUD-403, y 2 pruebas API de desactivación segura para área y unidad).
+  - **Corrección posterior**: la cifra "186 previos / 190 passed" no es reproducible contra el repositorio. El total verificado al [2026-10-22] es **194**; la diferencia con el aprobado de 148 es **+46** (Bloque 2 ampliado a 37 + Bloque 3 con 29 tests nuevos). Ver entrada "Bloque 3 (Parte 2)".
+- Evidencia SQL directa (script `scratch`/temp): los COUNT de dependencias devuelven `1` para cada entidad; las 4 desactivaciones responden `HTTP 400` con el conteo (`"...hay 1 registro(s) de inventario activo(s) asociado(s)"` / `"...hay 1 producto(s) activo(s) asociado(s)"`), y los estados permanecen `Activo` tras el bloqueo.
+- Frontend: el mensaje del backend (con conteo) se muestra en toast porque `readCatalogError` extrae `detail` ([`frontend/js/catalog.js`](../frontend/js/catalog.js)) en las rutas de desactivación.
+- **No probado en navegador**: la validación de estos dos pendientes es de capa de API/servicio (permisos RBAC y regla de negocio). El flujo visual de CRUD/combos ya fue validado previamente con Playwright por `scratch/verify_bloque2_browser.py`. Si se requiere, la revalidación en navegador de estos comportamientos específicos (403 y toast con conteo) necesita servidor en vivo con usuarios no-admin sembrados.
+
+---
+
+## [2026-10-21] Fase 2 — Bloque 2: Catálogos (Sucursales, Áreas de Bodega, Subcategorías, Unidades de Medida) y Puntos Previos 1–4
+
+### Causa Raíz / Requerimiento
+1. Resolución de los 4 puntos previos requeridos antes del Bloque 2:
+   - Punto 1: Eliminar datos de prueba en PostgreSQL real (`cliente` NIT 889941360-1 y `tipo_cliente` Mayorista VIP) y agregar auto-limpieza a `verify_flow.py`.
+   - Punto 2: Prueba manual/automatizada en navegador real con Playwright (Clientes con 2 contactos dinámicos, ficha de solo lectura y búsqueda POS de cliente registrado, no registrado y CF).
+   - Punto 3: En el POS, clientes con estado 'Inactivo' quedan bloqueados (aviso toast, rechazo 400 y reset a CF).
+   - Punto 4: Venta en POS con cliente Mayorista aplica precio mayorista y descuento del tipo de cliente.
+2. Implementación de Bloque 2: Mantenimiento completo (CRUD con soft delete `estado='Inactivo'`, reactivación, filtros, fechas, ordenamiento, fichas, exportación Excel/CSV, pruebas de API y RBAC con `CATALOGO_ADMIN`, y prueba de flujo en navegador real) para Sucursales, Áreas de Bodega, Subcategorías y Unidades de Medida.
+
+### Solución Implementada
+1. **Puntos Previos (1 a 4)**:
+   - Limpieza ejecutada en PostgreSQL; scripts `scratch/verify_flow.py` y `scratch/run_browser_test.py` ajustados con limpieza automática.
+   - En `frontend/js/clients.js`, corregido selector `DOM.clientDept` que impedía poblar municipios. Flujo completo validado en Playwright.
+   - En `backend/app/services/sale_service.py` y `frontend/js/pos.js`, rechazo de clientes inactivos con HTTP 400 y toast preventivo.
+   - En `backend/app/services/sale_service.py`, aplicación automática de `precio_mayorista` y porcentaje de descuento para clientes de tipo Mayorista.
+2. **Backend DERCAS Bloque 2**:
+   - Schemas ([`catalogo_schema.py`](../backend/app/schemas/catalogo_schema.py)): filtros (`SucursalFilter`, `AreaBodegaFilter`, `SubcategoriaFilter`, `UnidadMedidaFilter`), esquemas Create/Update/Out con nombres relacionados.
+   - Repositorios ([`catalogo_repository.py`](../backend/app/repositories/catalogo_repository.py)): consultas sin commits, paginación, filtros por texto, estado, padre y rango de fechas (`fecha_desde`/`fecha_hasta`), y ordenamiento dinámico.
+   - UnitOfWork ([`deps.py`](../backend/app/api/deps.py)): expone `sucursales`, `areas`, `subcategorias`, `unidades`.
+   - Servicio ([`catalogo_service.py`](../backend/app/services/catalogo_service.py)): CRUD completo, soft delete (`estado='Inactivo'`), reactivación, auditoría (`log_action`), reportes Excel/CSV con filtros activos y retrocompatibilidad con combos de frontend.
+   - Endpoints ([`catalogos.py`](../backend/app/api/catalogos.py)): controladores delgados sin `try/except`, protegidos con RBAC `CATALOGO_ADMIN`.
+3. **Frontend Catálogos**:
+   - [`frontend/index.html`](../frontend/index.html) y [`frontend/js/catalog.js`](../frontend/js/catalog.js): 4 pestañas interactivas, tablas ordenables con paginación, modales estáticos para formulario, ficha de solo lectura y confirmación de cambio de estado. Botones para descargar Excel y CSV.
+4. **Pruebas Automatizadas y Navegador**:
+   - `tests/test_catalogo_bloque2_service.py` (15 pruebas) y `tests/test_catalogo_bloque2_api.py` (5 pruebas). Suite completa: **148 pruebas pasando (0 fallos)**.
+   - `scratch/verify_bloque2_browser.py`: Validación de extremo a extremo en Playwright Chromium headless para las 4 entidades con 100% de éxito.
+
+### Verificación
+- `python -m pytest -q` en `backend/`: **148 passed, 0 failed**.
+- Playwright Chromium Headless (`scratch/verify_bloque2_browser.py`): Creación, ficha, edición, desactivación, reactivación y exportación CSV/Excel aprobados al 100% en las 4 entidades.
+- Base de datos PostgreSQL: Verificada en estado semilla limpio.
+
+---
+
+## [2026-10-21] Fase 2 — Bloque 1: Cierre y Verificación Integral de Clientes (9 Puntos Completos)
+
+### Causa Raíz / Requerimiento
+Cierre formal de los 9 puntos requeridos para el Bloque 1 (Clientes):
+1. Mantenimiento de tipos de cliente: endpoint `/api/tipos-cliente` (CRUD con soft delete `estado='Inactivo'`) y pestaña en vista de Clientes.
+2. Contactos: agregar, editar y quitar teléfono y correo dinámicamente desde el modal de cliente.
+3. Modal de ficha de solo lectura del cliente (contactos, tipo, municipio, departamento, fecha de registro).
+4. Filtros por fecha de creación desde/hasta y ordenamiento interactivo asc/desc por columnas en la tabla.
+5. Botones "Descargar Excel" y "Descargar CSV" respetando todos los filtros activos (fechas, texto, tipo, estado).
+6. Cliente "CF": protección doble estricta: no se puede desactivar Y su NIT no se puede modificar.
+7. Pruebas de API completas: 403 sin `CLIENTE_ADMIN`, bloqueo de desactivar/renombrar "CF", NIT duplicado (400), paginación, filtros y CRUD tipos.
+8. Prueba de flujo completo en backend y navegador con y sin cliente registrado (descrita paso a paso).
+9. Reubicación de municipios a endpoint reutilizable: `GET /api/departamentos/{id}/municipios`.
+
+### Solución Implementada
+1. **Endpoint `/api/tipos-cliente` y Mantenimiento** ([`backend/app/api/tipos_cliente.py`](../backend/app/api/tipos_cliente.py), [`backend/app/services/cliente_service.py`](../backend/app/services/cliente_service.py)):
+   - Controlador CRUD completo montado en `main.py` bajo `/api/tipos-cliente`. Métodos `get_tipo_cliente` y `deactivate_tipo_cliente` con soft delete `estado='Inactivo'`, auditoría y protección RBAC `CLIENTE_ADMIN`.
+   - Frontend: Pestaña "Tipos de Cliente" con tabla, modal `#tipo-cliente-modal` y modal de confirmación `#confirm-tipo-deactivate-modal` con `backdrop="static"`.
+2. **Contactos Dinámicos** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/clients.js`](../frontend/js/clients.js)):
+   - Contenedor dinámico `#client-contacts-container` con botón `+ Agregar Contacto`. Cada fila permite teléfono, correo y botón eliminar. Serialización y deserialización a arreglo en payloads de creación/edición.
+3. **Modal de Ficha de Solo Lectura** (`#client-detail-modal` en [`frontend/index.html`](../frontend/index.html)):
+   - Botón de ojo (`bi-eye`) en tabla. Muestra NIT, Estado, Nombre, Tipo con descuento, Departamento, Municipio, Dirección, Fecha formateada y tabla detallada de contactos.
+4. **Filtros por Fecha y Ordenamiento** ([`backend/app/schemas/cliente_schema.py`](../backend/app/schemas/cliente_schema.py), [`backend/app/repositories/cliente_repository.py`](../backend/app/repositories/cliente_repository.py)):
+   - Esquema `ClienteFilter` y repositorio soportan `fecha_desde`, `fecha_hasta`, `sort_by` y `sort_order`.
+   - Interfaz con campos datepicker `#filter-client-date-from` / `#filter-client-date-to` y encabezados ordenables interactivos con iconos asc/desc.
+5. **Reportes Excel y CSV** ([`backend/app/services/cliente_service.py`](../backend/app/services/cliente_service.py), [`frontend/js/clients.js`](../frontend/js/clients.js)):
+   - `export_clientes` consume todos los filtros activos para generar archivos `.xlsx` y `.csv` coherentes con la vista filtrada.
+6. **Protección Total de Consumidor Final (CF)** ([`backend/app/services/cliente_service.py`](../backend/app/services/cliente_service.py)):
+   - `update_cliente` rechaza con HTTP 400 cualquier intento de cambiar el NIT de CF (`cliente.nit == 'CF' and data.nit != 'CF'`) o de asignar NIT 'CF' a otro cliente.
+   - En frontend: NIT de CF en modo edición se bloquea en modo solo lectura con nota informativa.
+7. **Pruebas de API** ([`backend/tests/test_cliente_api.py`](../backend/tests/test_cliente_api.py), [`backend/tests/test_cliente_service.py`](../backend/tests/test_cliente_service.py)):
+   - 6 suites nuevas de integración cubriendo 403 sin `CLIENTE_ADMIN`, bloqueo de desactivar/renombrar CF, NIT duplicado (400), paginación y ordenamiento, CRUD tipos de cliente y endpoint reutilizable de ubicación. Total: 126 pruebas pasando (0 fallos).
+8. **Prueba de Flujo Completo** ([`scratch/verify_flow.py`](../scratch/verify_flow.py)):
+   - Ejecución automatizada contra PostgreSQL y endpoints del sistema verificando creación, edición, ficha, desactivación y búsqueda por NIT en POS (con cliente registrado, no registrado y CF).
+9. **Endpoint Reutilizable de Ubicación** ([`backend/app/api/departments.py`](../backend/app/api/departments.py)):
+   - Implementado `GET /api/departamentos/{id}/municipios` y `GET /api/departamentos/municipios`, integrados en repositorio y servicio de departamentos, consumidos directamente por el frontend.
+
+### Verificación
+- `python -m pytest -q` en `backend/`: **126 passed, 0 failed**.
+- Script `verify_flow.py`: Verificación de extremo a extremo aprobada contra base de datos PostgreSQL real.
+- Sintaxis frontend: `node --check frontend/js/clients.js` aprobado.
+
+---
+
+## [2026-10-21] Fase 2 — Bloque 1: Módulo Clientes Completo (DERCAS, POS, FEL y Frontend)
+
+### Causa Raíz / Requerimiento
+1. **Migración 0011 de saneamiento**: Mover el saneamiento preventivo de codificación de `Solol??` a una migración dedicada `0011_saneamiento_departamento_solola.py`, preservando `0010` inalterada respecto a su aplicación inicial.
+2. **Módulo integral de Clientes (DERCAS)**: Implementación de la gestión completa de clientes requerida para la operación comercial del sistema y la emisión de facturación electrónica FEL:
+   - Regla de negocio: unicidad de NIT estricta excepto para Consumidor Final (`'CF'`), el cual puede coexistir múltiples veces.
+   - Protección de Consumidor Final: prohibición absoluta de desactivar o eliminar el cliente con NIT `'CF'`.
+   - Soporte de múltiples contactos por cliente (teléfono, correo).
+   - Catálogo de tipos de cliente (Minorista, Mayorista, etc.) con sus respectivos descuentos.
+   - Integración con POS y FEL: autocompletado y selección de cliente en caja para facturación DTE inmediata.
+
+### Solución Implementada
+- **Migración 0011** ([`backend/alembic/versions/0011_saneamiento_departamento_solola.py`](../backend/alembic/versions/0011_saneamiento_departamento_solola.py)):
+  - Creada migración idempotente dedicada para unificar departamentos legacy corruptos hacia `Sololá` y reasignar claves foráneas de municipios. Aplicada en PostgreSQL (`alembic upgrade head -> 0011`).
+- **Capa DERCAS Backend**:
+  - **Esquemas Pydantic v2** ([`backend/app/schemas/cliente_schema.py`](../backend/app\schemas\cliente_schema.py)): `ClienteCreate`, `ClienteUpdate`, `ClienteOut`, `ClienteFilter`, `ClienteList`, `TipoClienteCreate`, `TipoClienteUpdate`, `TipoClienteOut`, `ClienteContactoCreate`, `ClienteContactoOut`.
+  - **Repositorios** ([`backend/app/repositories/cliente_repository.py`](../backend/app/repositories/cliente_repository.py)): `ClienteRepositoryImpl` (consultas asíncronas con `selectinload` para relaciones, búsqueda filtrada, sin commit) y `TipoClienteRepositoryImpl`.
+  - **Unit of Work** ([`backend/app/api/deps.py`](../backend/app/api/deps.py) y [`backend/tests/conftest.py`](../backend/tests/conftest.py)): Expuestas propiedades `uow.clientes` y `uow.tipos_cliente`.
+  - **Servicio** ([`backend/app/services/cliente_service.py`](../backend/app/services/cliente_service.py)): `ConcreteClienteService` con validación de tipo de cliente activo, validación de municipio, regla de unicidad condicional de NIT (permitiendo múltiples CF), bloqueo de desactivación de CF, auditoría atómica en `bitacora_auditoria` y exportación Excel/CSV.
+  - **Controlador API** ([`backend/app/api/clientes.py`](../backend/app/api/clientes.py)): Endpoints delgados bajo `/api/clientes` protegidos con RBAC (`CLIENTE_ADMIN`), más endpoints de consulta pública autenticada `/api/clientes/nit/{nit}` y `/api/clientes/municipios` para el flujo de ventas.
+  - **Registro en App**: Montado router en [`backend/app/main.py`](../backend/app/main.py).
+- **Capa Frontend SPA**:
+  - **Interfaz HTML** ([`frontend/index.html`](../frontend/index.html)):
+    - Enlace en sidebar protegido por `data-module-item="clients"`.
+    - Vista `#clients-view` con tabla responsiva, filtros rápidos por nombre, NIT, tipo y estado, más paginación.
+    - Modal de edición/creación `#client-modal` con `backdrop="static"`, selector dependiente de Departamento → Municipio y validaciones 422 inline.
+    - Modal de confirmación `#confirm-client-deactivate-modal` para soft delete sin diálogos nativos.
+  - **Lógica de Módulo** ([`frontend/js/clients.js`](../frontend/js/clients.js)): `window.showClientsModule()`, carga asíncrona de catálogos, guardado dinámico con spinner y toasts, exportación Excel y CSV.
+  - **Enrutamiento SPA** ([`frontend/js/app.js`](../frontend/js/app.js)): Registrada vista `clients` en `mainViews`, guardia RBAC con permiso `CLIENTE_ADMIN` y enlace con `renderView`.
+  - **Integración POS y Facturación FEL** ([`frontend/js/pos.js`](../frontend/js/pos.js) e [`frontend/index.html`](../frontend/index.html)):
+    - Tarjeta receptora de cliente en checkout POS (`#pos-client-nit`, botón de búsqueda y badge de tipo de cliente).
+    - Búsqueda en tiempo real contra `/api/clientes/nit/{nit}` para autocompletar nombre comercial y enlazar `id_cliente`, `nit_receptor` y `nombre_receptor` al payload de `/api/ventas`.
+
+### Verificación y Pruebas
+- Pruebas unitarias de servicio ([`backend/tests/test_cliente_service.py`](../backend/tests/test_cliente_service.py)): 9 pruebas unitarias cubriendo creación con contactos, regla de duplicados de NIT y CF, protección de desactivación de CF, soft delete, búsqueda y catálogo de tipos.
+- Pruebas de integración API ([`backend/tests/test_cliente_api.py`](../backend/tests/test_cliente_api.py)): 1 prueba completa de flujo HTTP con autenticación Bearer y RBAC.
+- Sintaxis JavaScript verificada con `node --check` para `app.js`, `clients.js` y `pos.js` (0 errores).
+- Suite completa de pruebas del backend: **120 pruebas pasadas** (110 previas + 10 nuevas, 0 fallos).
+
+## [2026-10-21] Fase 2 — Bloque 0: Reescritura de Pruebas Históricas (.old) a Español y DERCAS
+
+### Causa Raíz / Requerimiento
+1. **Saneamiento preventivo de codificación**: Existía riesgo de registros con caracteres corruptos como `Solol??` en bases de datos heredadas. Se requirió unificación formal hacia `Sololá`, reasignación de municipios y verificación de no existencia de otros textos con `??`.
+2. **Clarificación y trazabilidad geográfica**: Documentar explícitamente que se cargaron 338 municipios y que 4 quedan marcados pendientes por verificar contra fuente oficial (decretos legislativos de Petatán, Sipacate, Las Cruces y El Chal).
+3. **Reescritura de pruebas unitarias `.old`**: Las suites históricas `_test_category_service.py.old`, `_test_department_service.py.old`, `_test_role_service.py.old`, `_test_user_service.py.old` y `_test_product_service.py.old` se encontraban excluidas por utilizar nomenclatura en inglés (`name`, `is_active`, `barcode`) incompatible con la arquitectura DERCAS en español.
+
+### Solución Implementada
+- **Saneamiento en Migración 0010**: Se integró en [`backend/alembic/versions/0010_estado_fechas_visitas_permisos_municipios.py`](../backend/alembic/versions/0010_estado_fechas_visitas_permisos_municipios.py) un bloque PL/pgSQL que detecta nombres corruptos como `Solol%`, reasigna sus municipios a `Sololá` y elimina el registro residual. Se escaneó la base de datos completa confirmando cero ocurrencias de `??`.
+- **Estatus Geográfico Oficial**: Se documentó formalmente el estado de municipios: `338 cargados, 4 por verificar contra fuente oficial`.
+- **Reescritura de Pruebas Unitarias en Español**:
+  - [`backend/tests/test_category_service.py`](../backend/tests/test_category_service.py): 5 pruebas sobre `ConcreteCategoryService` (`CategoriaCreate`, `CategoriaOut`, unicidad, 404, soft delete con `estado='Inactivo'`).
+  - [`backend/tests/test_department_service.py`](../backend/tests/test_department_service.py): 5 pruebas sobre `ConcreteDepartmentService` (`DepartmentCreate`, `id_departamento`, `nombre`, validación de unicidad, listados y actualización).
+  - [`backend/tests/test_role_service.py`](../backend/tests/test_role_service.py): 5 pruebas sobre `ConcreteRoleService` (`RoleCreate`, `id_rol`, `nombre`, `estado`, soft delete y unicidad).
+  - [`backend/tests/test_user_service.py`](../backend/tests/test_user_service.py): 7 pruebas sobre `ConcreteUserService` (`UserCreate`, validación de rol activo, rechazo de rol inactivo, unicidad de username, actualización y soft delete).
+  - [`backend/tests/test_product_service.py`](../backend/tests/test_product_service.py): 6 pruebas sobre `ConcreteProductService` (creación anidada con variante e inventario, validación de subcategoría, unicidad de código de barras, búsqueda y soft delete).
+- **Limpieza**: Se eliminaron los 5 archivos `.old` redundantes.
+
+### Verificación y Pruebas
+- Escaneo exhaustivo en PostgreSQL: 0 columnas o filas con `??`.
+- Ejecución completa de la suite de pruebas del backend: **110 pruebas pasadas** (82 baseline + 28 pruebas reescritas incorporadas exitosamente, 0 fallos).
+
+## [2026-10-21] Fase 1 — Base de Datos: Migración 0010, Soft Delete, Visitas de Seguimiento y Catálogos INE
+
+### Causa Raíz / Requerimiento
+Necesidad de estandarizar el soporte de soft delete (`estado = 'Activo'|'Inactivo'`) en tablas de catálogos y transaccionales que carecían de él, registrar fechas de creación en entidades maestras (`cliente`, `proveedor`, `sucursal`), incorporar restricciones compuestas de unicidad (`(id_departamento, nombre)` en `municipio`, `(id_categoria, nombre)` en `subcategoria`, y unicidad parcial sobre `nit` de `cliente` excluyendo `'CF'`), añadir las tablas para el Módulo 8 (`visita_seguimiento` y `visita_modulo_evaluacion`), asignar nuevos permisos RBAC para la administradora y sembrar los 22 departamentos y 340 municipios oficiales de Guatemala.
+
+### Solución Implementada
+- **Migración Alembic 0010** (`backend/alembic/versions/0010_estado_fechas_visitas_permisos_municipios.py`):
+  - Inyección idempotente de columnas `estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo','Inactivo'))` en: `cliente`, `tipo_cliente`, `area_bodega`, `departamento_geografico`, `municipio`, `subcategoria`, `unidad_medida`, `motivo_merma`, `metodo_pago` y `proveedor`.
+  - Agregadas columnas `fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()` a `cliente`, `proveedor` y `sucursal`.
+  - Configurado `DEFAULT NOW()` en `bitacora_auditoria.fecha_hora`.
+  - Restricciones únicas compuestas: `uq_municipio_depto_nombre` y `uq_subcategoria_cat_nombre` (removiendo restricciones simples previas); e índice parcial `uq_cliente_nit_no_cf` para NITs distintos de `'CF'`.
+  - DDL de tablas `visita_seguimiento` y `visita_modulo_evaluacion` (con cascada de eliminación).
+  - Semilla de 5 nuevos permisos (`CLIENTE_ADMIN`, `BITACORA_CONSULTAR`, `REPORTE_VER`, `CATALOGO_ADMIN`, `VISITA_REGISTRAR`) asignados a `id_rol = 1`.
+  - Saneamiento y unificación preventiva de cualquier registro corrupto como `Solol??` hacia `Sololá`, reasignando claves foráneas de municipios asociados.
+  - Carga geográfica: 22 departamentos; 338 cargados, 4 por verificar contra fuente oficial.
+  - Implementada función de reversión simétrica en `downgrade()`.
+- **Actualización de Modelos ORM** (`backend/app/db/models.py`):
+  - Añadidas las columnas `estado` y `fecha_creacion` (con defaults compatibles en Python y PostgreSQL) a los modelos respectivos.
+  - Creados modelos SQLAlchemy `VisitaSeguimiento` y `VisitaModuloEvaluacion` con relación 1:N y cascade.
+- **Sincronización de Init Script** (`database/init.sql`):
+  - Actualizado el script DDL maestro para que los despliegues limpios en Docker inicien de forma idéntica a la migración 0010.
+- **Robustez de Réplica Local** (`backend/app/repositories/sync_repository.py`):
+  - Se ajustó `replicate_to_sqlite` para recrear limpiamente el esquema (`drop_all` + `create_all`) ante actualizaciones de metadata DDL.
+
+### Verificación y Pruebas
+- Ejecución completa de la suite de pruebas del backend: **82 pruebas pasadas** (0 regresiones).
+- Revisión de pruebas `.old` existentes en `backend/tests/`: se confirmó que corresponden a versiones previas en inglés (`name`, `is_active`) anteriores a la migración idiomática a español.
 
 ### Causa Raíz / Requerimiento
 Auditoría técnica de solo lectura sobre las 23 tablas de los Módulos I, II y III para evaluar la cobertura en modelos SQLAlchemy, routers/endpoints, vistas frontend, campos de estado lógico, tablas sin CRUD y divergencias idiomáticas de nomenclatura. Se profundizó en las capas DERCAS (schemas, repositorios, servicios, interfaces y tests) y en los endpoints de catálogos consumidos por el frontend.
 
 ### Solución Implementada
-- Se actualizó el reporte técnico [`documentacion/auditoria_estado.md`](file:///c:/Users/abima/OneDrive/Desktop/Sistema_Regalito/Sistema_Regalito/documentacion/auditoria_estado.md) con la sección "Capas".
+- Se actualizó el reporte técnico [`documentacion/auditoria_estado.md`](auditoria_estado.md) con la sección "Capas".
 - Se verificó que solo `usuario` y `producto` tienen filtros y paginación completos; `rol`, `usuario`, `categoria`, `producto` y `departamento` soportan soft delete (`Inactivo`).
 - Se confirmó que `departments.py` / `department_service.py` apunta a la tabla `departamento_geografico`.
 - Se mapearon las rutas exactas de catálogo (`/api/catalogos/subcategorias`, `/unidades`, `/sucursales`, `/areas`) consumidas por `frontend/js/catalog.js`.

@@ -5,7 +5,7 @@ const systemModule = document.getElementById('system-module');
 
 // Array of all auth views to easily hide them
 const authViews = ['view-login', 'view-recover', 'view-verify', 'view-reset'];
-const mainViews = ['dashboard', 'pos', 'users', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras'];
+const mainViews = ['dashboard', 'pos', 'users', 'clients', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras'];
 let currentView = null;
 
 // ---------------------------------------------------------------------------
@@ -254,6 +254,7 @@ function applyRoleRestrictions() {
         cash: isUserAdmin || role === 'Cajero',
         caja: isUserAdmin || role === 'Cajero',
         users: isUserAdmin,
+        clients: isUserAdmin || window.hasPermission('CLIENTE_ADMIN'),
         catalog: isUserAdmin || role === 'Bodeguero',
         reportes: isUserAdmin,
         configuracion: isUserAdmin,
@@ -272,7 +273,7 @@ function applyRoleRestrictions() {
     const opSection = document.querySelector('[data-section="operacion"]');
     if (opSection) opSection.classList.toggle('d-none', !opVisible);
 
-    const admItems = document.querySelectorAll('[data-module-item="users"], [data-module-item="catalog"], [data-module-item="reportes"], [data-module-item="configuracion"]');
+    const admItems = document.querySelectorAll('[data-module-item="users"], [data-module-item="clients"], [data-module-item="catalog"], [data-module-item="reportes"], [data-module-item="configuracion"]');
     const admVisible = Array.from(admItems).some(el => !el.classList.contains('d-none'));
     const admSection = document.querySelector('[data-section="administracion"]');
     if (admSection) admSection.classList.toggle('d-none', !admVisible);
@@ -309,6 +310,7 @@ function canAccessView(viewKey) {
     if (viewKey === 'compras') return window.hasPermission('COMPRA_EMITIR_ORDEN');
     if (viewKey === 'cash' || viewKey === 'caja') return role === 'Cajero';
     if (viewKey === 'catalog') return role === 'Bodeguero';
+    if (viewKey === 'clients') return window.hasPermission('CLIENTE_ADMIN');
     if (viewKey === 'users' || viewKey === 'reportes' || viewKey === 'configuracion') return false;
 
     return false;
@@ -384,6 +386,9 @@ function renderView(viewKey) {
     }
     if (viewKey === 'users' && typeof window.showUsersModule === 'function') {
         window.showUsersModule();
+    }
+    if (viewKey === 'clients' && typeof window.showClientsModule === 'function') {
+        window.showClientsModule();
     }
     if (viewKey === 'catalog' && typeof window.showCatalogModule === 'function') {
         window.showCatalogModule();
@@ -472,6 +477,7 @@ const moduleLabels = {
     caja: 'Caja',
     cash: 'Caja',
     users: 'Usuarios / Personal',
+    clients: 'Clientes',
     catalog: 'Catálogos',
     reportes: 'Reportes',
     configuracion: 'Configuración',

@@ -103,6 +103,61 @@ class UnitOfWork:
         from app.repositories.inventory_repository import InventoryRepositoryImpl
         return InventoryRepositoryImpl(self.db)
 
+    @property
+    def clientes(self):
+        from app.repositories.cliente_repository import ClienteRepositoryImpl
+        return ClienteRepositoryImpl(self.db)
+
+    @property
+    def tipos_cliente(self):
+        from app.repositories.cliente_repository import TipoClienteRepositoryImpl
+        return TipoClienteRepositoryImpl(self.db)
+
+    @property
+    def sucursales(self):
+        from app.repositories.catalogo_repository import SucursalRepository
+        return SucursalRepository(self.db)
+
+    @property
+    def areas(self):
+        from app.repositories.catalogo_repository import AreaBodegaRepository
+        return AreaBodegaRepository(self.db)
+
+    @property
+    def subcategorias(self):
+        from app.repositories.catalogo_repository import SubcategoriaRepository
+        return SubcategoriaRepository(self.db)
+
+    @property
+    def unidades(self):
+        from app.repositories.catalogo_repository import UnidadMedidaRepository
+        return UnidadMedidaRepository(self.db)
+
+    @property
+    def motivos_merma(self):
+        from app.repositories.catalogo_repository import MotivoMermaRepository
+        return MotivoMermaRepository(self.db)
+
+    @property
+    def metodos_pago(self):
+        from app.repositories.catalogo_repository import MetodoPagoRepository
+        return MetodoPagoRepository(self.db)
+
+    @property
+    def proveedores(self):
+        from app.repositories.catalogo_repository import ProveedorRepository
+        return ProveedorRepository(self.db)
+
+    @property
+    def departamentos_geo(self):
+        from app.repositories.catalogo_repository import DepartamentoRepository
+        return DepartamentoRepository(self.db)
+
+    @property
+    def municipios(self):
+        from app.repositories.catalogo_repository import MunicipioRepository
+        return MunicipioRepository(self.db)
+
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
@@ -189,7 +244,12 @@ def get_product_service(db: AsyncSession = Depends(get_db)) -> ConcreteProductSe
 
 def get_catalogo_service(db: AsyncSession = Depends(get_db)) -> ConcreteCatalogoService:
     product_repository = ProductRepositoryImpl(db)
-    return ConcreteCatalogoService(db, product_repository)
+    return ConcreteCatalogoService(UnitOfWork(db), product_repository)
+
+
+def get_catalogo_general_service(db: AsyncSession = Depends(get_db)):
+    from app.services.catalogo_general_service import ConcreteCatalogoGeneralService
+    return ConcreteCatalogoGeneralService(UnitOfWork(db))
 
 
 def get_role_service(db: AsyncSession = Depends(get_db)) -> ConcreteRoleService:
@@ -258,3 +318,7 @@ def get_configuracion_service(db: AsyncSession = Depends(get_db)):
 def get_inventory_service(db: AsyncSession = Depends(get_db)):
     from app.services.inventory_service import ConcreteInventoryService
     return ConcreteInventoryService(UnitOfWork(db))
+
+def get_cliente_service(db: AsyncSession = Depends(get_db)):
+    from app.services.cliente_service import ConcreteClienteService
+    return ConcreteClienteService(UnitOfWork(db))

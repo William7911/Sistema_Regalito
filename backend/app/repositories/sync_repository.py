@@ -147,11 +147,12 @@ class SyncRepositoryImpl(SyncRepository):
         return snapshot
 
     async def replicate_to_sqlite(self, snapshot: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
-        """Crea el esquema si no existe y vuelca atómicamente el snapshot en SQLite local."""
+        """Crea (o recrea) el esquema en SQLite local y vuelca atómicamente el snapshot."""
         engine = self._get_local_engine()
 
-        # 1. Asegurar que el DDL existe en SQLite
+        # 1. Recrear esquema para garantizar que los cambios de migración se reflejen
         async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
         session_maker = async_sessionmaker(engine, expire_on_commit=False)
