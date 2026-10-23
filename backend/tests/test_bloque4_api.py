@@ -143,6 +143,69 @@ async def test_permisos_rol_api_403_sin_admin(client, db_session):
     assert res.status_code == 403
 
 
+@pytest.mark.asyncio
+async def test_administradora_no_puede_perder_permisos_criticos_api(client, db_session):
+    headers = await seed_admin_auth(db_session, username="admin_prot")
+    admin_user = await get_user_by_username(db_session, "admin_prot")
+    id_rol_admin = admin_user.id_rol
+
+    # Registrar permisos criticos
+    p1 = Permiso(modulo="Seguridad", codigo="ROL_ADMIN", descripcion="Roles")
+    p2 = Permiso(modulo="Seguridad", codigo="USUARIO_ADMIN", descripcion="Usuarios")
+    p3 = Permiso(modulo="Ventas", codigo="VENTA_COBRAR", descripcion="Cobro")
+    db_session.add_all([p1, p2, p3])
+    await db_session.commit()
+
+    # Intentar retirar permisos criticos (omitiendo USUARIO_ADMIN) al rol Administradora -> 400
+    res = await client.put(
+        f"/api/roles/{id_rol_admin}/permisos",
+        headers=headers,
+        json={"codigos": ["ROL_ADMIN", "VENTA_COBRAR"]},
+    )
+    assert res.status_code == 400
+    assert "permisos críticos" in res.json()["detail"].lower()
+
+    # Si se incluyen los permisos críticos -> 200 OK
+    res_ok = await client.put(
+        f"/api/roles/{id_rol_admin}/permisos",
+        headers=headers,
+        json={"codigos": ["ROL_ADMIN", "USUARIO_ADMIN", "VENTA_COBRAR"]},
+    )
+    assert res_ok.status_code == 200
+    assert "ROL_ADMIN" in res_ok.json()
+    assert "USUARIO_ADMIN" in res_ok.json()
+
+
+@pytest.mark.asyncio
+async def test_usuario_no_puede_quitarse_a_si_mismo_acceso_roles_api(client, db_session):
+    headers = await seed_admin_auth(db_session, username="admin_self")
+    admin_user = await get_user_by_username(db_session, "admin_self")
+
+    p1 = Permiso(modulo="Seguridad", codigo="ROL_ADMIN", descripcion="Roles")
+    p2 = Permiso(modulo="Seguridad", codigo="USUARIO_ADMIN", descripcion="Usuarios")
+    db_session.add_all([p1, p2])
+    await db_session.commit()
+
+    # Quitar ROL_ADMIN de su propio rol -> 400
+    res = await client.put(
+        f"/api/roles/{admin_user.id_rol}/permisos",
+        headers=headers,
+        json={"codigos": ["USUARIO_ADMIN"]},
+    )
+    assert res.status_code == 400
+    assert "no puedes quitarte a ti mismo el acceso" in res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_no_se_puede_desactivar_rol_administradora_api(client, db_session):
+    headers = await seed_admin_auth(db_session, username="admin_deact")
+    admin_user = await get_user_by_username(db_session, "admin_deact")
+
+    res = await client.delete(f"/api/roles/{admin_user.id_rol}", headers=headers)
+    assert res.status_code == 400
+    assert "no se puede desactivar el rol administradora" in res.json()["detail"].lower()
+
+
 # ---------------------------------------------------------------------------
 # BITÁCORA DE AUDITORÍA
 # ---------------------------------------------------------------------------

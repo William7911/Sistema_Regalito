@@ -525,10 +525,17 @@ INSERT INTO permiso (id_permiso, modulo, codigo, descripcion) VALUES
 (2, 'Ventas', 'VENTA_APLICAR_DESCUENTO', 'Aplicar descuentos por volumen'),
 (3, 'Inventario', 'INV_INGRESAR_MERCADERIA', 'Registrar ingreso de compras'),
 (4, 'Caja', 'CAJA_CIERRE_CIEGAS', 'Ejecutar arqueo de caja a ciegas'),
-(5, 'Compras', 'COMPRA_EMITIR_ORDEN', 'Emitir órdenes de compra');
+(5, 'Compras', 'COMPRA_EMITIR_ORDEN', 'Emitir órdenes de compra'),
+(6, 'Clientes', 'CLIENTE_ADMIN', 'Gestión completa de clientes'),
+(7, 'Seguridad', 'BITACORA_CONSULTAR', 'Consultar bitácora de auditoría'),
+(8, 'Reportes', 'REPORTE_VER', 'Ver reportes del sistema'),
+(9, 'Catálogo', 'CATALOGO_ADMIN', 'Gestión completa de catálogos'),
+(10, 'Visitas', 'VISITA_REGISTRAR', 'Registrar y consultar visitas de seguimiento'),
+(11, 'Seguridad', 'ROL_ADMIN', 'Gestión completa de roles y permisos'),
+(12, 'Seguridad', 'USUARIO_ADMIN', 'Gestión completa de usuarios');
 
 INSERT INTO rol_permiso (id_rol, id_permiso) VALUES
-(1,1),(1,2),(1,3),(1,4),(1,5),
+(1,1),(1,2),(1,3),(1,4),(1,5),(1,6),(1,7),(1,8),(1,9),(1,10),(1,11),(1,12),
 (2,1),(2,2),
 (3,3);
 

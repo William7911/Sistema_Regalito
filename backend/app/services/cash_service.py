@@ -97,6 +97,14 @@ class ConcreteCashService(CashRegisterService):
             raise
 
         fresh = await self.uow.turnos.get_by_id(active_turno.id_turno)
+        await log_action(
+            self.uow.db,
+            id_usuario=user_id,
+            tabla="turno_caja",
+            accion="CIERRE",
+            descripcion=f"Cerró turno ID {fresh.id_turno} con monto Q{data.monto_cierre:.2f}.",
+        )
+        await self.uow.commit()
         return schemas.TurnoResponse.model_validate(fresh)
 
     async def get_estado_actual(self, user_id: int) -> Optional[schemas.TurnoResponse]:

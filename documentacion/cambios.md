@@ -3,6 +3,44 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Bloque 4: Protección de Permisos Críticos en Roles, Auditoría Completa de Escritura y Diagnóstico de Procesos
+
+### Causa Raíz / Requerimiento
+1. **Diagnóstico de Formularios de Proceso (Parte 1)**: Elaborar la tabla diagnóstica integral de los 6 procesos operativos (traslados, mermas, ajuste de stock, alertas, compras y caja) evaluando estado en backend, pantalla en frontend, estados de seguimiento y pendientes técnicos.
+2. **Protección de Permisos Críticos y Anti-Auto-Despojo**:
+   - Evitar que el rol Administradora (id 1) pueda perder sus permisos críticos (`ROL_ADMIN` y `USUARIO_ADMIN`) o ser desactivado.
+   - Evitar que un usuario autenticado pueda quitarse a sí mismo el acceso al módulo de Roles (`ROL_ADMIN`) o desactivar su propio rol.
+   - Aclarar el ciclo de vida de aplicación de permisos (inmediato en backend vs siguiente inicio de sesión en caché frontend).
+3. **Auditoría de Bitácora en Servicios de Escritura**:
+   - Relevar tabla de todos los servicios de escritura y corregir operaciones relevantes que carecían de registro en bitácora (`cerrar_turno` directo en `cash_service.py`).
+4. **Seguridad y Privacidad en Bitácora**:
+   - Confirmar formalmente que ningún evento de bitácora almacena contraseñas en texto plano ni hashes en el campo de detalle.
+
+### Solución Implementada
+1. **Reglas de Seguridad en Servicio de Roles** ([`backend/app/services/role_service.py`](../backend/app/services/role_service.py)):
+   - En `update_rol_permisos`: se validan dos reglas antes de aplicar cambios:
+     - Regla 1: Si `actor_id` pertenece al rol editado y omite `ROL_ADMIN`, se rechaza con HTTP 400 (`"No puedes quitarte a ti mismo el acceso al módulo de Roles"`).
+     - Regla 2: Si el rol es Administradora y se omiten los permisos críticos (`ROL_ADMIN`, `USUARIO_ADMIN`), se rechaza con HTTP 400 (`"El rol Administradora no puede perder los permisos críticos (acceso a Roles y Usuarios)"`).
+   - En `deactivate_role`: se bloquea la desactivación del rol Administradora y el auto-bloqueo del propio rol del actor con HTTP 400.
+2. **Interfaz de Permisos** ([`frontend/js/roles.js`](../frontend/js/roles.js)):
+   - Los permisos críticos se renderizan deshabilitados y marcados (`checked disabled`) con badges informativos: `Crítico (Administradora)` y `Tu rol actual (Acceso a Roles)`.
+   - Se incluye `id_rol` en la respuesta de login de [`backend/app/api/auth.py`](../backend/app/api/auth.py) y se almacena en `localStorage` en [`frontend/js/app.js`](../frontend/js/app.js).
+3. **Migración 0013 y Esquema `init.sql`**:
+   - Creada migración Alembic [`backend/alembic/versions/0013_permisos_roles_usuarios.py`](../backend/alembic/versions/0013_permisos_roles_usuarios.py) insertando formalmente `ROL_ADMIN` y `USUARIO_ADMIN` asignados a Administradora.
+   - Sincronizado [`database/init.sql`](../database/init.sql) con la lista completa de 12 permisos del sistema.
+4. **Corrección de Bitácora en Caja** ([`backend/app/services/cash_service.py`](../backend/app/services/cash_service.py)):
+   - Se añadió `log_action` en `cerrar_turno` (`accion="CIERRE"`, `tabla="turno_caja"`), cubriendo el cierre estándar además del cierre a ciegas.
+5. **Pruebas Automatizadas**:
+   - Pruebas unitarias añadidas en [`backend/tests/test_permisos_service.py`](../backend/tests/test_permisos_service.py).
+   - Pruebas de integración API añadidas en [`backend/tests/test_bloque4_api.py`](../backend/tests/test_bloque4_api.py).
+
+### Verificación
+- `pytest tests/test_permisos_service.py tests/test_bloque4_api.py tests/test_cash_service.py`: **31 passed, 0 failed**.
+- Suite global: 227 pruebas aprobadas sin regresiones.
+
+
+---
+
 ## [2026-10-23] Fase 2 — Bloque 4: Permisos por Rol, Bitácora de Auditoría y Historial de Precios
 
 ### Causa Raíz / Requerimiento

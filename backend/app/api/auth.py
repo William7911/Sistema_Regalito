@@ -92,6 +92,7 @@ async def login_for_access_token(
         "access_token": access_token,
         "token_type": "bearer",
         "rol": rol_nombre,
+        "id_rol": user.id_rol,
         "permisos": permisos,
         "nombre_completo": user.nombre_completo,
     }

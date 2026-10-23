@@ -210,16 +210,33 @@ async function openRolePermisos(roleId) {
             (grupos[p.modulo] = grupos[p.modulo] || []).push(p);
         });
 
+        const myRoleId = parseInt(localStorage.getItem('user_id_rol') || '0', 10);
+        const isEditingAdmin = (roleId === 1);
+        const isEditingSelf = (myRoleId > 0 && myRoleId === roleId);
+
         if (body) {
             body.innerHTML = Object.keys(grupos).sort().map(mod => {
-                const checks = grupos[mod].map(p => `
+                const checks = grupos[mod].map(p => {
+                    const isCriticoAdmin = isEditingAdmin && (p.codigo === 'ROL_ADMIN' || p.codigo === 'USUARIO_ADMIN');
+                    const isCriticoSelf = isEditingSelf && (p.codigo === 'ROL_ADMIN');
+                    const isChecked = asignados.has(p.codigo) || isCriticoAdmin;
+                    const isDisabled = isCriticoAdmin || isCriticoSelf;
+                    let badge = '';
+                    if (isCriticoAdmin) {
+                        badge = '<span class="badge bg-warning text-dark ms-1">Crítico (Administradora)</span>';
+                    } else if (isCriticoSelf) {
+                        badge = '<span class="badge bg-info text-dark ms-1">Tu rol actual (Acceso a Roles)</span>';
+                    }
+                    return `
                     <div class="form-check mb-1">
-                        <input class="form-check-input role-permiso-cb" type="checkbox" value="${p.codigo}" id="perm-${p.codigo}" ${asignados.has(p.codigo) ? 'checked' : ''}>
+                        <input class="form-check-input role-permiso-cb" type="checkbox" value="${p.codigo}" id="perm-${p.codigo}" ${isChecked ? 'checked' : ''} ${isDisabled ? 'disabled' : ''} data-critico="${isDisabled ? '1' : '0'}">
                         <label class="form-check-label small" for="perm-${p.codigo}">
                             <strong>${p.codigo}</strong>
                             ${p.descripcion ? `<span class="text-muted">— ${p.descripcion}</span>` : ''}
+                            ${badge}
                         </label>
-                    </div>`).join('');
+                    </div>`;
+                }).join('');
                 return `
                     <div class="card border-0 shadow-sm rounded-3 mb-3 bg-light">
                         <div class="card-header bg-white fw-semibold"><i class="bi bi-grid me-1"></i>${mod}</div>

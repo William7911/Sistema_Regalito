@@ -70,6 +70,12 @@ class ConcreteRoleService(RoleService):
         role = await self.uow.roles.get_by_id(role_id)
         if not role:
             raise HTTPException(status_code=404, detail="Rol no encontrado")
+        if role.nombre == "Administradora" or (role.id_rol == 1 and role.nombre.lower().startswith("admin")):
+            raise HTTPException(status_code=400, detail="No se puede desactivar el rol Administradora")
+        if actor_id:
+            actor = await self.uow.users.get_by_id(actor_id)
+            if actor and actor.id_rol == role_id:
+                raise HTTPException(status_code=400, detail="No puedes desactivar tu propio rol")
         role.estado = "Inactivo"
         updated = await self.uow.roles.update(role)
         if actor_id:
@@ -113,6 +119,26 @@ class ConcreteRoleService(RoleService):
         actuales = await self.uow.permisos.list_by_rol(role_id)
         actuales_cod = {p.codigo for p in actuales}
         codigos_set = set(codigos)
+
+        # Regla 1: Un usuario no puede quitarse a sí mismo el acceso a Roles
+        if actor_id:
+            actor = await self.uow.users.get_by_id(actor_id)
+            if actor and actor.id_rol == role_id:
+                if "ROL_ADMIN" in mapa and "ROL_ADMIN" not in codigos_set:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="No puedes quitarte a ti mismo el acceso al módulo de Roles",
+                    )
+
+        # Regla 2: El rol Administradora no puede perder los permisos críticos (Roles y Usuarios)
+        if role.nombre == "Administradora" or (role.id_rol == 1 and role.nombre.lower().startswith("admin")):
+            permisos_criticos = {"ROL_ADMIN", "USUARIO_ADMIN"}
+            faltantes = [p for p in permisos_criticos if p in mapa and p not in codigos_set]
+            if faltantes:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El rol Administradora no puede perder los permisos críticos (acceso a Roles y Usuarios)",
+                )
 
         # Quitar permisos que ya no están seleccionados
         for p in actuales:

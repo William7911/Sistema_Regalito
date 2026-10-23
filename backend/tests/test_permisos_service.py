@@ -110,3 +110,73 @@ async def test_create_rol_registra_bitacora(uow):
         .where(BitacoraAuditoria.accion == "CREATE", BitacoraAuditoria.tabla_afectada == "rol")
     )).scalar_one()
     assert conteo == 1
+
+
+@pytest.mark.asyncio
+async def test_administradora_no_puede_perder_permisos_criticos(uow):
+    svc = service(uow)
+    rol_admin = await svc.create_role(schemas.RoleCreate(nombre="Administradora"))
+    p_rol = Permiso(modulo="Seguridad", codigo="ROL_ADMIN", descripcion="Roles")
+    p_usr = Permiso(modulo="Seguridad", codigo="USUARIO_ADMIN", descripcion="Usuarios")
+    p_vta = Permiso(modulo="Ventas", codigo="VENTA_COBRAR", descripcion="Cobro")
+    uow.db.add_all([p_rol, p_usr, p_vta])
+    await uow.db.commit()
+
+    # Intento de asignar solo VENTA_COBRAR sin los permisos críticos
+    with pytest.raises(HTTPException) as exc:
+        await svc.update_rol_permisos(rol_admin.id_rol, ["VENTA_COBRAR"])
+    assert exc.value.status_code == 400
+    assert "El rol Administradora no puede perder los permisos críticos" in exc.value.detail
+
+    # Con ambos permisos críticos sí procede
+    cods = await svc.update_rol_permisos(rol_admin.id_rol, ["ROL_ADMIN", "USUARIO_ADMIN", "VENTA_COBRAR"])
+    assert "ROL_ADMIN" in cods
+    assert "USUARIO_ADMIN" in cods
+
+
+@pytest.mark.asyncio
+async def test_usuario_no_puede_quitarse_a_si_mismo_acceso_roles(uow):
+    from app.db.models import Usuario
+    svc = service(uow)
+    rol_sup = await svc.create_role(schemas.RoleCreate(nombre="Supervisor"))
+    user = Usuario(
+        id_rol=rol_sup.id_rol, nombre_completo="Sup User", username="sup_user",
+        password_hash="x", estado="Activo",
+    )
+    uow.db.add(user)
+    p_rol = Permiso(modulo="Seguridad", codigo="ROL_ADMIN", descripcion="Roles")
+    p_vta = Permiso(modulo="Ventas", codigo="VENTA_COBRAR", descripcion="Cobro")
+    uow.db.add_all([p_rol, p_vta])
+    await uow.db.commit()
+
+    # Usuario intentando quitar ROL_ADMIN de su propio rol
+    with pytest.raises(HTTPException) as exc:
+        await svc.update_rol_permisos(rol_sup.id_rol, ["VENTA_COBRAR"], actor_id=user.id_usuario)
+    assert exc.value.status_code == 400
+    assert "No puedes quitarte a ti mismo el acceso al módulo de Roles" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_no_se_puede_desactivar_rol_administradora_ni_propio_rol(uow):
+    from app.db.models import Usuario
+    svc = service(uow)
+    rol_admin = await svc.create_role(schemas.RoleCreate(nombre="Administradora"))
+    rol_cajero = await svc.create_role(schemas.RoleCreate(nombre="Cajero Especial"))
+    user_cajero = Usuario(
+        id_rol=rol_cajero.id_rol, nombre_completo="Cajero Test", username="cajero_test",
+        password_hash="x", estado="Activo",
+    )
+    uow.db.add(user_cajero)
+    await uow.db.commit()
+
+    # No se puede desactivar Administradora
+    with pytest.raises(HTTPException) as exc1:
+        await svc.deactivate_role(rol_admin.id_rol)
+    assert exc1.value.status_code == 400
+    assert "No se puede desactivar el rol Administradora" in exc1.value.detail
+
+    # No puede desactivar su propio rol
+    with pytest.raises(HTTPException) as exc2:
+        await svc.deactivate_role(rol_cajero.id_rol, actor_id=user_cajero.id_usuario)
+    assert exc2.value.status_code == 400
+    assert "No puedes desactivar tu propio rol" in exc2.value.detail

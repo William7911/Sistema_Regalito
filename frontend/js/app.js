@@ -610,6 +610,7 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
         const data = await response.json();
         localStorage.setItem('jwt_token', data.access_token);
         localStorage.setItem('user_role', data.rol || '');
+        localStorage.setItem('user_id_rol', data.id_rol || '');
         localStorage.setItem('user_permissions', JSON.stringify(data.permisos || []));
         localStorage.setItem('user_name', user);
 

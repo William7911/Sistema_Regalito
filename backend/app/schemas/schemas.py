@@ -11,6 +11,7 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     rol: Optional[str] = None
+    id_rol: Optional[int] = None
     permisos: List[str] = []
     nombre_completo: Optional[str] = None
 
