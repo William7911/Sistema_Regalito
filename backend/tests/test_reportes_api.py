@@ -184,3 +184,4 @@ async def test_api_reportes_404_no_encontrado(client, db_session):
 
     r_cli = await client.get("/api/reportes/clientes/9999", headers=admin_headers)
     assert r_cli.status_code == 404
+

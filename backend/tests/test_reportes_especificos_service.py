@@ -234,3 +234,4 @@ async def test_reportes_403_cajera_sin_permiso(db_session):
     with pytest.raises(HTTPException) as exc2:
         await svc.obtener_reporte_clientes(None, None, None, user_id=3)
     assert exc2.value.status_code == 403
+
