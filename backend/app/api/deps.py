@@ -87,6 +87,11 @@ class UnitOfWork:
     def compras(self):
         from app.repositories.compra_repository import CompraRepositoryImpl
         return CompraRepositoryImpl(self.db)
+
+    @property
+    def traslados(self):
+        from app.repositories.traslado_repository import TrasladoRepositoryImpl
+        return TrasladoRepositoryImpl(self.db)
         
     @property
     def reportes(self):

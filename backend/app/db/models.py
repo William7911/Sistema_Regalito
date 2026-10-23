@@ -369,11 +369,18 @@ class TrasladoInventario(Base):
     id_sucursal_origen = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False, index=True)
     id_sucursal_destino = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False, index=True)
     cantidad = Column(Integer, nullable=False)
-    fecha_traslado = Column(DateTime, nullable=False)
+    fecha_traslado = Column(DateTime, nullable=False, default=datetime.utcnow)
+    estado = Column(String(20), nullable=False, default="En tránsito")
+    id_usuario_envia = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=True)
+    id_usuario_recibe = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=True)
+    fecha_recepcion = Column(DateTime, nullable=True)
+    observaciones = Column(Text, nullable=True)
 
     variante = relationship("VarianteProducto")
     sucursal_origen = relationship("Sucursal", foreign_keys=[id_sucursal_origen])
     sucursal_destino = relationship("Sucursal", foreign_keys=[id_sucursal_destino])
+    usuario_envia = relationship("Usuario", foreign_keys=[id_usuario_envia])
+    usuario_recibe = relationship("Usuario", foreign_keys=[id_usuario_recibe])
 
 
 # ============================================================================

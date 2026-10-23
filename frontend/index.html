@@ -173,6 +173,11 @@
                         <i class="bi bi-trash3-fill me-2"></i> Mermas
                     </a>
                 </li>
+                <li data-module-item="traslados">
+                    <a href="#" id="nav-traslados" class="nav-link text-white-50 sidebar-link" data-nav="traslados" onclick="navigateTo('traslados'); return false;">
+                        <i class="bi bi-arrow-left-right me-2"></i> Traslados
+                    </a>
+                </li>
 
                 <li class="nav-item mt-3" data-section="administracion">
                     <span class="text-uppercase text-muted-teal small fw-bold px-3">— ADMINISTRACIÓN —</span>
@@ -1949,6 +1954,81 @@
                 </div>
             </div>
 
+            <!-- Traslados Module View -->
+            <div id="traslados-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="traslados">
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                    <div>
+                        <h4 class="fw-bold mb-1">Traslados entre Sucursales</h4>
+                        <p class="text-muted small mb-0">Control de envío, seguimiento en tránsito y recepción o cancelación de transferencias de inventario</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <button id="btn-traslados-refresh" class="btn btn-outline-secondary" title="Recargar"><i class="bi bi-arrow-clockwise"></i></button>
+                        <button id="btn-nuevo-traslado" class="btn btn-teal"><i class="bi bi-plus-lg me-1"></i> Despachar Traslado</button>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-12 col-md-3">
+                                <label class="form-label text-muted small fw-semibold mb-1">Fecha Desde</label>
+                                <input type="date" id="traslados-filter-desde" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label text-muted small fw-semibold mb-1">Fecha Hasta</label>
+                                <input type="date" id="traslados-filter-hasta" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label text-muted small fw-semibold mb-1">Estado</label>
+                                <select id="traslados-filter-estado" class="form-select form-select-sm">
+                                    <option value="">Todos los estados</option>
+                                    <option value="En tránsito">En tránsito</option>
+                                    <option value="Recibido">Recibido</option>
+                                    <option value="Cancelado">Cancelado</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-3 d-flex gap-2">
+                                <button id="btn-traslados-filtrar" class="btn btn-sm btn-teal flex-grow-1"><i class="bi bi-funnel me-1"></i> Filtrar</button>
+                                <button id="btn-traslados-limpiar" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Limpiar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Traslados -->
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table align-middle table-hover mb-0" id="tabla-traslados">
+                                <thead class="thead-users">
+                                    <tr>
+                                        <th style="width: 70px;"># ID</th>
+                                        <th>Fecha Envío</th>
+                                        <th>Origen</th>
+                                        <th>Destino</th>
+                                        <th>Producto / Variante</th>
+                                        <th class="text-center">Cant.</th>
+                                        <th>Despachado Por</th>
+                                        <th class="text-center">Estado</th>
+                                        <th class="text-end pe-3">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="traslados-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="traslados-empty" class="text-center text-muted py-5 d-none">
+                            <i class="bi bi-arrow-left-right fs-1 d-block mb-2 opacity-50"></i>
+                            <span>No se encontraron traslados de inventario</span>
+                        </div>
+                        <div id="traslados-pagination" class="d-flex justify-content-between align-items-center mt-3">
+                            <span id="traslados-total-info" class="text-muted small">Total: 0 traslados</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Compras Module View -->
             <!-- Mermas Module View -->
             <div id="mermas-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="mermas">
@@ -3103,6 +3183,7 @@
     <script src="js/bitacora.js?v=1.0"></script>
     <script src="js/historial.js?v=1.0"></script>
     <script src="js/mermas.js"></script>
+    <script src="js/traslados.js?v=1.0"></script>
 
     <!-- Modales Bloque 2: Sucursales, Áreas, Subcategorías, Unidades -->
     <!-- Modal: Formulario Sucursal -->
@@ -3912,6 +3993,120 @@
                 </div>
                 <div class="modal-footer border-0 px-4 py-3">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nuevo Traslado -->
+    <div class="modal fade" id="modal-nuevo-traslado" tabindex="-1" aria-labelledby="modalNuevoTrasladoLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-light rounded-top-4 px-4 py-3">
+                    <h5 class="modal-title fw-bold" id="modalNuevoTrasladoLabel">
+                        <i class="bi bi-arrow-left-right text-teal me-2"></i>Despachar Traslado entre Sucursales
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <div id="traslado-error-alert" class="alert alert-danger py-2 small d-none mb-3"></div>
+                    <form id="form-nuevo-traslado">
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold">Sucursal Origen <span class="text-danger">*</span></label>
+                                <select id="traslado-input-origen" class="form-select form-select-sm" required>
+                                    <option value="">Seleccionar origen...</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold">Sucursal Destino <span class="text-danger">*</span></label>
+                                <select id="traslado-input-destino" class="form-select form-select-sm" required>
+                                    <option value="">Seleccionar destino...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Producto / Variante <span class="text-danger">*</span></label>
+                            <select id="traslado-input-producto" class="form-select form-select-sm" required>
+                                <option value="">Seleccionar producto...</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-semibold mb-0">Cantidad a Trasladar <span class="text-danger">*</span></label>
+                                <span class="badge bg-light text-muted border" id="traslado-stock-disponible-badge">Stock en origen: —</span>
+                            </div>
+                            <input type="number" id="traslado-input-cantidad" class="form-control form-control-sm" min="1" step="1" required placeholder="Ej. 10">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Observaciones / Motivo</label>
+                            <textarea id="traslado-input-observaciones" class="form-control form-control-sm" rows="2" placeholder="Ej. Reabastecimiento de fin de semana"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer border-0 px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-teal fw-semibold" id="btn-guardar-traslado">
+                        <i class="bi bi-send me-1"></i> Despachar y Descontar Stock
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Recibir Traslado -->
+    <div class="modal fade" id="modal-recibir-traslado" tabindex="-1" aria-labelledby="modalRecibirTrasladoLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-light rounded-top-4 px-4 py-3">
+                    <h5 class="modal-title fw-bold" id="modalRecibirTrasladoLabel">
+                        <i class="bi bi-box-arrow-in-down text-success me-2"></i>Recibir Traslado #<span id="recibir-traslado-id"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <div class="alert alert-info py-2 px-3 small mb-3">
+                        <p class="mb-1"><strong>Producto:</strong> <span id="recibir-traslado-producto">—</span></p>
+                        <p class="mb-1"><strong>Cantidad a ingresar:</strong> <span id="recibir-traslado-cantidad" class="badge bg-success fs-6">—</span></p>
+                        <p class="mb-0"><strong>Ruta:</strong> <span id="recibir-traslado-ruta">—</span></p>
+                    </div>
+                    <p class="text-muted small mb-0">Al confirmar, las unidades serán agregadas inmediatamente al inventario de la sucursal de destino y el traslado quedará finalizado como <strong>Recibido</strong>.</p>
+                </div>
+                <div class="modal-footer border-0 px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Volver</button>
+                    <button type="button" class="btn btn-success fw-semibold" id="btn-confirmar-recibir-traslado">
+                        <i class="bi bi-check-lg me-1"></i> Confirmar Recepción
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cancelar Traslado -->
+    <div class="modal fade" id="modal-cancelar-traslado" tabindex="-1" aria-labelledby="modalCancelarTrasladoLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-danger-subtle rounded-top-4 px-4 py-3">
+                    <h5 class="modal-title fw-bold text-danger" id="modalCancelarTrasladoLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Cancelar Traslado #<span id="cancelar-traslado-id"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <p class="text-muted mb-3">¿Estás seguro de cancelar este traslado? Las unidades en tránsito serán <strong>devueltas automáticamente al inventario de la sucursal de origen</strong>.</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted">Motivo de Cancelación (opcional)</label>
+                        <textarea id="cancelar-traslado-motivo" class="form-control" rows="2" placeholder="Ej. Envío cancelado por error en cantidad o daño de transporte..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Volver</button>
+                    <button type="button" class="btn btn-danger fw-semibold" id="btn-confirmar-cancelar-traslado">
+                        <i class="bi bi-x-circle me-1"></i> Sí, Cancelar y Devolver Stock
+                    </button>
                 </div>
             </div>
         </div>

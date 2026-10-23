@@ -234,8 +234,13 @@ CREATE TABLE traslado_inventario (
     id_variante INT NOT NULL REFERENCES variante_producto(id_variante),
     id_sucursal_origen INT NOT NULL REFERENCES sucursal(id_sucursal),
     id_sucursal_destino INT NOT NULL REFERENCES sucursal(id_sucursal),
-    cantidad INT NOT NULL CHECK (cantidad >= 0),
-    fecha_traslado TIMESTAMP NOT NULL
+    cantidad INT NOT NULL CHECK (cantidad > 0),
+    fecha_traslado TIMESTAMP NOT NULL DEFAULT NOW(),
+    estado VARCHAR(20) NOT NULL DEFAULT 'En tránsito' CHECK (estado IN ('En tránsito', 'Recibido', 'Cancelado')),
+    id_usuario_envia INT REFERENCES usuario(id_usuario),
+    id_usuario_recibe INT REFERENCES usuario(id_usuario),
+    fecha_recepcion TIMESTAMP,
+    observaciones TEXT
 );
 
 -- ============================================================================

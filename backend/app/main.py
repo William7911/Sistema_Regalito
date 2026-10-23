@@ -3,7 +3,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from app.api import auth, cash_register, catalogos, catalogos_generales, categories, compras, dashboard, departments, mermas, products, roles, sales, users, sync, health, reportes, configuracion, inventory, facturacion, clientes, tipos_cliente, bitacora, historial_precios
+from app.api import auth, cash_register, catalogos, catalogos_generales, categories, compras, dashboard, departments, mermas, products, roles, sales, users, sync, health, reportes, configuracion, inventory, facturacion, clientes, tipos_cliente, bitacora, historial_precios, traslados
 from app.db.database import engine, Base
 import logging
 import os
@@ -94,6 +94,7 @@ app.include_router(inventory.inventario_router)
 app.include_router(dashboard.router)
 app.include_router(bitacora.router, prefix="/api/bitacora", tags=["bitacora"])
 app.include_router(historial_precios.router, prefix="/api/historial-precios", tags=["historial-precios"])
+app.include_router(traslados.router, prefix="/api/traslados", tags=["traslados"])
 
 # Servir archivos estáticos del frontend en la ruta principal (Recomendado para simplicidad)
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")

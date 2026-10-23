@@ -3,6 +3,46 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Proceso 4: Módulo Integral de Traslados entre Sucursales (Envío, Tránsito, Recepción, Cancelación y Trazabilidad)
+
+### Causa Raíz / Requerimiento
+1. **Módulo Completo de Traslados de Inventario**:
+   - Modernizar y ampliar la estructura de datos de la tabla `traslado_inventario` para soportar ciclo de vida de transferencias de stock entre sucursales: estados `En tránsito`, `Recibido` y `Cancelado`, usuario que despacha (`id_usuario_envia`), usuario que recibe (`id_usuario_recibe`), fecha de recepción y observaciones.
+   - Creación de migración Alembic `0014_traslado_seguimiento.py` y actualización sincronizada en `database/init.sql` y `backend/app/db/models.py`.
+2. **Lógica de Negocio y Consistencia Transaccional (DERCAS)**:
+   - **Despacho (`crear_envio`)**: Validación de sucursales distintas (`origen != destino`), verificación pesimista de stock disponible en origen y descuento inmediato de unidades en inventario de origen, registrando el traslado en estado `En tránsito`.
+   - **Recepción en destino (`recibir_traslado`)**: Verificación de estado `En tránsito`, incremento de existencias en sucursal de destino (creando el registro en `inventario_sucursal` si aún no existía), registro de usuario receptor, fecha de recepción y cambio de estado a `Recibido`.
+   - **Cancelación (`cancelar_traslado`)**: Verificación de estado `En tránsito`, restitución automática de existencias al inventario de la sucursal de origen, registro opcional de motivo en observaciones y cambio a estado `Cancelado`.
+   - **Auditoría**: Registro de acciones en `bitacora_auditoria` con verbos en mayúsculas (`CREAR` al despachar, `EDITAR` al recibir o cancelar).
+3. **Seguridad y Control de Acceso (RBAC)**:
+   - Permiso requerido: `INV_INGRESAR_MERCADERIA` (Administradora y Bodeguero).
+   - Usuarios no autorizados (Cajera): enlace oculto en menú lateral, navegación rechazada por SPA y endpoints protegidos con HTTP 403 Forbidden.
+4. **Interfaz de Usuario Reactiva**:
+   - Vista `#traslados-view` con filtros reactivos por estado (`En tránsito`, `Recibido`, `Cancelado`) y rango de fechas (desde/hasta).
+   - Tabla interactiva con badges visuales de estado y acciones dinámicas contextuales (`[Recibir]`, `[Cancelar]`).
+   - Modal `#modal-nuevo-traslado` con selector de origen, destino, producto/variante, indicador en tiempo real de stock disponible en la sucursal origen y validaciones client-side y server-side.
+   - Modales `#modal-recibir-traslado` y `#modal-cancelar-traslado` para confirmaciones seguras sin ventanas nativas `alert()` o `confirm()`.
+
+### Solución Implementada
+1. **Base de Datos y Modelos** ([`backend/alembic/versions/0014_traslado_seguimiento.py`](../backend/alembic/versions/0014_traslado_seguimiento.py), [`database/init.sql`](../database/init.sql), [`backend/app/db/models.py`](../backend/app/db/models.py)):
+   - Se crearon las columnas `estado` (VARCHAR(20) DEFAULT 'En tránsito'), `id_usuario_envia` (FK a usuario), `id_usuario_recibe` (FK a usuario), `fecha_recepcion` (TIMESTAMP) y `observaciones` (TEXT).
+   - Se mapearon en el modelo `TrasladoInventario` las relaciones ORM `variante`, `sucursal_origen`, `sucursal_destino`, `usuario_envia` y `usuario_recibe`.
+2. **Arquitectura DERCAS** ([`backend/app/schemas/traslado_schema.py`](../backend/app/schemas/traslado_schema.py), [`backend/app/repositories/traslado_repository.py`](../backend/app/repositories/traslado_repository.py), [`backend/app/services/traslado_service.py`](../backend/app/services/traslado_service.py), [`backend/app/api/traslados.py`](../backend/app/api/traslados.py), [`backend/app/api/deps.py`](../backend/app/api/deps.py)):
+   - Schemas Pydantic v2: `TrasladoCreate`, `TrasladoCancelar`, `TrasladoOut` (enriquecido con `nombre_origen`, `nombre_destino`, `nombre_producto`, `codigo_barras`, `nombre_usuario_envia`, `nombre_usuario_recibe`).
+   - Repositorio `TrasladoRepositoryImpl`: `create`, `get_by_id`, `list_all` con `selectinload` de relaciones y filtros dinámicos, `get_inventario_for_update` y `get_or_create_inventario`.
+   - `UnitOfWork` y `TestUnitOfWork`: integrada propiedad `traslados`.
+   - Servicio `ConcreteTrasladoService`: orquestación de transferencias con validación de stock, descuentos, sumas, restituciones y auditoría.
+   - Router `/api/traslados`: endpoints `GET /api/traslados`, `GET /{id}`, `POST ""` (despacho), `POST /{id}/recibir`, `POST /{id}/cancelar`. Registrado en `backend/app/main.py`.
+3. **Frontend Vanilla JS y Bootstrap** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/traslados.js`](../frontend/js/traslados.js), [`frontend/js/app.js`](../frontend/js/app.js)):
+   - Enlace `Traslados` en menú lateral bajo la sección de Operación Diaria.
+   - Contenedor de módulo `#traslados-view` con filtros, tabla de transferencias y paginación informativa.
+   - Modales de nuevo traslado, recepción y cancelación con `data-bs-backdrop="static"` y sin diálogos bloqueantes nativos.
+   - Controlador `traslados.js` con inicialización `initDOM()`, actualización reactiva de stock disponible según sucursal origen y producto, feedback con `showToast()`.
+   - Control de permisos en `app.js` (`moduleAllowed`, `opItems`, `canAccessView`, `renderView` y `moduleLabels`).
+4. **Verificación y Pruebas**:
+   - Backend Pytest: 8 pruebas unitarias y de API en `backend/tests/test_traslados.py` cubriendo descuento en origen, bloqueo por stock insuficiente, bloqueo por misma sucursal, incremento en destino, devolución en cancelación, transiciones de estado inválidas y 403 Forbidden para Cajera.
+   - Frontend Playwright E2E: 29 pruebas en `scratch/verify_traslados_browser.py` cubriendo validaciones de formulario, ciclo de vida completo (despacho -> tránsito -> recepción -> finalizado, y despacho -> tránsito -> cancelación -> restitución de stock), filtros reactivos por estado y restricciones RBAC para Bodeguero y Cajera.
+
 ## [2026-10-23] Proceso 3: Flujo Completo de Compras y Órdenes (Emisión, Recepción en Bodega, Cancelación y Seguimiento de Estados)
 
 ### Causa Raíz / Requerimiento

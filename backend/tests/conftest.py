@@ -28,6 +28,9 @@ class TestUnitOfWork:
         
         from app.repositories.compra_repository import CompraRepositoryImpl
         self.compras = CompraRepositoryImpl(db)
+
+        from app.repositories.traslado_repository import TrasladoRepositoryImpl
+        self.traslados = TrasladoRepositoryImpl(db)
         
         from app.repositories.reporte_repository import ReporteRepositoryImpl
         self.reportes = ReporteRepositoryImpl(db)
