@@ -32,6 +32,25 @@ class TestUnitOfWork:
         from app.repositories.reporte_repository import ReporteRepositoryImpl
         self.reportes = ReporteRepositoryImpl(db)
 
+        from app.repositories.cliente_repository import ClienteRepositoryImpl, TipoClienteRepositoryImpl
+        self.clientes = ClienteRepositoryImpl(db)
+        self.tipos_cliente = TipoClienteRepositoryImpl(db)
+
+        from app.repositories.catalogo_repository import (
+            SucursalRepository, AreaBodegaRepository, SubcategoriaRepository, UnidadMedidaRepository,
+            MotivoMermaRepository, MetodoPagoRepository, ProveedorRepository,
+            DepartamentoRepository, MunicipioRepository,
+        )
+        self.sucursales = SucursalRepository(db)
+        self.areas = AreaBodegaRepository(db)
+        self.subcategorias = SubcategoriaRepository(db)
+        self.unidades = UnidadMedidaRepository(db)
+        self.motivos_merma = MotivoMermaRepository(db)
+        self.metodos_pago = MetodoPagoRepository(db)
+        self.proveedores = ProveedorRepository(db)
+        self.departamentos_geo = DepartamentoRepository(db)
+        self.municipios = MunicipioRepository(db)
+
     async def commit(self):
         await self.db.commit()
 

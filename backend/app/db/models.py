@@ -1,9 +1,11 @@
 from sqlalchemy import (
-    Column, Integer, String, Numeric, Boolean, DateTime, Date, ForeignKey, Text
+    Column, Integer, String, Numeric, Boolean, DateTime, Date, ForeignKey, Text,
+    SmallInteger, UniqueConstraint, Index
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
+from datetime import datetime
 
 
 # ============================================================================
@@ -30,7 +32,7 @@ class Usuario(Base):
     username = Column(String(50), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
     estado = Column(String(20), nullable=False)
-    fecha_creacion = Column(DateTime, server_default=func.now(), nullable=False)
+    fecha_creacion = Column(DateTime, server_default=func.now(), default=datetime.utcnow, nullable=False)
 
     rol = relationship("Rol", back_populates="usuarios")
 
@@ -120,6 +122,7 @@ class Sucursal(Base):
     direccion = Column(String(200), nullable=False)
     telefono = Column(String(20), nullable=True)
     estado = Column(String(20), nullable=False)
+    fecha_creacion = Column(DateTime, server_default=func.now(), default=datetime.utcnow, nullable=False)
 
     areas = relationship("AreaBodega", back_populates="sucursal")
     cajas = relationship("Caja", back_populates="sucursal")
@@ -131,6 +134,7 @@ class AreaBodega(Base):
     id_area = Column(Integer, primary_key=True)
     id_sucursal = Column(Integer, ForeignKey("sucursal.id_sucursal"), nullable=False, index=True)
     nombre_area = Column(String(50), nullable=False)
+    estado = Column(String(20), nullable=False, default="Activo")
 
     sucursal = relationship("Sucursal", back_populates="areas")
 
@@ -140,6 +144,7 @@ class DepartamentoGeografico(Base):
 
     id_departamento = Column(Integer, primary_key=True)
     nombre = Column(String(50), nullable=False, unique=True)
+    estado = Column(String(20), nullable=False, default="Activo")
 
     municipios = relationship("Municipio", back_populates="departamento")
 
@@ -150,6 +155,11 @@ class Municipio(Base):
     id_municipio = Column(Integer, primary_key=True)
     id_departamento = Column(Integer, ForeignKey("departamento_geografico.id_departamento"), nullable=False, index=True)
     nombre = Column(String(50), nullable=False)
+    estado = Column(String(20), nullable=False, default="Activo")
+
+    __table_args__ = (
+        UniqueConstraint("id_departamento", "nombre", name="uq_municipio_depto_nombre"),
+    )
 
     departamento = relationship("DepartamentoGeografico", back_populates="municipios")
 
@@ -160,6 +170,7 @@ class TipoCliente(Base):
     id_tipo_cliente = Column(Integer, primary_key=True)
     nombre = Column(String(50), nullable=False)
     descuento_predeterminado = Column(Numeric(5, 2), nullable=True)
+    estado = Column(String(20), nullable=False, default="Activo")
 
     clientes = relationship("Cliente", back_populates="tipo_cliente")
 
@@ -173,6 +184,8 @@ class Cliente(Base):
     nit = Column(String(15), nullable=False)
     nombre_comercial = Column(String(120), nullable=False)
     direccion = Column(String(200), nullable=True)
+    estado = Column(String(20), nullable=False, default="Activo")
+    fecha_creacion = Column(DateTime, server_default=func.now(), default=datetime.utcnow, nullable=False)
 
     tipo_cliente = relationship("TipoCliente", back_populates="clientes")
     municipio = relationship("Municipio")
@@ -210,6 +223,11 @@ class Subcategoria(Base):
     id_subcategoria = Column(Integer, primary_key=True)
     id_categoria = Column(Integer, ForeignKey("categoria.id_categoria"), nullable=False, index=True)
     nombre = Column(String(50), nullable=False)
+    estado = Column(String(20), nullable=False, default="Activo")
+
+    __table_args__ = (
+        UniqueConstraint("id_categoria", "nombre", name="uq_subcategoria_cat_nombre"),
+    )
 
     categoria = relationship("Categoria", back_populates="subcategorias")
     productos = relationship("Producto", back_populates="subcategoria")
@@ -221,6 +239,7 @@ class UnidadMedida(Base):
     id_unidad = Column(Integer, primary_key=True)
     codigo = Column(String(10), nullable=False, unique=True)
     descripcion = Column(String(50), nullable=False)
+    estado = Column(String(20), nullable=False, default="Activo")
 
     productos = relationship("Producto", back_populates="unidad")
 
@@ -235,7 +254,7 @@ class Producto(Base):
     descripcion = Column(Text, nullable=True)
     imagen_url = Column(String(255), nullable=True)
     estado = Column(String(20), nullable=False)
-    fecha_creacion = Column(DateTime, server_default=func.now(), nullable=False)
+    fecha_creacion = Column(DateTime, server_default=func.now(), default=datetime.utcnow, nullable=False)
 
     subcategoria = relationship("Subcategoria", back_populates="productos")
     unidad = relationship("UnidadMedida", back_populates="productos")
@@ -310,6 +329,7 @@ class MotivoMerma(Base):
 
     id_motivo = Column(Integer, primary_key=True)
     descripcion = Column(String(100), nullable=False)
+    estado = Column(String(20), nullable=False, default="Activo")
 
 
 class Merma(Base):
@@ -461,6 +481,7 @@ class MetodoPago(Base):
 
     id_metodo_pago = Column(Integer, primary_key=True)
     nombre = Column(String(30), nullable=False)
+    estado = Column(String(20), nullable=False, default="Activo")
 
 
 class Venta(Base):
@@ -543,6 +564,8 @@ class Proveedor(Base):
     correo = Column(String(100), nullable=True)
     cuenta_bancaria = Column(String(50), nullable=True)
     direccion = Column(String(150), nullable=True)
+    estado = Column(String(20), nullable=False, default="Activo")
+    fecha_creacion = Column(DateTime, server_default=func.now(), default=datetime.utcnow, nullable=False)
 
     ordenes = relationship("OrdenCompra", back_populates="proveedor")
 
@@ -624,3 +647,39 @@ class SyncQueue(Base):
     ultimo_error = Column(Text, nullable=True)
     creado_en = Column(DateTime, default=func.now())
     actualizado_en = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+# ============================================================================
+# MÓDULO 8: VISITAS DE SEGUIMIENTO
+# ============================================================================
+
+class VisitaSeguimiento(Base):
+    __tablename__ = "visita_seguimiento"
+
+    id_visita = Column(Integer, primary_key=True)
+    id_cliente = Column(Integer, ForeignKey("cliente.id_cliente"), nullable=False, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False, index=True)
+    fecha_visita = Column(Date, nullable=False)
+    observaciones = Column(Text, nullable=True)
+    estado = Column(String(20), nullable=False, default="Pendiente")
+    fecha_creacion = Column(DateTime, server_default=func.now(), default=datetime.utcnow, nullable=False)
+
+    cliente = relationship("Cliente")
+    usuario = relationship("Usuario")
+    modulos = relationship(
+        "VisitaModuloEvaluacion",
+        back_populates="visita",
+        cascade="all, delete-orphan",
+    )
+
+
+class VisitaModuloEvaluacion(Base):
+    __tablename__ = "visita_modulo_evaluacion"
+
+    id_modulo_eval = Column(Integer, primary_key=True)
+    id_visita = Column(Integer, ForeignKey("visita_seguimiento.id_visita", ondelete="CASCADE"), nullable=False, index=True)
+    nombre_modulo = Column(String(100), nullable=False)
+    calificacion = Column(SmallInteger, nullable=True)
+    comentario = Column(Text, nullable=True)
+
+    visita = relationship("VisitaSeguimiento", back_populates="modulos")

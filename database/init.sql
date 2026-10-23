@@ -51,7 +51,7 @@ CREATE TABLE bitacora_auditoria (
     tabla_afectada VARCHAR(50) NOT NULL,
     accion VARCHAR(20) NOT NULL,
     descripcion TEXT NOT NULL,
-    fecha_hora TIMESTAMP NOT NULL
+    fecha_hora TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE parametro_sistema (
@@ -77,30 +77,36 @@ CREATE TABLE sucursal (
     nombre VARCHAR(100) NOT NULL,
     direccion VARCHAR(200) NOT NULL,
     telefono VARCHAR(20),
-    estado VARCHAR(20) NOT NULL CHECK (estado IN ('Activo', 'Inactivo'))
+    estado VARCHAR(20) NOT NULL CHECK (estado IN ('Activo', 'Inactivo')),
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE area_bodega (
     id_area SERIAL PRIMARY KEY,
     id_sucursal INT NOT NULL REFERENCES sucursal(id_sucursal),
-    nombre_area VARCHAR(50) NOT NULL
+    nombre_area VARCHAR(50) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo'))
 );
 
 CREATE TABLE departamento_geografico (
     id_departamento SERIAL PRIMARY KEY,
-    nombre VARCHAR(50) NOT NULL UNIQUE
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo'))
 );
 
 CREATE TABLE municipio (
     id_municipio SERIAL PRIMARY KEY,
     id_departamento INT NOT NULL REFERENCES departamento_geografico(id_departamento),
-    nombre VARCHAR(50) NOT NULL UNIQUE
+    nombre VARCHAR(50) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
+    CONSTRAINT uq_municipio_depto_nombre UNIQUE (id_departamento, nombre)
 );
 
 CREATE TABLE tipo_cliente (
     id_tipo_cliente SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL,
-    descuento_predeterminado DECIMAL(5,2)
+    descuento_predeterminado DECIMAL(5,2),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo'))
 );
 
 CREATE TABLE cliente (
@@ -109,8 +115,11 @@ CREATE TABLE cliente (
     id_municipio INT REFERENCES municipio(id_municipio),
     nit VARCHAR(15) NOT NULL,
     nombre_comercial VARCHAR(120) NOT NULL,
-    direccion VARCHAR(200)
+    direccion VARCHAR(200),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_cliente_nit_no_cf ON cliente (nit) WHERE nit <> 'CF';
 
 CREATE TABLE cliente_contacto (
     id_contacto SERIAL PRIMARY KEY,
@@ -132,13 +141,16 @@ CREATE TABLE categoria (
 CREATE TABLE subcategoria (
     id_subcategoria SERIAL PRIMARY KEY,
     id_categoria INT NOT NULL REFERENCES categoria(id_categoria),
-    nombre VARCHAR(50) NOT NULL UNIQUE
+    nombre VARCHAR(50) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
+    CONSTRAINT uq_subcategoria_cat_nombre UNIQUE (id_categoria, nombre)
 );
 
 CREATE TABLE unidad_medida (
     id_unidad SERIAL PRIMARY KEY,
     codigo VARCHAR(10) NOT NULL UNIQUE,
-    descripcion VARCHAR(50) NOT NULL
+    descripcion VARCHAR(50) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo'))
 );
 
 CREATE TABLE producto (
@@ -196,7 +208,8 @@ CREATE TABLE alerta_stock (
 
 CREATE TABLE motivo_merma (
     id_motivo SERIAL PRIMARY KEY,
-    descripcion VARCHAR(100) NOT NULL
+    descripcion VARCHAR(100) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo'))
 );
 
 CREATE TABLE merma (
@@ -295,7 +308,8 @@ CREATE TABLE detalle_arqueo_efectivo (
 
 CREATE TABLE metodo_pago (
     id_metodo_pago SERIAL PRIMARY KEY,
-    nombre VARCHAR(30) NOT NULL
+    nombre VARCHAR(30) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo'))
 );
 
 CREATE TABLE venta (
@@ -352,7 +366,9 @@ CREATE TABLE proveedor (
     telefono VARCHAR(20),
     correo VARCHAR(100),
     cuenta_bancaria VARCHAR(50),
-    direccion VARCHAR(150)
+    direccion VARCHAR(150),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE orden_compra (
@@ -394,6 +410,29 @@ CREATE TABLE detalle_compra (
     subtotal DECIMAL(10,2) NOT NULL
 );
 
+
+
+-- ============================================================================
+-- MÓDULO 8: VISITAS DE SEGUIMIENTO
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS visita_seguimiento (
+    id_visita SERIAL PRIMARY KEY,
+    id_cliente INT NOT NULL REFERENCES cliente(id_cliente),
+    id_usuario INT NOT NULL REFERENCES usuario(id_usuario),
+    fecha_visita DATE NOT NULL,
+    observaciones TEXT,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Pendiente' CHECK (estado IN ('Pendiente','Completada','Cancelada')),
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS visita_modulo_evaluacion (
+    id_modulo_eval SERIAL PRIMARY KEY,
+    id_visita INT NOT NULL REFERENCES visita_seguimiento(id_visita) ON DELETE CASCADE,
+    nombre_modulo VARCHAR(100) NOT NULL,
+    calificacion SMALLINT CHECK (calificacion BETWEEN 1 AND 10),
+    comentario TEXT
+);
 
 -- ============================================================================
 -- ÍNDICES PARA LLAVES FORÁNEAS (OPTIMIZACIÓN DE CONSULTAS Y REPORTES)
@@ -638,6 +677,9 @@ SELECT setval('tipo_movimiento_caja_id_tipo_movimiento_seq', COALESCE((SELECT MA
 SELECT setval('denominacion_efectivo_id_denominacion_seq', COALESCE((SELECT MAX(id_denominacion) FROM denominacion_efectivo), 0) + 1, false);
 SELECT setval('metodo_pago_id_metodo_pago_seq', COALESCE((SELECT MAX(id_metodo_pago) FROM metodo_pago), 0) + 1, false);
 SELECT setval('proveedor_id_proveedor_seq', COALESCE((SELECT MAX(id_proveedor) FROM proveedor), 0) + 1, false);
+SELECT setval('visita_seguimiento_id_visita_seq', COALESCE((SELECT MAX(id_visita) FROM visita_seguimiento), 0) + 1, false);
+SELECT setval('visita_modulo_evaluacion_id_modulo_eval_seq', COALESCE((SELECT MAX(id_modulo_eval) FROM visita_modulo_evaluacion), 0) + 1, false);
+
 
 -- ============================================================================
 -- NOTA DE DESPLIEGUE
