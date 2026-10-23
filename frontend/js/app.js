@@ -5,7 +5,7 @@ const systemModule = document.getElementById('system-module');
 
 // Array of all auth views to easily hide them
 const authViews = ['view-login', 'view-recover', 'view-verify', 'view-reset'];
-const mainViews = ['dashboard', 'pos', 'users', 'roles', 'clients', 'bitacora', 'historial', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras'];
+const mainViews = ['dashboard', 'pos', 'users', 'roles', 'clients', 'bitacora', 'historial', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras', 'mermas'];
 let currentView = null;
 
 // ---------------------------------------------------------------------------
@@ -251,6 +251,7 @@ function applyRoleRestrictions() {
         pos: isUserAdmin || window.hasPermission('VENTA_COBRAR'),
         inventory: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         compras: isUserAdmin || window.hasPermission('COMPRA_EMITIR_ORDEN'),
+        mermas: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         cash: isUserAdmin || role === 'Cajero',
         caja: isUserAdmin || role === 'Cajero',
         users: isUserAdmin,
@@ -271,7 +272,7 @@ function applyRoleRestrictions() {
     });
 
     // 2. Sidebar Section Headers
-    const opItems = document.querySelectorAll('[data-module-item="pos"], [data-module-item="inventory"], [data-module-item="compras"], [data-module-item="cash"]');
+    const opItems = document.querySelectorAll('[data-module-item="pos"], [data-module-item="inventory"], [data-module-item="compras"], [data-module-item="cash"], [data-module-item="mermas"]');
     const opVisible = Array.from(opItems).some(el => !el.classList.contains('d-none'));
     const opSection = document.querySelector('[data-section="operacion"]');
     if (opSection) opSection.classList.toggle('d-none', !opVisible);
@@ -311,6 +312,7 @@ function canAccessView(viewKey) {
     if (viewKey === 'pos') return window.hasPermission('VENTA_COBRAR');
     if (viewKey === 'inventory') return window.hasPermission('INV_INGRESAR_MERCADERIA');
     if (viewKey === 'compras') return window.hasPermission('COMPRA_EMITIR_ORDEN');
+    if (viewKey === 'mermas') return window.hasPermission('INV_INGRESAR_MERCADERIA');
     if (viewKey === 'cash' || viewKey === 'caja') return role === 'Cajero';
     if (viewKey === 'catalog') return role === 'Bodeguero';
     if (viewKey === 'clients') return window.hasPermission('CLIENTE_ADMIN');
@@ -426,6 +428,9 @@ function renderView(viewKey) {
     }
     if (viewKey === 'pos' && typeof window.showPOSModule === 'function') {
         window.showPOSModule();
+    }
+    if (viewKey === 'mermas' && typeof window.showMermasModule === 'function') {
+        window.showMermasModule();
     }
 }
 

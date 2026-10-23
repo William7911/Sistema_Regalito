@@ -3,6 +3,45 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Proceso 1: Módulo de Mermas de Inventario (Pantalla, Filtros y Control RBAC) y Unificación de Bitácora
+
+### Causa Raíz / Requerimiento
+1. **Pantalla de Mermas**: Implementar la interfaz visual operativa para el módulo de mermas de inventario (RF10):
+   - Formulario modal para registrar una merma especificando: sucursal, producto/variante, motivo de merma, cantidad a mermar y observación/justificación.
+   - Listado reactivo de mermas con visualización de fecha/hora, sucursal, usuario responsable, producto/variante, motivo, cantidad descargada, costo de pérdida y observaciones.
+   - Filtros dinámicos en el listado por rango de fechas (desde/hasta) y motivo de merma.
+2. **Seguridad y Permisos (RBAC)**: Proteger endpoints con `require_permission("INV_INGRESAR_MERCADERIA")`, permitiendo acceso a Administradora y Bodeguero, y devolviendo HTTP 403 Forbidden para usuarios sin dicho permiso (como Cajera).
+3. **Unificación de Acciones en Bitácora**: Normalizar en todos los servicios del backend los nombres de acción a verbos en español en mayúsculas (`CREAR`, `EDITAR`, `DESACTIVAR`, `REACTIVAR`), corrigiendo pruebas y asegurando paridad terminológica.
+4. **Validación de Roles Cajera y Bodega**: Confirmar formalmente que tras la incorporación de los permisos `ROL_ADMIN` y `USUARIO_ADMIN`, los roles Cajera y Bodega conservan estrictamente su nivel de acceso previo.
+
+### Solución Implementada
+1. **Backend — Mermas y Filtros** ([`backend/app/schemas/merma_schema.py`](../backend/app/schemas/merma_schema.py), [`backend/app/repositories/merma_repository.py`](../backend/app/repositories/merma_repository.py), [`backend/app/services/merma_service.py`](../backend/app/services/merma_service.py), [`backend/app/api/mermas.py`](../backend/app/api/mermas.py)):
+   - Se añadió `id_motivo` y soporte de fechas (`fecha_desde`, `fecha_hasta`) a `MermaFilter`.
+   - El repositorio filtra por motivo mediante subconsulta atómica `Merma.detalles.any(DetalleMerma.id_motivo == id_motivo)` y fechas mediante `func.date(Merma.fecha_merma)`.
+   - Se enriqueció la salida `MermaOut` y `DetalleMermaOut` con nombres legibles (`nombre_sucursal`, `nombre_usuario`, `nombre_producto`, `variante_info`).
+   - Se protegió `/api/mermas` (`GET`, `POST`) y `/api/mermas/motivos` con `require_permission("INV_INGRESAR_MERCADERIA")`.
+   - Se registra en bitácora cada merma creada con acción `CREAR` sobre la tabla `merma`.
+2. **Frontend — Pantalla y Modal de Mermas** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/app.js`](../frontend/js/app.js), [`frontend/js/mermas.js`](../frontend/js/mermas.js)):
+   - Menú lateral y dashboard: enlace y tarjeta de "Mermas" condicionados dinámicamente según permiso `INV_INGRESAR_MERCADERIA`.
+   - Vista `[data-main-view="mermas"]`: cabecera, filtros por fecha desde/hasta y motivo, tabla de mermas con badges de motivos y formateo monetario en Quetzales (Q), estado vacío y contador de registros.
+   - Modal `mermaModal` (`data-bs-backdrop="static"`): selector de sucursal, selector de motivo, selector de producto/variante con badge de stock en tiempo real, cálculo automático del costo estimado de pérdida (`cantidad * costo_promedio`), validación de existencias antes de enviar y confirmación visual con `showToast()`.
+3. **Unificación de Bitácora a Español en Mayúsculas**:
+   - Actualizados servicios [`catalogo_service.py`](../backend/app/services/catalogo_service.py), [`catalogo_general_service.py`](../backend/app/services/catalogo_general_service.py), [`compra_service.py`](../backend/app/services/compra_service.py), [`configuracion_service.py`](../backend/app/services/configuracion_service.py), [`department_service.py`](../backend/app/services/department_service.py), [`category_service.py`](../backend/app/services/category_service.py), [`role_service.py`](../backend/app/services/role_service.py), [`inventory_service.py`](../backend/app/services/inventory_service.py) y [`merma_service.py`](../backend/app/services/merma_service.py).
+   - Acciones estandarizadas: `CREAR`, `EDITAR`, `DESACTIVAR`, `REACTIVAR`, `CIERRE`.
+4. **Pruebas Automatizadas (TDD)**:
+   - Nuevas pruebas de API en [`backend/tests/test_merma_api.py`](../backend/tests/test_merma_api.py) (motivos, registro exitoso con descargo de existencias, stock insuficiente, filtros y verificaciones de 403 Forbidden para Cajera).
+   - Pruebas de servicio en [`backend/tests/test_merma_service.py`](../backend/tests/test_merma_service.py).
+   - Script de prueba de navegador Playwright en [`scratch/verify_merma_browser.py`](../scratch/verify_merma_browser.py).
+
+### Verificación
+- **Pytest**: **234 pruebas aprobadas, 0 fallidas** (incremento desde 221 / 227).
+- **Playwright (Navegador real)**: **20/20 pruebas aprobadas**:
+  - Admin: navegación a `#mermas`, apertura de modal, cálculo de costo estimado Q 50.00, registro con descargo de stock, visualización de columnas en tabla, filtrado por motivo y limpieza de filtros.
+  - No Admin (Cajera): enlace en menú lateral oculto, navegación bloqueada por SPA guard y petición HTTP `/api/mermas` rechazada con `403 Forbidden (INV_INGRESAR_MERCADERIA)`.
+- **RBAC**: Roles Cajera y Bodega conservan estrictamente sus permisos aislados (`test_rbac.py` 7/7 passed).
+
+---
+
 ## [2026-10-23] Bloque 4: Protección de Permisos Críticos en Roles, Auditoría Completa de Escritura y Diagnóstico de Procesos
 
 ### Causa Raíz / Requerimiento

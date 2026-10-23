@@ -92,27 +92,50 @@ class ConcreteMermaService:
             self.uow.db,
             id_usuario=user_id,
             tabla="merma",
-            accion="MERMA",
+            accion="CREAR",
             descripcion=f"Registró merma ID {fresh.id_merma}, costo Q{costo_total:.2f}.",
         )
         await self.uow.commit()
-        resp = merma_schema.MermaOut.model_validate(fresh)
+        resp = self._enrich_merma_out(fresh)
         resp.costo_total_perdida = costo_total
+        return resp
+
+    def _enrich_merma_out(self, m: Merma) -> merma_schema.MermaOut:
+        resp = merma_schema.MermaOut.model_validate(m)
+        if getattr(m, "sucursal", None):
+            resp.nombre_sucursal = m.sucursal.nombre
+        if getattr(m, "usuario", None):
+            resp.nombre_usuario = m.usuario.nombre_completo or m.usuario.username
+
+        costo_calc = Decimal("0.00")
+        for idx, d in enumerate(getattr(m, "detalles", [])):
+            costo_calc += (d.costo_perdida or Decimal("0.00"))
+            if idx < len(resp.detalles):
+                det_out = resp.detalles[idx]
+                if getattr(d, "variante", None):
+                    if getattr(d.variante, "producto", None):
+                        det_out.nombre_producto = d.variante.producto.nombre
+                    parts = [p for p in [d.variante.talla, d.variante.color] if p]
+                    det_out.variante_info = " / ".join(parts) if parts else (d.variante.codigo_barras or "Única")
+        if not resp.costo_total_perdida:
+            resp.costo_total_perdida = costo_calc
         return resp
 
     async def list_mermas(self, filters: merma_schema.MermaFilter) -> List[merma_schema.MermaOut]:
         items = await self.uow.mermas.search(
             id_sucursal=filters.id_sucursal,
+            id_motivo=filters.id_motivo,
             fecha_desde=filters.fecha_desde,
             fecha_hasta=filters.fecha_hasta,
             limit=filters.limit,
             offset=filters.offset,
         )
-        return [merma_schema.MermaOut.model_validate(m) for m in items]
+        return [self._enrich_merma_out(m) for m in items]
 
     async def count_mermas(self, filters: merma_schema.MermaFilter) -> int:
         return await self.uow.mermas.count_search(
             id_sucursal=filters.id_sucursal,
+            id_motivo=filters.id_motivo,
             fecha_desde=filters.fecha_desde,
             fecha_hasta=filters.fecha_hasta,
         )

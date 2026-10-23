@@ -168,6 +168,11 @@
                         <i class="bi bi-cash-coin me-2"></i> Caja
                     </a>
                 </li>
+                <li data-module-item="mermas">
+                    <a href="#" id="nav-mermas" class="nav-link text-white-50 sidebar-link" data-nav="mermas" onclick="navigateTo('mermas'); return false;">
+                        <i class="bi bi-trash3-fill me-2"></i> Mermas
+                    </a>
+                </li>
 
                 <li class="nav-item mt-3" data-section="administracion">
                     <span class="text-uppercase text-muted-teal small fw-bold px-3">— ADMINISTRACIÓN —</span>
@@ -346,6 +351,12 @@
                                 <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="caja" onclick="openModule('caja')">
                                     <i class="bi bi-cash-coin fs-2 text-teal d-block mb-2"></i>
                                     <span class="fw-medium text-dark">Caja</span>
+                                </button>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3" data-card-module="mermas">
+                                <button type="button" class="btn btn-light p-4 w-100 rounded-4 module-btn border" data-module="mermas" onclick="openModule('mermas')">
+                                    <i class="bi bi-trash3-fill fs-2 text-teal d-block mb-2"></i>
+                                    <span class="fw-medium text-dark">Mermas</span>
                                 </button>
                             </div>
                             <div class="col-6 col-md-4 col-lg-3" data-card-module="users">
@@ -1939,6 +1950,78 @@
             </div>
 
             <!-- Compras Module View -->
+            <!-- Mermas Module View -->
+            <div id="mermas-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="mermas">
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                    <div>
+                        <h4 class="fw-bold mb-1">Mermas de Inventario</h4>
+                        <p class="text-muted small mb-0">Registro y consulta de salidas por deterioro, pérdida o vencimiento con descargo de existencias</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <button id="btn-nueva-merma" class="btn btn-teal"><i class="bi bi-plus-lg me-1"></i> Registrar Merma</button>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-12 col-md-3">
+                                <label class="form-label text-muted small fw-semibold mb-1">Fecha Desde</label>
+                                <input type="date" id="mermas-filter-desde" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label text-muted small fw-semibold mb-1">Fecha Hasta</label>
+                                <input type="date" id="mermas-filter-hasta" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label text-muted small fw-semibold mb-1">Motivo de Merma</label>
+                                <select id="mermas-filter-motivo" class="form-select form-select-sm">
+                                    <option value="">Todos los motivos</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-3 d-flex gap-2">
+                                <button id="btn-mermas-filtrar" class="btn btn-sm btn-teal flex-grow-1"><i class="bi bi-funnel me-1"></i> Filtrar</button>
+                                <button id="btn-mermas-limpiar" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Limpiar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Mermas -->
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table align-middle table-hover mb-0">
+                                <thead class="thead-users">
+                                    <tr>
+                                        <th style="width: 70px;"># ID</th>
+                                        <th>Fecha / Hora</th>
+                                        <th>Sucursal</th>
+                                        <th>Registrado Por</th>
+                                        <th>Producto / Detalle</th>
+                                        <th>Motivo</th>
+                                        <th class="text-center">Cantidad</th>
+                                        <th class="text-end">Costo Pérdida</th>
+                                        <th>Observaciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mermas-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="mermas-empty" class="text-center text-muted py-5 d-none">
+                            <i class="bi bi-trash3 fs-1 d-block mb-2 opacity-50"></i>
+                            <span>No se encontraron mermas registradas</span>
+                        </div>
+                        <div id="mermas-pagination" class="d-flex justify-content-between align-items-center mt-3">
+                            <span id="mermas-total-info" class="text-muted small">Total: 0 mermas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compras Module View -->
             <div id="compras-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="compras">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
@@ -2965,6 +3048,7 @@
     <script src="js/roles.js?v=1.0"></script>
     <script src="js/bitacora.js?v=1.0"></script>
     <script src="js/historial.js?v=1.0"></script>
+    <script src="js/mermas.js"></script>
 
     <!-- Modales Bloque 2: Sucursales, Áreas, Subcategorías, Unidades -->
     <!-- Modal: Formulario Sucursal -->
@@ -3557,6 +3641,62 @@
                     <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" id="btn-confirm-municipio-deactivate" class="btn btn-danger btn-sm px-3">Desactivar</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Registrar Merma -->
+    <div class="modal fade" id="mermaModal" tabindex="-1" aria-labelledby="mermaModalLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="mermaModalLabel"><i class="bi bi-trash3-fill text-danger me-2"></i>Registrar Merma de Inventario</h5>
+                        <p class="text-muted small mb-0">Descargo atómico de existencias por pérdida o daño</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <form id="form-merma">
+                    <div class="modal-body pt-3">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="merma-input-sucursal" class="form-label small fw-semibold">Sucursal <span class="text-danger">*</span></label>
+                                <select id="merma-input-sucursal" class="form-select" required>
+                                    <option value="">Seleccione una sucursal...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="merma-input-motivo" class="form-label small fw-semibold">Motivo de Merma <span class="text-danger">*</span></label>
+                                <select id="merma-input-motivo" class="form-select" required>
+                                    <option value="">Seleccione un motivo...</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label for="merma-input-producto" class="form-label small fw-semibold">Producto / Variante <span class="text-danger">*</span></label>
+                                <select id="merma-input-producto" class="form-select" required>
+                                    <option value="">Seleccione producto...</option>
+                                </select>
+                                <div id="merma-stock-info" class="form-text text-muted small mt-1"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="merma-input-cantidad" class="form-label small fw-semibold">Cantidad a Mermar <span class="text-danger">*</span></label>
+                                <input type="number" id="merma-input-cantidad" class="form-control" min="1" step="1" required placeholder="Ej: 5">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="merma-costo-estimado" class="form-label small fw-semibold">Costo Estimado de Pérdida</label>
+                                <input type="text" id="merma-costo-estimado" class="form-control bg-light" readonly value="Q 0.00">
+                            </div>
+                            <div class="col-12">
+                                <label for="merma-input-observaciones" class="form-label small fw-semibold">Observaciones / Justificación</label>
+                                <textarea id="merma-input-observaciones" class="form-control" rows="2" maxlength="255" placeholder="Detalle la causa o circunstancias del daño o pérdida..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top-0 pt-0">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" id="btn-guardar-merma" class="btn btn-danger"><i class="bi bi-check-lg me-1"></i> Registrar Descargo</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

@@ -99,3 +99,57 @@ async def test_registrar_merma_stock_insuficiente_falla(merma_service, db_sessio
     assert exc_info.value.status_code == 400
     assert "Stock insuficiente" in exc_info.value.detail
 
+
+@pytest.mark.asyncio
+async def test_list_y_count_mermas_con_filtros(merma_service, db_session):
+    """Filtros por motivo, sucursal y rango de fechas en listado de mermas."""
+    await _seed_merma_data(db_session)
+
+    # Agregar segundo motivo
+    motivo2 = MotivoMerma(id_motivo=2, descripcion="Vencimiento")
+    db_session.add(motivo2)
+    await db_session.commit()
+
+    # Registrar merma con motivo 1
+    m1 = await merma_service.registrar_merma(
+        merma_schema.MermaCreate(
+            id_sucursal=1,
+            observaciones="Merma motivo 1",
+            detalles=[merma_schema.DetalleMermaCreate(id_variante=1, id_motivo=1, cantidad=2)]
+        ),
+        user_id=1
+    )
+    # Registrar merma con motivo 2
+    m2 = await merma_service.registrar_merma(
+        merma_schema.MermaCreate(
+            id_sucursal=1,
+            observaciones="Merma motivo 2",
+            detalles=[merma_schema.DetalleMermaCreate(id_variante=1, id_motivo=2, cantidad=3)]
+        ),
+        user_id=1
+    )
+
+    # Filtrar por motivo 1
+    f_motivo1 = merma_schema.MermaFilter(id_motivo=1)
+    res1 = await merma_service.list_mermas(f_motivo1)
+    cnt1 = await merma_service.count_mermas(f_motivo1)
+    assert cnt1 == 1
+    assert len(res1) == 1
+    assert res1[0].id_merma == m1.id_merma
+    assert res1[0].nombre_sucursal == "Sucursal Central"
+    assert res1[0].detalles[0].nombre_producto == "Cuaderno 100 Hojas"
+
+    # Filtrar por motivo 2
+    f_motivo2 = merma_schema.MermaFilter(id_motivo=2)
+    res2 = await merma_service.list_mermas(f_motivo2)
+    cnt2 = await merma_service.count_mermas(f_motivo2)
+    assert cnt2 == 1
+    assert res2[0].id_merma == m2.id_merma
+
+    # Filtrar por fecha hoy
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    f_fecha = merma_schema.MermaFilter(fecha_desde=today_str, fecha_hasta=today_str)
+    res_fecha = await merma_service.list_mermas(f_fecha)
+    assert len(res_fecha) == 2
+
+

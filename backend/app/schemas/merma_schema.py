@@ -31,6 +31,8 @@ class DetalleMermaOut(BaseModel):
     cantidad: int
     costo_perdida: Decimal
     motivo: Optional[MotivoMermaOut] = None
+    nombre_producto: Optional[str] = None
+    variante_info: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,6 +44,8 @@ class MermaOut(BaseModel):
     fecha_merma: datetime
     observaciones: Optional[str] = None
     costo_total_perdida: Optional[Decimal] = None
+    nombre_sucursal: Optional[str] = None
+    nombre_usuario: Optional[str] = None
     detalles: List[DetalleMermaOut] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -49,8 +53,9 @@ class MermaOut(BaseModel):
 
 class MermaFilter(BaseModel):
     id_sucursal: Optional[int] = None
-    fecha_desde: Optional[datetime] = None
-    fecha_hasta: Optional[datetime] = None
+    id_motivo: Optional[int] = None
+    fecha_desde: Optional[str] = None
+    fecha_hasta: Optional[str] = None
     limit: int = Field(default=50, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
 
