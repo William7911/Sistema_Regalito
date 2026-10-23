@@ -2,7 +2,8 @@ from typing import Optional, List
 from fastapi import HTTPException
 from app.db.models import DepartamentoGeografico
 from app.interfaces.services import DepartmentService
-from app.schemas import schemas
+from app.schemas import schemas, cliente_schema
+from app.services.audit_service import log_action
 
 
 class ConcreteDepartmentService(DepartmentService):
@@ -22,17 +23,31 @@ class ConcreteDepartmentService(DepartmentService):
             raise HTTPException(status_code=404, detail="Departamento no encontrado")
         return schemas.Department.model_validate(department)
 
-    async def create_department(self, data: schemas.DepartmentCreate) -> schemas.Department:
+    async def list_municipios(
+        self, department_id: Optional[int] = None
+    ) -> List[cliente_schema.MunicipioOut]:
+        munis = await self.uow.departments.list_municipios(department_id=department_id)
+        return [cliente_schema.MunicipioOut.model_validate(m) for m in munis]
+
+
+
+
+    async def create_department(self, data: schemas.DepartmentCreate, actor_id: int = 0) -> schemas.Department:
         existing = await self.uow.departments.get_by_name(data.nombre.strip())
         if existing:
             raise HTTPException(status_code=400, detail="Ya existe un departamento con ese nombre")
         department = DepartamentoGeografico(nombre=data.nombre.strip())
         created = await self.uow.departments.create(department)
+        if actor_id:
+            await log_action(
+                self.uow.db, id_usuario=actor_id, accion="CREAR", tabla="departamento_geografico",
+                descripcion=f"Creó departamento '{created.nombre}' (ID: {created.id_departamento})",
+            )
         await self.uow.commit()
         return schemas.Department.model_validate(created)
 
     async def update_department(
-        self, department_id: int, data: schemas.DepartmentUpdate
+        self, department_id: int, data: schemas.DepartmentUpdate, actor_id: int = 0
     ) -> schemas.Department:
         department = await self.uow.departments.get_by_id(department_id)
         if not department:
@@ -48,6 +63,11 @@ class ConcreteDepartmentService(DepartmentService):
             department.nombre = nombre
 
         updated = await self.uow.departments.update(department)
+        if actor_id:
+            await log_action(
+                self.uow.db, id_usuario=actor_id, accion="EDITAR", tabla="departamento_geografico",
+                descripcion=f"Actualizó departamento '{updated.nombre}' (ID: {updated.id_departamento})",
+            )
         await self.uow.commit()
         return schemas.Department.model_validate(updated)
 
@@ -61,3 +81,11 @@ class ConcreteDepartmentService(DepartmentService):
         if not department:
             raise HTTPException(status_code=404, detail="Departamento no encontrado")
         return schemas.Department.model_validate(department)
+
+    async def list_municipios(
+        self, department_id: Optional[int] = None
+    ) -> List[cliente_schema.MunicipioOut]:
+        munis = await self.uow.departments.list_municipios(department_id=department_id)
+        return [cliente_schema.MunicipioOut.model_validate(m) for m in munis]
+
+

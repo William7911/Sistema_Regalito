@@ -5,7 +5,7 @@ const systemModule = document.getElementById('system-module');
 
 // Array of all auth views to easily hide them
 const authViews = ['view-login', 'view-recover', 'view-verify', 'view-reset'];
-const mainViews = ['dashboard', 'users', 'catalog', 'cash'];
+const mainViews = ['dashboard', 'pos', 'users', 'roles', 'clients', 'bitacora', 'historial', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras', 'mermas', 'traslados', 'visitas'];
 let currentView = null;
 
 // ---------------------------------------------------------------------------
@@ -71,7 +71,21 @@ function hasActiveSession() {
 }
 
 // Limpia completamente la sesión local y muestra la pantalla de Login sin residuos.
-function showLogin() {
+async function showLogin() {
+    // Si tenemos un token, intentamos hacer logout en el backend para limpiar la cookie
+    if (localStorage.getItem('jwt_token')) {
+        try {
+            await nativeFetch(`${API_URL}/auth/logout`, { method: 'POST' });
+        } catch (e) {
+            // Ignorar errores en logout
+        }
+    }
+
+    if (typeof healthCheckInterval !== 'undefined' && healthCheckInterval) {
+        clearInterval(healthCheckInterval);
+        healthCheckInterval = null;
+    }
+
     // 1. Limpieza total de almacenamiento
     localStorage.clear();
     sessionStorage.clear();
@@ -130,15 +144,75 @@ function handleUnauthorized() {
     showLogin();
 }
 
-// Interceptor global: cualquier petición con 401 limpia la sesión y redirige a Login.
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function subscribeTokenRefresh(cb) {
+    refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token) {
+    refreshSubscribers.forEach(cb => cb(token));
+    refreshSubscribers = [];
+}
+
+// Interceptor global: intenta refrescar silenciosamente ante un 401.
 const nativeFetch = window.fetch;
-window.fetch = function (...args) {
-    return nativeFetch.apply(this, args).then((response) => {
-        if (response.status === 401 && !response.url.endsWith('/auth/login')) {
-            handleUnauthorized();
+window.fetch = async function (...args) {
+    const url = args[0];
+    let response = await nativeFetch.apply(this, args);
+
+    if (response.status === 401 && !url.endsWith('/auth/login') && !url.endsWith('/auth/refresh') && !url.endsWith('/auth/logout')) {
+        if (!isRefreshing) {
+            isRefreshing = true;
+            try {
+                const refreshRes = await nativeFetch(`${API_URL}/auth/refresh`, { method: 'POST' });
+                if (refreshRes.ok) {
+                    const data = await refreshRes.json();
+                    localStorage.setItem('jwt_token', data.access_token);
+                    isRefreshing = false;
+                    onRefreshed(data.access_token);
+                    
+                    // Reintentar la petición original con el nuevo token
+                    const newOptions = args[1] || {};
+                    newOptions.headers = newOptions.headers || {};
+                    // Solo actualizamos el header Authorization si ya estaba presente (ya que se envía manualmente en la app)
+                    if (newOptions.headers['Authorization'] || newOptions.headers.get?.('Authorization')) {
+                        if (newOptions.headers instanceof Headers) {
+                            newOptions.headers.set('Authorization', `Bearer ${data.access_token}`);
+                        } else {
+                            newOptions.headers['Authorization'] = `Bearer ${data.access_token}`;
+                        }
+                    }
+                    return nativeFetch(args[0], newOptions);
+                } else {
+                    isRefreshing = false;
+                    handleUnauthorized();
+                    return response;
+                }
+            } catch (err) {
+                isRefreshing = false;
+                handleUnauthorized();
+                return response;
+            }
+        } else {
+            return new Promise(resolve => {
+                subscribeTokenRefresh(token => {
+                    const newOptions = args[1] || {};
+                    newOptions.headers = newOptions.headers || {};
+                    if (newOptions.headers['Authorization'] || newOptions.headers.get?.('Authorization')) {
+                        if (newOptions.headers instanceof Headers) {
+                            newOptions.headers.set('Authorization', `Bearer ${token}`);
+                        } else {
+                            newOptions.headers['Authorization'] = `Bearer ${token}`;
+                        }
+                    }
+                    resolve(nativeFetch(args[0], newOptions));
+                });
+            });
         }
-        return response;
-    });
+    }
+    return response;
 };
 
 // Actualiza el nombre visible y badge de rol en el header y sidebar
@@ -174,14 +248,21 @@ function applyRoleRestrictions() {
     const isUserAdmin = window.isAdmin();
 
     const moduleAllowed = {
-        pos: window.hasPermission('VENTA_COBRAR'),
-        inventario: window.hasPermission('INV_INGRESAR_MERCADERIA'),
-        compras: window.hasPermission('COMPRA_EMITIR_ORDEN'),
+        pos: isUserAdmin || window.hasPermission('VENTA_COBRAR'),
+        inventory: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
+        compras: isUserAdmin || window.hasPermission('COMPRA_EMITIR_ORDEN') || window.hasPermission('INV_INGRESAR_MERCADERIA'),
+        mermas: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
+        traslados: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
+        visitas: isUserAdmin || window.hasPermission('VISITA_REGISTRAR'),
         cash: isUserAdmin || role === 'Cajero',
         caja: isUserAdmin || role === 'Cajero',
         users: isUserAdmin,
+        roles: isUserAdmin,
+        clients: isUserAdmin || window.hasPermission('CLIENTE_ADMIN'),
         catalog: isUserAdmin || role === 'Bodeguero',
-        reportes: isUserAdmin,
+        bitacora: isUserAdmin || window.hasPermission('BITACORA_CONSULTAR'),
+        historial: isUserAdmin || window.hasPermission('REPORTE_VER'),
+        reportes: isUserAdmin || window.hasPermission('REPORTE_VER'),
         configuracion: isUserAdmin,
     };
 
@@ -193,12 +274,12 @@ function applyRoleRestrictions() {
     });
 
     // 2. Sidebar Section Headers
-    const opItems = document.querySelectorAll('[data-module-item="pos"], [data-module-item="inventario"], [data-module-item="compras"], [data-module-item="cash"]');
+    const opItems = document.querySelectorAll('[data-module-item="pos"], [data-module-item="inventory"], [data-module-item="compras"], [data-module-item="cash"], [data-module-item="mermas"], [data-module-item="traslados"], [data-module-item="visitas"]');
     const opVisible = Array.from(opItems).some(el => !el.classList.contains('d-none'));
     const opSection = document.querySelector('[data-section="operacion"]');
     if (opSection) opSection.classList.toggle('d-none', !opVisible);
 
-    const admItems = document.querySelectorAll('[data-module-item="users"], [data-module-item="catalog"], [data-module-item="reportes"], [data-module-item="configuracion"]');
+    const admItems = document.querySelectorAll('[data-module-item="users"], [data-module-item="roles"], [data-module-item="clients"], [data-module-item="catalog"], [data-module-item="bitacora"], [data-module-item="historial"], [data-module-item="reportes"], [data-module-item="configuracion"]');
     const admVisible = Array.from(admItems).some(el => !el.classList.contains('d-none'));
     const admSection = document.querySelector('[data-section="administracion"]');
     if (admSection) admSection.classList.toggle('d-none', !admVisible);
@@ -231,11 +312,19 @@ function canAccessView(viewKey) {
 
     const role = window.getUserRole();
     if (viewKey === 'pos') return window.hasPermission('VENTA_COBRAR');
-    if (viewKey === 'inventario') return window.hasPermission('INV_INGRESAR_MERCADERIA');
-    if (viewKey === 'compras') return window.hasPermission('COMPRA_EMITIR_ORDEN');
+    if (viewKey === 'inventory') return window.hasPermission('INV_INGRESAR_MERCADERIA');
+    if (viewKey === 'compras') return window.hasPermission('COMPRA_EMITIR_ORDEN') || window.hasPermission('INV_INGRESAR_MERCADERIA');
+    if (viewKey === 'mermas') return window.hasPermission('INV_INGRESAR_MERCADERIA');
+    if (viewKey === 'traslados') return window.hasPermission('INV_INGRESAR_MERCADERIA');
+    if (viewKey === 'visitas') return window.hasPermission('VISITA_REGISTRAR');
     if (viewKey === 'cash' || viewKey === 'caja') return role === 'Cajero';
     if (viewKey === 'catalog') return role === 'Bodeguero';
-    if (viewKey === 'users' || viewKey === 'reportes' || viewKey === 'configuracion') return false;
+    if (viewKey === 'clients') return window.hasPermission('CLIENTE_ADMIN');
+    if (viewKey === 'users' || viewKey === 'configuracion') return false;
+    if (viewKey === 'roles') return false;
+    if (viewKey === 'bitacora') return window.hasPermission('BITACORA_CONSULTAR');
+    if (viewKey === 'historial') return window.hasPermission('REPORTE_VER');
+    if (viewKey === 'reportes') return window.hasPermission('REPORTE_VER');
 
     return false;
 }
@@ -305,14 +394,53 @@ function renderView(viewKey) {
     if (target) target.classList.remove('d-none');
     setActiveNav(viewKey);
 
+    if (viewKey === 'dashboard' && typeof window.showDashboardModule === 'function') {
+        window.showDashboardModule();
+    }
     if (viewKey === 'users' && typeof window.showUsersModule === 'function') {
         window.showUsersModule();
+    }
+    if (viewKey === 'roles' && typeof window.showRolesModule === 'function') {
+        window.showRolesModule();
+    }
+    if (viewKey === 'bitacora' && typeof window.showBitacoraModule === 'function') {
+        window.showBitacoraModule();
+    }
+    if (viewKey === 'historial' && typeof window.showHistorialModule === 'function') {
+        window.showHistorialModule();
+    }
+    if (viewKey === 'clients' && typeof window.showClientsModule === 'function') {
+        window.showClientsModule();
     }
     if (viewKey === 'catalog' && typeof window.showCatalogModule === 'function') {
         window.showCatalogModule();
     }
     if (viewKey === 'cash' && typeof window.showCashModule === 'function') {
         window.showCashModule();
+    }
+    if (viewKey === 'reportes' && typeof window.showReportesModule === 'function') {
+        window.showReportesModule();
+    }
+    if (viewKey === 'configuracion' && typeof window.showConfiguracionModule === 'function') {
+        window.showConfiguracionModule();
+    }
+    if (viewKey === 'inventory' && typeof window.showInventoryModule === 'function') {
+        window.showInventoryModule();
+    }
+    if (viewKey === 'compras' && typeof window.showComprasModule === 'function') {
+        window.showComprasModule();
+    }
+    if (viewKey === 'pos' && typeof window.showPOSModule === 'function') {
+        window.showPOSModule();
+    }
+    if (viewKey === 'mermas' && typeof window.showMermasModule === 'function') {
+        window.showMermasModule();
+    }
+    if (viewKey === 'traslados' && typeof window.showTrasladosModule === 'function') {
+        window.showTrasladosModule();
+    }
+    if (viewKey === 'visitas' && typeof window.showVisitasModule === 'function') {
+        window.showVisitasModule();
     }
 }
 
@@ -375,14 +503,21 @@ window.addEventListener('pageshow', () => {
 
 const moduleLabels = {
     pos: 'POS / Ventas',
-    inventario: 'Inventario / Bodega',
+    inventory: 'Inventario / Bodega',
     compras: 'Compras',
     caja: 'Caja',
     cash: 'Caja',
     users: 'Usuarios / Personal',
+    roles: 'Roles y Permisos',
+    clients: 'Clientes',
     catalog: 'Catálogos',
     reportes: 'Reportes',
     configuracion: 'Configuración',
+    bitacora: 'Bitácora',
+    historial: 'Historial de Precios',
+    mermas: 'Mermas',
+    traslados: 'Traslados',
+    visitas: 'Visitas de Seguimiento',
 };
 
 // Abre un módulo desde el dashboard o navegación lateral
@@ -406,6 +541,59 @@ function openModule(moduleKey) {
 window.openModule = openModule;
 
 // 1. Login Logic
+
+// 1a. Toggle mostrar/ocultar contraseña
+window.toggleLoginPassword = function(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const loginPassInput = document.getElementById('login-pass');
+    const btnTogglePass = document.getElementById('btn-toggle-pass');
+    if (!loginPassInput) return;
+
+    const isPassword = loginPassInput.type === 'password' || loginPassInput.getAttribute('type') === 'password';
+    const newType = isPassword ? 'text' : 'password';
+    loginPassInput.type = newType;
+    loginPassInput.setAttribute('type', newType);
+
+    const icon = document.getElementById('btn-toggle-pass-icon') || (btnTogglePass ? btnTogglePass.querySelector('i') : null);
+    if (icon) {
+        icon.className = isPassword ? 'bi bi-eye text-muted' : 'bi bi-eye-slash text-muted';
+    }
+    if (btnTogglePass) {
+        btnTogglePass.setAttribute('title', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    }
+    
+    // Mantener cursor al final
+    try {
+        const len = loginPassInput.value.length;
+        loginPassInput.setSelectionRange(len, len);
+    } catch (_) {}
+    loginPassInput.focus();
+};
+
+const btnTogglePass = document.getElementById('btn-toggle-pass');
+if (btnTogglePass) {
+    btnTogglePass.onclick = window.toggleLoginPassword;
+}
+
+// 1b. Helpers de estado del botón de login
+const btnLoginSubmit = document.getElementById('btn-login-submit');
+const loginBtnOriginalText = btnLoginSubmit ? btnLoginSubmit.innerHTML : '';
+
+function setLoginLoading(loading) {
+    if (!btnLoginSubmit) return;
+    if (loading) {
+        btnLoginSubmit.disabled = true;
+        btnLoginSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Ingresando...';
+    } else {
+        btnLoginSubmit.disabled = false;
+        btnLoginSubmit.innerHTML = loginBtnOriginalText;
+    }
+}
+
+// 1c. Submit del formulario de login
 document.getElementById('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
     const user = document.getElementById('login-user').value.trim();
@@ -423,6 +611,8 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
     formData.append('username', user);
     formData.append('password', pass);
 
+    setLoginLoading(true);
+
     try {
         const response = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
@@ -438,6 +628,7 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
         const data = await response.json();
         localStorage.setItem('jwt_token', data.access_token);
         localStorage.setItem('user_role', data.rol || '');
+        localStorage.setItem('user_id_rol', data.id_rol || '');
         localStorage.setItem('user_permissions', JSON.stringify(data.permisos || []));
         localStorage.setItem('user_name', user);
 
@@ -450,6 +641,8 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
     } catch (err) {
         errorDiv.textContent = err.message;
         errorDiv.classList.remove('d-none');
+    } finally {
+        setLoginLoading(false);
     }
 });
 
@@ -502,11 +695,35 @@ document.getElementById('form-reset').addEventListener('submit', (e) => {
     switchView('view-login');
 });
 
+let healthCheckInterval = null;
+
+async function checkHealth() {
+    try {
+        const response = await fetch(`${API_URL}/health`);
+        if (!response.ok) {
+            throw new Error('Health check failed');
+        }
+        const data = await response.json();
+        if (data.status !== 'ok') {
+            throw new Error('Database disconnected');
+        }
+    } catch (error) {
+        if (typeof window.showToast === 'function') {
+            window.showToast('Problemas de conexión con el servidor', 'danger');
+        }
+    }
+}
+
 // 6. Dashboard Switch & Logout
-function showDashboard() {
+async function showDashboard() {
     authModule.classList.add('d-none');
     systemModule.classList.remove('d-none');
     
+    // Check health once before showing dashboard fully, and set interval
+    await checkHealth();
+    if (healthCheckInterval) clearInterval(healthCheckInterval);
+    healthCheckInterval = setInterval(checkHealth, 30000); // 30 seconds
+
     // Set dynamic date
     const now = new Date();
     const options = { month: 'long', year: 'numeric' };
@@ -518,6 +735,11 @@ function showDashboard() {
 
     updateUserInfoUI();
     applyRoleRestrictions();
+
+    // Campanita de notificaciones: alertas de stock pendientes (al iniciar y tras login)
+    if (typeof window.cargarNotificaciones === 'function') {
+        window.cargarNotificaciones();
+    }
 
     // Restaura la vista activa desde la URL (hash) si existe y tiene permisos; si no, Panel Principal.
     let initialView = parseHash();

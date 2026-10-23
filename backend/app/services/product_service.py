@@ -1,10 +1,11 @@
 from typing import Optional, List
 from fastapi import HTTPException, status
 from datetime import datetime
-from app.db.models import Producto, VarianteProducto, InventarioSucursal
+from app.db.models import Producto, VarianteProducto, InventarioSucursal, HistorialPrecio
 from app.interfaces.repositories import ProductRepository
 from app.interfaces.services import ProductService
 from app.schemas import schemas
+from app.services.audit_service import log_action
 
 
 class ConcreteProductService(ProductService):
@@ -94,7 +95,7 @@ class ConcreteProductService(ProductService):
                 status_code=400, detail="Ya existe un producto con ese código de barras"
             )
 
-    async def create_product(self, data: schemas.ProductoCreate) -> schemas.ProductoOut:
+    async def create_product(self, data: schemas.ProductoCreate, actor_id: int = 0) -> schemas.ProductoOut:
         await self._validate_subcategoria(data.id_subcategoria)
         await self._validate_unidad(data.id_unidad)
         await self._validate_sucursal(data.inventario.id_sucursal)
@@ -130,18 +131,31 @@ class ConcreteProductService(ProductService):
             fecha_actualizacion=datetime.utcnow(),
         )
         await self.products.add_inventario(inventario)
-
         await self.products.commit()
 
         created = await self.products.get_producto_by_id(producto.id_producto)
+        if actor_id:
+            await log_action(
+                self.products.db,
+                id_usuario=actor_id,
+                tabla="producto",
+                accion="CREAR",
+                descripcion=f"Creó producto '{created.nombre}' (ID {created.id_producto}).",
+            )
+            await self.products.commit()
         return schemas.ProductoOut.model_validate(created)
 
     async def update_product(
-        self, product_id: int, data: schemas.ProductoUpdate
+        self, product_id: int, data: schemas.ProductoUpdate, actor_id: int = 0
     ) -> schemas.ProductoOut:
         producto = await self.products.get_producto_by_id(product_id)
         if not producto:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+        # Detectar cambios de precio para auditoría específica
+        variante_previa = producto.variantes[0] if producto.variantes else None
+        precio_detalle_prev = float(variante_previa.precio_detalle) if variante_previa else None
+        precio_mayoreo_prev = float(variante_previa.precio_mayoreo) if variante_previa else None
 
         if data.id_subcategoria is not None:
             await self._validate_subcategoria(data.id_subcategoria)
@@ -216,14 +230,56 @@ class ConcreteProductService(ProductService):
         await self.products.commit()
 
         updated = await self.products.get_producto_by_id(product_id)
+        if actor_id:
+            # Generar descripción de auditoría
+            partes_precio = []
+            variante_nueva = updated.variantes[0] if updated.variantes else None
+            if variante_nueva and precio_detalle_prev is not None:
+                nuevo_det = float(variante_nueva.precio_detalle)
+                nuevo_may = float(variante_nueva.precio_mayoreo)
+                if nuevo_det != precio_detalle_prev:
+                    partes_precio.append(f"precio_detalle: Q{precio_detalle_prev:.2f}→Q{nuevo_det:.2f}")
+                if nuevo_may != precio_mayoreo_prev:
+                    partes_precio.append(f"precio_mayoreo: Q{precio_mayoreo_prev:.2f}→Q{nuevo_may:.2f}")
+                # Registrar en historial_precio el cambio de precio de detalle
+                if nuevo_det != precio_detalle_prev:
+                    self.products.db.add(HistorialPrecio(
+                        id_variante=variante_nueva.id_variante,
+                        id_usuario=actor_id,
+                        precio_anterior=precio_detalle_prev,
+                        precio_nuevo=nuevo_det,
+                        fecha_modificacion=datetime.utcnow(),
+                    ))
+            accion = "PRECIO" if partes_precio else "EDITAR"
+            desc = f"Editó producto '{updated.nombre}' (ID {product_id})."
+            if partes_precio:
+                desc += " Cambio de precios: " + ", ".join(partes_precio) + "."
+            await log_action(
+                self.products.db,
+                id_usuario=actor_id,
+                tabla="producto",
+                accion=accion,
+                descripcion=desc,
+            )
+            await self.products.commit()
         return schemas.ProductoOut.model_validate(updated)
 
-    async def deactivate_product(self, product_id: int) -> schemas.ProductoOut:
+    async def deactivate_product(self, product_id: int, actor_id: int = 0) -> schemas.ProductoOut:
         """Eliminación lógica (soft delete): marca el producto como inactivo."""
         producto = await self.products.get_producto_by_id(product_id)
         if not producto:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
+        nombre_p = producto.nombre
         producto.estado = "Inactivo"
         await self.products.commit()
         updated = await self.products.get_producto_by_id(product_id)
+        if actor_id:
+            await log_action(
+                self.products.db,
+                id_usuario=actor_id,
+                tabla="producto",
+                accion="DESACTIVAR",
+                descripcion=f"Desactivó producto '{nombre_p}' (ID {product_id}).",
+            )
+            await self.products.commit()
         return schemas.ProductoOut.model_validate(updated)

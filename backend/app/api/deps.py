@@ -15,6 +15,9 @@ from app.repositories.user_repository import UserRepositoryImpl
 from app.repositories.cash_repository import CajaRepositoryImpl, TurnoCajaRepositoryImpl
 from app.repositories.merma_repository import MermaRepositoryImpl
 from app.repositories.sale_repository import SaleRepositoryImpl
+from app.repositories.fel_repository import FelRepositoryImpl
+from app.repositories.login_attempt_repository import LoginAttemptRepositoryImpl
+from app.repositories.sync_repository import SyncRepositoryImpl
 from app.services.category_service import ConcreteCategoryService
 from app.services.product_service import ConcreteProductService
 from app.services.catalogo_service import ConcreteCatalogoService
@@ -24,6 +27,10 @@ from app.services.user_service import ConcreteUserService
 from app.services.cash_service import ConcreteCashService
 from app.services.merma_service import ConcreteMermaService
 from app.services.sale_service import ConcreteSaleService
+from app.services.login_security_service import LoginSecurityService
+from app.services.sync_service import ConcreteSyncService
+from app.repositories.health_repository import HealthRepositoryImpl
+from app.services.health_service import ConcreteHealthService
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
@@ -72,6 +79,109 @@ class UnitOfWork:
     def sales(self):
         return SaleRepositoryImpl(self.db)
 
+    @property
+    def fel(self):
+        return FelRepositoryImpl(self.db)
+
+    @property
+    def compras(self):
+        from app.repositories.compra_repository import CompraRepositoryImpl
+        return CompraRepositoryImpl(self.db)
+
+    @property
+    def traslados(self):
+        from app.repositories.traslado_repository import TrasladoRepositoryImpl
+        return TrasladoRepositoryImpl(self.db)
+
+    @property
+    def visitas(self):
+        from app.repositories.visita_repository import VisitaRepositoryImpl
+        return VisitaRepositoryImpl(self.db)
+        
+    @property
+    def reportes(self):
+        from app.repositories.reporte_repository import ReporteRepositoryImpl
+        return ReporteRepositoryImpl(self.db)
+
+    @property
+    def configuracion(self):
+        from app.repositories.configuracion_repository import ConfiguracionRepositoryImpl
+        return ConfiguracionRepositoryImpl(self.db)
+
+    @property
+    def inventory(self):
+        from app.repositories.inventory_repository import InventoryRepositoryImpl
+        return InventoryRepositoryImpl(self.db)
+
+    @property
+    def clientes(self):
+        from app.repositories.cliente_repository import ClienteRepositoryImpl
+        return ClienteRepositoryImpl(self.db)
+
+    @property
+    def tipos_cliente(self):
+        from app.repositories.cliente_repository import TipoClienteRepositoryImpl
+        return TipoClienteRepositoryImpl(self.db)
+
+    @property
+    def sucursales(self):
+        from app.repositories.catalogo_repository import SucursalRepository
+        return SucursalRepository(self.db)
+
+    @property
+    def areas(self):
+        from app.repositories.catalogo_repository import AreaBodegaRepository
+        return AreaBodegaRepository(self.db)
+
+    @property
+    def subcategorias(self):
+        from app.repositories.catalogo_repository import SubcategoriaRepository
+        return SubcategoriaRepository(self.db)
+
+    @property
+    def unidades(self):
+        from app.repositories.catalogo_repository import UnidadMedidaRepository
+        return UnidadMedidaRepository(self.db)
+
+    @property
+    def motivos_merma(self):
+        from app.repositories.catalogo_repository import MotivoMermaRepository
+        return MotivoMermaRepository(self.db)
+
+    @property
+    def metodos_pago(self):
+        from app.repositories.catalogo_repository import MetodoPagoRepository
+        return MetodoPagoRepository(self.db)
+
+    @property
+    def proveedores(self):
+        from app.repositories.catalogo_repository import ProveedorRepository
+        return ProveedorRepository(self.db)
+
+    @property
+    def departamentos_geo(self):
+        from app.repositories.catalogo_repository import DepartamentoRepository
+        return DepartamentoRepository(self.db)
+
+    @property
+    def municipios(self):
+        from app.repositories.catalogo_repository import MunicipioRepository
+        return MunicipioRepository(self.db)
+
+    @property
+    def permisos(self):
+        from app.repositories.catalogo_repository import PermisoRepository
+        return PermisoRepository(self.db)
+
+    @property
+    def bitacora(self):
+        from app.repositories.catalogo_repository import BitacoraRepository
+        return BitacoraRepository(self.db)
+
+    @property
+    def historial_precios(self):
+        from app.repositories.catalogo_repository import HistorialPrecioRepository
+        return HistorialPrecioRepository(self.db)
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
@@ -159,7 +269,12 @@ def get_product_service(db: AsyncSession = Depends(get_db)) -> ConcreteProductSe
 
 def get_catalogo_service(db: AsyncSession = Depends(get_db)) -> ConcreteCatalogoService:
     product_repository = ProductRepositoryImpl(db)
-    return ConcreteCatalogoService(db, product_repository)
+    return ConcreteCatalogoService(UnitOfWork(db), product_repository)
+
+
+def get_catalogo_general_service(db: AsyncSession = Depends(get_db)):
+    from app.services.catalogo_general_service import ConcreteCatalogoGeneralService
+    return ConcreteCatalogoGeneralService(UnitOfWork(db))
 
 
 def get_role_service(db: AsyncSession = Depends(get_db)) -> ConcreteRoleService:
@@ -184,3 +299,61 @@ def get_merma_service(db: AsyncSession = Depends(get_db)) -> ConcreteMermaServic
 
 def get_sale_service(db: AsyncSession = Depends(get_db)) -> ConcreteSaleService:
     return ConcreteSaleService(UnitOfWork(db))
+
+
+def get_fel_service(db: AsyncSession = Depends(get_db)):
+    from app.services.fel_service import ConcreteFelService
+    return ConcreteFelService(UnitOfWork(db))
+
+
+def get_login_security_service(db: AsyncSession = Depends(get_db)) -> LoginSecurityService:
+    repository = LoginAttemptRepositoryImpl(db)
+    return LoginSecurityService(repository)
+
+
+def get_sync_service(db: AsyncSession = Depends(get_db)) -> ConcreteSyncService:
+    repository = SyncRepositoryImpl(db)
+    return ConcreteSyncService(repository)
+
+
+def get_health_service(db: AsyncSession = Depends(get_db)) -> ConcreteHealthService:
+    repository = HealthRepositoryImpl(db)
+    return ConcreteHealthService(repository)
+
+
+def get_dashboard_service(db: AsyncSession = Depends(get_db)):
+    from app.repositories.dashboard_repository import DashboardRepositoryImpl
+    from app.services.dashboard_service import ConcreteDashboardService
+    repository = DashboardRepositoryImpl(db)
+    return ConcreteDashboardService(repository)
+
+
+def get_reporte_service(db: AsyncSession = Depends(get_db)):
+    from app.services.reporte_service import ReportesService
+    return ReportesService(UnitOfWork(db))
+
+def get_facturacion_offline_service(db: AsyncSession = Depends(get_db)):
+    from app.services.facturacion_offline_service import FacturacionOfflineService
+    return FacturacionOfflineService(UnitOfWork(db))
+
+def get_configuracion_service(db: AsyncSession = Depends(get_db)):
+    from app.services.configuracion_service import ConfiguracionService
+    return ConfiguracionService(UnitOfWork(db))
+
+def get_inventory_service(db: AsyncSession = Depends(get_db)):
+    from app.services.inventory_service import ConcreteInventoryService
+    return ConcreteInventoryService(UnitOfWork(db))
+
+def get_cliente_service(db: AsyncSession = Depends(get_db)):
+    from app.services.cliente_service import ConcreteClienteService
+    return ConcreteClienteService(UnitOfWork(db))
+
+
+def get_bitacora_service(db: AsyncSession = Depends(get_db)):
+    from app.services.bitacora_service import ConcreteBitacoraService
+    return ConcreteBitacoraService(UnitOfWork(db))
+
+
+def get_historial_precio_service(db: AsyncSession = Depends(get_db)):
+    from app.services.historial_precio_service import ConcreteHistorialPrecioService
+    return ConcreteHistorialPrecioService(UnitOfWork(db))

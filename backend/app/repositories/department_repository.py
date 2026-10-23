@@ -1,7 +1,7 @@
 from typing import Optional, List
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.models import DepartamentoGeografico
+from app.db.models import DepartamentoGeografico, Municipio
 from app.interfaces.repositories import DepartmentRepository
 
 
@@ -39,3 +39,11 @@ class DepartmentRepositoryImpl(DepartmentRepository):
         await self.db.flush()
         await self.db.refresh(department)
         return department
+
+    async def list_municipios(self, department_id: Optional[int] = None) -> List[Municipio]:
+        stmt = select(Municipio).where(Municipio.estado == "Activo")
+        if department_id is not None:
+            stmt = stmt.where(Municipio.id_departamento == department_id)
+        stmt = stmt.order_by(Municipio.nombre.asc())
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())

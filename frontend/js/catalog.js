@@ -792,20 +792,22 @@ async function saveProduct(event) {
     }
 
     // 8. Stock Actual (PROBLEMA 2 - Cero fallback destructivo, obligatorio)
+    let numStock = 0;
     if (rawStock === '' || rawStock === null || rawStock === undefined) {
         applyFieldError('stock_actual', 'Este campo es obligatorio.');
     } else {
-        const numStock = parseInt(rawStock, 10);
+        numStock = parseInt(rawStock, 10);
         if (isNaN(numStock) || numStock < 0) {
             applyFieldError('stock_actual', 'El stock inicial debe ser 0 o superior.');
         }
     }
 
     // 9. Stock Mínimo (PROBLEMA 2 - Cero fallback destructivo, obligatorio)
+    let numStockMin = 0;
     if (rawStockMin === '' || rawStockMin === null || rawStockMin === undefined) {
         applyFieldError('stock_minimo', 'Este campo es obligatorio.');
     } else {
-        const numStockMin = parseInt(rawStockMin, 10);
+        numStockMin = parseInt(rawStockMin, 10);
         if (isNaN(numStockMin) || numStockMin < 0) {
             applyFieldError('stock_minimo', 'El stock mínimo debe ser 0 o superior.');
         }
@@ -1012,7 +1014,14 @@ window.showCatalogModule = async function () {
         loadProducts(),
         loadCategoriesTable(),
         populateSubcategorias('filter-product-subcategoria', null, 'Todas las subcategorías'),
+        loadSubcategoriasTable(),
+        loadUnidadesTable(),
+        loadSucursalesTable(),
+        loadAreasTable(),
+        populateSubcatCategoriesDropdown(),
+        populateAreaSucursalesDropdown(),
     ]);
+    initBloque3Tables();
 };
 
 window.editProduct = editProduct;
@@ -1079,4 +1088,2153 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#tab-products th.sortable').forEach((th) => {
         th.addEventListener('click', () => toggleProductSort(th.getAttribute('data-sort')));
     });
+});
+
+// ===========================================================================
+// BLOQUE 2: SUBCATEGORÍAS, UNIDADES, SUCURSALES, ÁREAS DE BODEGA
+// ===========================================================================
+
+function getCatalogAuthHeaders() {
+    const token = localStorage.getItem('jwt_token');
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+}
+
+async function readCatalogError(res, fallback) {
+    // Extrae el detalle (mensaje claro del backend, p.ej. desactivación segura 400).
+    try {
+        const errData = await res.json();
+        if (errData && typeof errData.detail === 'string' && errData.detail.trim()) return errData.detail;
+    } catch (_) { /* cuerpo no JSON */ }
+    return fallback;
+}
+
+async function downloadCatalogExport(url, defaultFilename) {
+    try {
+        const token = localStorage.getItem('jwt_token');
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) throw new Error('Error al descargar el archivo de reporte');
+        const blob = await res.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = defaultFilename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        showToast('Reporte generado y descargado correctamente.', 'success');
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 1. SUBCATEGORÍAS CRUD
+// ---------------------------------------------------------------------------
+
+let subcatState = {
+    page: 1,
+    limit: 10,
+    total: 0,
+    sortBy: 'nombre',
+    sortOrder: 'asc',
+    search: '',
+    id_categoria: '',
+    status: '',
+    currentEditId: null,
+};
+
+async function populateSubcatCategoriesDropdown() {
+    const filterSelect = document.getElementById('filter-subcat-cat');
+    const formSelect = document.getElementById('subcat-cat-id');
+    try {
+        const res = await fetch(`${CATEGORIES_API}?limit=500`, { headers: getCatalogAuthHeaders() });
+        if (res.ok) {
+            const data = await res.json();
+            const cats = Array.isArray(data) ? data : (data.items || []);
+            if (filterSelect) {
+                const current = filterSelect.value;
+                filterSelect.innerHTML = '<option value="">Todas las categorías</option>' +
+                    cats.map(c => `<option value="${c.id_categoria}">${c.nombre}</option>`).join('');
+                filterSelect.value = current;
+            }
+            if (formSelect) {
+                formSelect.innerHTML = '<option value="">Seleccione categoría...</option>' +
+                    cats.map(c => `<option value="${c.id_categoria}">${c.nombre}</option>`).join('');
+            }
+        }
+    } catch (e) {
+        console.warn('Error al cargar categorías en combos de subcategoría:', e);
+    }
+}
+
+async function loadSubcategoriasTable() {
+    const tbody = document.getElementById('subcategorias-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando subcategorías...</td></tr>';
+
+    const offset = (subcatState.page - 1) * subcatState.limit;
+    const params = new URLSearchParams({
+        limit: subcatState.limit,
+        offset: offset,
+        sort_by: subcatState.sortBy,
+        sort_order: subcatState.sortOrder,
+    });
+    if (subcatState.search) params.append('search', subcatState.search);
+    if (subcatState.id_categoria) params.append('id_categoria', subcatState.id_categoria);
+    if (subcatState.status === 'Activo') params.append('is_active', 'true');
+    if (subcatState.status === 'Inactivo') params.append('is_active', 'false');
+
+    try {
+        const res = await fetch(`${CATALOGOS_API}/subcategorias/paged?${params.toString()}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al cargar subcategorías');
+        const data = await res.json();
+        subcatState.total = data.total;
+        renderSubcategoriasTable(data.items || []);
+        renderSubcatPagination();
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger"><i class="bi bi-exclamation-circle me-1"></i> ${err.message}</td></tr>`;
+    }
+}
+
+function renderSubcategoriasTable(items) {
+    const tbody = document.getElementById('subcategorias-table-body');
+    if (!tbody) return;
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><i class="bi bi-diagram-2 fs-2 d-block mb-1 opacity-50"></i>No se encontraron subcategorías con los filtros aplicados.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(s => {
+        const statusBadge = s.estado === 'Activo'
+            ? '<span class="badge bg-success-subtle text-success">Activo</span>'
+            : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+
+        return `
+            <tr>
+                <td><span class="font-monospace text-muted small">#${s.id_subcategoria}</span></td>
+                <td><strong class="text-dark">${s.nombre}</strong></td>
+                <td><span class="badge bg-secondary-subtle text-secondary">${s.categoria_nombre || '-'}</span></td>
+                <td>${statusBadge}</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-info me-1" onclick="openSubcatDetailModal(${s.id_subcategoria})" title="Ver ficha">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="openEditSubcatModal(${s.id_subcategoria})" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm ${s.estado === 'Activo' ? 'btn-outline-danger' : 'btn-outline-success'}" onclick="toggleSubcatStatus(${s.id_subcategoria}, '${s.nombre}', '${s.estado}')" title="${s.estado === 'Activo' ? 'Desactivar' : 'Activar'}">
+                        <i class="bi ${s.estado === 'Activo' ? 'bi-trash' : 'bi-check-circle'}"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderSubcatPagination() {
+    const info = document.getElementById('subcat-pagination-info');
+    const pageInfo = document.getElementById('subcat-page-info');
+    const prevBtn = document.getElementById('subcat-prev-page');
+    const nextBtn = document.getElementById('subcat-next-page');
+    if (!info) return;
+
+    const start = subcatState.total === 0 ? 0 : (subcatState.page - 1) * subcatState.limit + 1;
+    const end = Math.min(subcatState.page * subcatState.limit, subcatState.total);
+    const maxPages = Math.ceil(subcatState.total / subcatState.limit) || 1;
+
+    info.textContent = `Mostrando ${start}–${end} de ${subcatState.total}`;
+    if (pageInfo) pageInfo.textContent = `Página ${subcatState.page} de ${maxPages}`;
+    if (prevBtn) prevBtn.disabled = (subcatState.page <= 1);
+    if (nextBtn) nextBtn.disabled = (subcatState.page >= maxPages);
+}
+
+function openNewSubcatModal() {
+    subcatState.currentEditId = null;
+    const title = document.getElementById('subcatModalTitle');
+    if (title) title.textContent = 'Nueva Subcategoría';
+    const form = document.getElementById('subcat-form');
+    if (form) form.reset();
+    document.getElementById('subcat-id').value = '';
+    const modalEl = document.getElementById('subcat-modal');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
+        modal.show();
+    }
+}
+
+async function openEditSubcatModal(id) {
+    subcatState.currentEditId = id;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/subcategorias/${id}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al obtener datos de la subcategoría');
+        const s = await res.json();
+        document.getElementById('subcat-id').value = s.id_subcategoria;
+        document.getElementById('subcat-nombre').value = s.nombre;
+        document.getElementById('subcat-cat-id').value = s.id_categoria;
+        const title = document.getElementById('subcatModalTitle');
+        if (title) title.textContent = `Editar Subcategoría: ${s.nombre}`;
+        const modalEl = document.getElementById('subcat-modal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
+            modal.show();
+        }
+    } catch (e) {
+        showToast(e.message, 'danger');
+    }
+}
+
+async function openSubcatDetailModal(id) {
+    const body = document.getElementById('subcat-detail-body');
+    if (!body) return;
+    body.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>';
+    const modalEl = document.getElementById('subcat-detail-modal');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
+    modal.show();
+
+    try {
+        const res = await fetch(`${CATALOGOS_API}/subcategorias/${id}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('No se pudo cargar la ficha');
+        const s = await res.json();
+        body.innerHTML = `
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">ID de Subcategoría</span>
+                    <strong class="font-monospace fs-6">#${s.id_subcategoria}</strong>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Estado</span>
+                    <span class="badge ${s.estado === 'Activo' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${s.estado}</span>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Nombre</span>
+                    <strong class="fs-6">${s.nombre}</strong>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Categoría Padre</span>
+                    <span class="badge bg-secondary-subtle text-secondary fs-6">${s.categoria_nombre || `ID #${s.id_categoria}`}</span>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        body.innerHTML = `<div class="text-center text-danger py-4">${err.message}</div>`;
+    }
+}
+
+async function handleSaveSubcat(e) {
+    e.preventDefault();
+    const id = document.getElementById('subcat-id').value;
+    const nombre = document.getElementById('subcat-nombre').value.trim();
+    const idCat = document.getElementById('subcat-cat-id').value;
+    if (!nombre || !idCat) {
+        showToast('Complete los campos obligatorios.', 'warning');
+        return;
+    }
+
+    const payload = { id_categoria: Number(idCat), nombre: nombre };
+    const isEdit = Boolean(id);
+    const url = isEdit ? `${CATALOGOS_API}/subcategorias/${id}` : `${CATALOGOS_API}/subcategorias`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: getCatalogAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Error al guardar la subcategoría');
+        }
+        showToast(`Subcategoría '${nombre}' ${isEdit ? 'actualizada' : 'creada'} con éxito.`, 'success');
+        const modalEl = document.getElementById('subcat-modal');
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        loadSubcategoriasTable();
+        populateSubcategorias('filter-product-subcategoria', null, 'Todas las subcategorías');
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+let pendingSubcatDeactivate = null;
+
+function toggleSubcatStatus(id, name, status) {
+    if (status === 'Activo') {
+        pendingSubcatDeactivate = { id, name };
+        const text = document.getElementById('confirm-subcat-deactivate-text');
+        if (text) text.innerHTML = `¿Está seguro de desactivar la subcategoría <strong>${name}</strong>? Los productos asociados permanecerán pero la subcategoría quedará inactiva.`;
+        const modalEl = document.getElementById('confirm-subcat-deactivate-modal');
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+    } else {
+        // Reactivar directamente
+        activateSubcat(id, name);
+    }
+}
+
+async function confirmSubcatDeactivate() {
+    if (!pendingSubcatDeactivate) return;
+    const { id, name } = pendingSubcatDeactivate;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/subcategorias/${id}`, { method: 'DELETE', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error(await readCatalogError(res, 'Error al desactivar la subcategoría'));
+        showToast(`Subcategoría '${name}' desactivada exitosamente.`, 'info');
+        const modalEl = document.getElementById('confirm-subcat-deactivate-modal');
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        loadSubcategoriasTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function activateSubcat(id, name) {
+    try {
+        const res = await fetch(`${CATALOGOS_API}/subcategorias/${id}/activar`, { method: 'POST', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al reactivar la subcategoría');
+        showToast(`Subcategoría '${name}' reactivada exitosamente.`, 'success');
+        loadSubcategoriasTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 2. UNIDADES DE MEDIDA CRUD
+// ---------------------------------------------------------------------------
+
+let unidadState = {
+    page: 1,
+    limit: 10,
+    total: 0,
+    sortBy: 'descripcion',
+    sortOrder: 'asc',
+    search: '',
+    status: '',
+    currentEditId: null,
+};
+
+async function loadUnidadesTable() {
+    const tbody = document.getElementById('unidades-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando unidades...</td></tr>';
+
+    const offset = (unidadState.page - 1) * unidadState.limit;
+    const params = new URLSearchParams({
+        limit: unidadState.limit,
+        offset: offset,
+        sort_by: unidadState.sortBy,
+        sort_order: unidadState.sortOrder,
+    });
+    if (unidadState.search) params.append('search', unidadState.search);
+    if (unidadState.status === 'Activo') params.append('is_active', 'true');
+    if (unidadState.status === 'Inactivo') params.append('is_active', 'false');
+
+    try {
+        const res = await fetch(`${CATALOGOS_API}/unidades/paged?${params.toString()}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al cargar unidades de medida');
+        const data = await res.json();
+        unidadState.total = data.total;
+        renderUnidadesTable(data.items || []);
+        renderUnidadPagination();
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger"><i class="bi bi-exclamation-circle me-1"></i> ${err.message}</td></tr>`;
+    }
+}
+
+function renderUnidadesTable(items) {
+    const tbody = document.getElementById('unidades-table-body');
+    if (!tbody) return;
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><i class="bi bi-rulers fs-2 d-block mb-1 opacity-50"></i>No se encontraron unidades de medida.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(u => {
+        const statusBadge = u.estado === 'Activo'
+            ? '<span class="badge bg-success-subtle text-success">Activo</span>'
+            : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+
+        return `
+            <tr>
+                <td><span class="font-monospace text-muted small">#${u.id_unidad}</span></td>
+                <td><strong class="font-monospace text-teal">${u.codigo}</strong></td>
+                <td>${u.descripcion}</td>
+                <td>${statusBadge}</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-info me-1" onclick="openUnidadDetailModal(${u.id_unidad})" title="Ver ficha">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="openEditUnidadModal(${u.id_unidad})" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm ${u.estado === 'Activo' ? 'btn-outline-danger' : 'btn-outline-success'}" onclick="toggleUnidadStatus(${u.id_unidad}, '${u.codigo}', '${u.estado}')" title="${u.estado === 'Activo' ? 'Desactivar' : 'Activar'}">
+                        <i class="bi ${u.estado === 'Activo' ? 'bi-trash' : 'bi-check-circle'}"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderUnidadPagination() {
+    const info = document.getElementById('unidad-pagination-info');
+    const pageInfo = document.getElementById('unidad-page-info');
+    const prevBtn = document.getElementById('unidad-prev-page');
+    const nextBtn = document.getElementById('unidad-next-page');
+    if (!info) return;
+
+    const start = unidadState.total === 0 ? 0 : (unidadState.page - 1) * unidadState.limit + 1;
+    const end = Math.min(unidadState.page * unidadState.limit, unidadState.total);
+    const maxPages = Math.ceil(unidadState.total / unidadState.limit) || 1;
+
+    info.textContent = `Mostrando ${start}–${end} de ${unidadState.total}`;
+    if (pageInfo) pageInfo.textContent = `Página ${unidadState.page} de ${maxPages}`;
+    if (prevBtn) prevBtn.disabled = (unidadState.page <= 1);
+    if (nextBtn) nextBtn.disabled = (unidadState.page >= maxPages);
+}
+
+function openNewUnidadModal() {
+    unidadState.currentEditId = null;
+    const title = document.getElementById('unidadModalTitle');
+    if (title) title.textContent = 'Nueva Unidad de Medida';
+    const form = document.getElementById('unidad-form');
+    if (form) form.reset();
+    document.getElementById('unidad-id').value = '';
+    const modalEl = document.getElementById('unidad-modal');
+    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+}
+
+async function openEditUnidadModal(id) {
+    unidadState.currentEditId = id;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/unidades/${id}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al obtener datos de la unidad');
+        const u = await res.json();
+        document.getElementById('unidad-id').value = u.id_unidad;
+        document.getElementById('unidad-codigo').value = u.codigo;
+        document.getElementById('unidad-descripcion').value = u.descripcion;
+        const title = document.getElementById('unidadModalTitle');
+        if (title) title.textContent = `Editar Unidad: ${u.codigo}`;
+        const modalEl = document.getElementById('unidad-modal');
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+    } catch (e) {
+        showToast(e.message, 'danger');
+    }
+}
+
+async function openUnidadDetailModal(id) {
+    const body = document.getElementById('unidad-detail-body');
+    if (!body) return;
+    body.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>';
+    const modalEl = document.getElementById('unidad-detail-modal');
+    bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+
+    try {
+        const res = await fetch(`${CATALOGOS_API}/unidades/${id}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('No se pudo cargar la ficha');
+        const u = await res.json();
+        body.innerHTML = `
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">ID de Unidad</span>
+                    <strong class="font-monospace fs-6">#${u.id_unidad}</strong>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Estado</span>
+                    <span class="badge ${u.estado === 'Activo' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${u.estado}</span>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Código</span>
+                    <strong class="font-monospace fs-5 text-teal">${u.codigo}</strong>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Descripción</span>
+                    <strong class="fs-6">${u.descripcion}</strong>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        body.innerHTML = `<div class="text-center text-danger py-4">${err.message}</div>`;
+    }
+}
+
+async function handleSaveUnidad(e) {
+    e.preventDefault();
+    const id = document.getElementById('unidad-id').value;
+    const codigo = document.getElementById('unidad-codigo').value.trim().toUpperCase();
+    const descripcion = document.getElementById('unidad-descripcion').value.trim();
+    if (!codigo || !descripcion) {
+        showToast('Complete los campos obligatorios.', 'warning');
+        return;
+    }
+
+    const payload = { codigo, descripcion };
+    const isEdit = Boolean(id);
+    const url = isEdit ? `${CATALOGOS_API}/unidades/${id}` : `${CATALOGOS_API}/unidades`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: getCatalogAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Error al guardar unidad');
+        }
+        showToast(`Unidad '${codigo}' ${isEdit ? 'actualizada' : 'creada'} con éxito.`, 'success');
+        const modalEl = document.getElementById('unidad-modal');
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        loadUnidadesTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+let pendingUnidadDeactivate = null;
+
+function toggleUnidadStatus(id, code, status) {
+    if (status === 'Activo') {
+        pendingUnidadDeactivate = { id, code };
+        const text = document.getElementById('confirm-unidad-deactivate-text');
+        if (text) text.innerHTML = `¿Está seguro de desactivar la unidad de medida <strong>${code}</strong>?`;
+        const modalEl = document.getElementById('confirm-unidad-deactivate-modal');
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+    } else {
+        activateUnidad(id, code);
+    }
+}
+
+async function confirmUnidadDeactivate() {
+    if (!pendingUnidadDeactivate) return;
+    const { id, code } = pendingUnidadDeactivate;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/unidades/${id}`, { method: 'DELETE', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error(await readCatalogError(res, 'Error al desactivar la unidad'));
+        showToast(`Unidad '${code}' desactivada exitosamente.`, 'info');
+        const modalEl = document.getElementById('confirm-unidad-deactivate-modal');
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        loadUnidadesTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function activateUnidad(id, code) {
+    try {
+        const res = await fetch(`${CATALOGOS_API}/unidades/${id}/activar`, { method: 'POST', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al reactivar la unidad');
+        showToast(`Unidad '${code}' reactivada exitosamente.`, 'success');
+        loadUnidadesTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 3. SUCURSALES CRUD
+// ---------------------------------------------------------------------------
+
+let sucursalState = {
+    page: 1,
+    limit: 10,
+    total: 0,
+    sortBy: 'nombre',
+    sortOrder: 'asc',
+    search: '',
+    status: '',
+    fecha_desde: '',
+    fecha_hasta: '',
+    currentEditId: null,
+};
+
+async function loadSucursalesTable() {
+    const tbody = document.getElementById('sucursales-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando sucursales...</td></tr>';
+
+    const offset = (sucursalState.page - 1) * sucursalState.limit;
+    const params = new URLSearchParams({
+        limit: sucursalState.limit,
+        offset: offset,
+        sort_by: sucursalState.sortBy,
+        sort_order: sucursalState.sortOrder,
+    });
+    if (sucursalState.search) params.append('search', sucursalState.search);
+    if (sucursalState.status === 'Activo') params.append('is_active', 'true');
+    if (sucursalState.status === 'Inactivo') params.append('is_active', 'false');
+    if (sucursalState.fecha_desde) params.append('fecha_desde', sucursalState.fecha_desde);
+    if (sucursalState.fecha_hasta) params.append('fecha_hasta', sucursalState.fecha_hasta);
+
+    try {
+        const res = await fetch(`${CATALOGOS_API}/sucursales/paged?${params.toString()}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al cargar sucursales');
+        const data = await res.json();
+        sucursalState.total = data.total;
+        renderSucursalesTable(data.items || []);
+        renderSucursalPagination();
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-3 text-danger"><i class="bi bi-exclamation-circle me-1"></i> ${err.message}</td></tr>`;
+    }
+}
+
+function renderSucursalesTable(items) {
+    const tbody = document.getElementById('sucursales-table-body');
+    if (!tbody) return;
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted"><i class="bi bi-building fs-2 d-block mb-1 opacity-50"></i>No se encontraron sucursales.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(s => {
+        const statusBadge = s.estado === 'Activo'
+            ? '<span class="badge bg-success-subtle text-success">Activo</span>'
+            : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+
+        return `
+            <tr>
+                <td><span class="font-monospace text-muted small">#${s.id_sucursal}</span></td>
+                <td><strong class="text-dark">${s.nombre}</strong></td>
+                <td><small class="text-muted">${s.direccion}</small></td>
+                <td><small>${s.telefono || '-'}</small></td>
+                <td><span class="badge bg-teal-subtle text-teal">${s.total_areas || 0} áreas</span></td>
+                <td>${statusBadge}</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-info me-1" onclick="openSucursalDetailModal(${s.id_sucursal})" title="Ver ficha">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="openEditSucursalModal(${s.id_sucursal})" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm ${s.estado === 'Activo' ? 'btn-outline-danger' : 'btn-outline-success'}" onclick="toggleSucursalStatus(${s.id_sucursal}, '${s.nombre}', '${s.estado}')" title="${s.estado === 'Activo' ? 'Desactivar' : 'Activar'}">
+                        <i class="bi ${s.estado === 'Activo' ? 'bi-trash' : 'bi-check-circle'}"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderSucursalPagination() {
+    const info = document.getElementById('sucursal-pagination-info');
+    const pageInfo = document.getElementById('sucursal-page-info');
+    const prevBtn = document.getElementById('sucursal-prev-page');
+    const nextBtn = document.getElementById('sucursal-next-page');
+    if (!info) return;
+
+    const start = sucursalState.total === 0 ? 0 : (sucursalState.page - 1) * sucursalState.limit + 1;
+    const end = Math.min(sucursalState.page * sucursalState.limit, sucursalState.total);
+    const maxPages = Math.ceil(sucursalState.total / sucursalState.limit) || 1;
+
+    info.textContent = `Mostrando ${start}–${end} de ${sucursalState.total}`;
+    if (pageInfo) pageInfo.textContent = `Página ${sucursalState.page} de ${maxPages}`;
+    if (prevBtn) prevBtn.disabled = (sucursalState.page <= 1);
+    if (nextBtn) nextBtn.disabled = (sucursalState.page >= maxPages);
+}
+
+function openNewSucursalModal() {
+    sucursalState.currentEditId = null;
+    const title = document.getElementById('sucursalModalTitle');
+    if (title) title.textContent = 'Nueva Sucursal';
+    const form = document.getElementById('sucursal-form');
+    if (form) form.reset();
+    document.getElementById('sucursal-id').value = '';
+    const modalEl = document.getElementById('sucursal-modal');
+    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+}
+
+async function openEditSucursalModal(id) {
+    sucursalState.currentEditId = id;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/sucursales/${id}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al obtener datos de la sucursal');
+        const s = await res.json();
+        document.getElementById('sucursal-id').value = s.id_sucursal;
+        document.getElementById('sucursal-nombre').value = s.nombre;
+        document.getElementById('sucursal-direccion').value = s.direccion;
+        document.getElementById('sucursal-telefono').value = s.telefono || '';
+        const title = document.getElementById('sucursalModalTitle');
+        if (title) title.textContent = `Editar Sucursal: ${s.nombre}`;
+        const modalEl = document.getElementById('sucursal-modal');
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+    } catch (e) {
+        showToast(e.message, 'danger');
+    }
+}
+
+async function openSucursalDetailModal(id) {
+    const body = document.getElementById('sucursal-detail-body');
+    if (!body) return;
+    body.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>';
+    const modalEl = document.getElementById('sucursal-detail-modal');
+    bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+
+    try {
+        const res = await fetch(`${CATALOGOS_API}/sucursales/${id}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('No se pudo cargar la ficha');
+        const s = await res.json();
+        body.innerHTML = `
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">ID de Sucursal</span>
+                    <strong class="font-monospace fs-6">#${s.id_sucursal}</strong>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Estado</span>
+                    <span class="badge ${s.estado === 'Activo' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${s.estado}</span>
+                </div>
+                <div class="col-12">
+                    <span class="text-muted small d-block">Nombre de la Sucursal</span>
+                    <strong class="fs-5 text-teal">${s.nombre}</strong>
+                </div>
+                <div class="col-sm-8">
+                    <span class="text-muted small d-block">Dirección</span>
+                    <span>${s.direccion}</span>
+                </div>
+                <div class="col-sm-4">
+                    <span class="text-muted small d-block">Teléfono</span>
+                    <span>${s.telefono || 'Sin teléfono'}</span>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Áreas Registradas</span>
+                    <span class="badge bg-teal-subtle text-teal fs-6">${s.total_areas || 0} áreas</span>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Fecha de Registro</span>
+                    <span class="small">${formatDate(s.fecha_creacion)}</span>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        body.innerHTML = `<div class="text-center text-danger py-4">${err.message}</div>`;
+    }
+}
+
+async function handleSaveSucursal(e) {
+    e.preventDefault();
+    const id = document.getElementById('sucursal-id').value;
+    const nombre = document.getElementById('sucursal-nombre').value.trim();
+    const direccion = document.getElementById('sucursal-direccion').value.trim();
+    const telefono = document.getElementById('sucursal-telefono').value.trim();
+    if (!nombre || !direccion) {
+        showToast('Complete los campos obligatorios.', 'warning');
+        return;
+    }
+
+    const payload = { nombre, direccion, telefono: telefono || null };
+    const isEdit = Boolean(id);
+    const url = isEdit ? `${CATALOGOS_API}/sucursales/${id}` : `${CATALOGOS_API}/sucursales`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: getCatalogAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Error al guardar sucursal');
+        }
+        showToast(`Sucursal '${nombre}' ${isEdit ? 'actualizada' : 'creada'} con éxito.`, 'success');
+        const modalEl = document.getElementById('sucursal-modal');
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        loadSucursalesTable();
+        populateAreaSucursalesDropdown();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+let pendingSucursalDeactivate = null;
+
+function toggleSucursalStatus(id, name, status) {
+    if (status === 'Activo') {
+        pendingSucursalDeactivate = { id, name };
+        const text = document.getElementById('confirm-sucursal-deactivate-text');
+        if (text) text.innerHTML = `¿Está seguro de desactivar la sucursal <strong>${name}</strong>?`;
+        const modalEl = document.getElementById('confirm-sucursal-deactivate-modal');
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+    } else {
+        activateSucursal(id, name);
+    }
+}
+
+async function confirmSucursalDeactivate() {
+    if (!pendingSucursalDeactivate) return;
+    const { id, name } = pendingSucursalDeactivate;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/sucursales/${id}`, { method: 'DELETE', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error(await readCatalogError(res, 'Error al desactivar la sucursal'));
+        showToast(`Sucursal '${name}' desactivada exitosamente.`, 'info');
+        const modalEl = document.getElementById('confirm-sucursal-deactivate-modal');
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        loadSucursalesTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function activateSucursal(id, name) {
+    try {
+        const res = await fetch(`${CATALOGOS_API}/sucursales/${id}/activar`, { method: 'POST', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al reactivar la sucursal');
+        showToast(`Sucursal '${name}' reactivada exitosamente.`, 'success');
+        loadSucursalesTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 4. ÁREAS DE BODEGA CRUD
+// ---------------------------------------------------------------------------
+
+let areaState = {
+    page: 1,
+    limit: 10,
+    total: 0,
+    sortBy: 'nombre_area',
+    sortOrder: 'asc',
+    search: '',
+    id_sucursal: '',
+    status: '',
+    currentEditId: null,
+};
+
+async function populateAreaSucursalesDropdown() {
+    const filterSelect = document.getElementById('filter-area-sucursal');
+    const formSelect = document.getElementById('area-sucursal-id');
+    try {
+        const res = await fetch(`${CATALOGOS_API}/sucursales?include_inactive=false`, { headers: getCatalogAuthHeaders() });
+        if (res.ok) {
+            const sucs = await res.json();
+            if (filterSelect) {
+                const current = filterSelect.value;
+                filterSelect.innerHTML = '<option value="">Todas las sucursales</option>' +
+                    sucs.map(s => `<option value="${s.id_sucursal}">${s.nombre}</option>`).join('');
+                filterSelect.value = current;
+            }
+            if (formSelect) {
+                formSelect.innerHTML = '<option value="">Seleccione sucursal...</option>' +
+                    sucs.map(s => `<option value="${s.id_sucursal}">${s.nombre}</option>`).join('');
+            }
+        }
+    } catch (e) {
+        console.warn('Error al cargar sucursales en combo de áreas:', e);
+    }
+}
+
+async function loadAreasTable() {
+    const tbody = document.getElementById('areas-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando áreas...</td></tr>';
+
+    const offset = (areaState.page - 1) * areaState.limit;
+    const params = new URLSearchParams({
+        limit: areaState.limit,
+        offset: offset,
+        sort_by: areaState.sortBy,
+        sort_order: areaState.sortOrder,
+    });
+    if (areaState.search) params.append('search', areaState.search);
+    if (areaState.id_sucursal) params.append('id_sucursal', areaState.id_sucursal);
+    if (areaState.status === 'Activo') params.append('is_active', 'true');
+    if (areaState.status === 'Inactivo') params.append('is_active', 'false');
+
+    try {
+        const res = await fetch(`${CATALOGOS_API}/areas/paged?${params.toString()}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al cargar áreas de bodega');
+        const data = await res.json();
+        areaState.total = data.total;
+        renderAreasTable(data.items || []);
+        renderAreaPagination();
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger"><i class="bi bi-exclamation-circle me-1"></i> ${err.message}</td></tr>`;
+    }
+}
+
+function renderAreasTable(items) {
+    const tbody = document.getElementById('areas-table-body');
+    if (!tbody) return;
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><i class="bi bi-geo-alt fs-2 d-block mb-1 opacity-50"></i>No se encontraron áreas de bodega.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(a => {
+        const statusBadge = a.estado === 'Activo'
+            ? '<span class="badge bg-success-subtle text-success">Activo</span>'
+            : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+
+        return `
+            <tr>
+                <td><span class="font-monospace text-muted small">#${a.id_area}</span></td>
+                <td><strong class="text-dark">${a.nombre_area}</strong></td>
+                <td><span class="badge bg-secondary-subtle text-secondary">${a.sucursal_nombre || `Sucursal #${a.id_sucursal}`}</span></td>
+                <td>${statusBadge}</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-info me-1" onclick="openAreaDetailModal(${a.id_area})" title="Ver ficha">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="openEditAreaModal(${a.id_area})" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm ${a.estado === 'Activo' ? 'btn-outline-danger' : 'btn-outline-success'}" onclick="toggleAreaStatus(${a.id_area}, '${a.nombre_area}', '${a.estado}')" title="${a.estado === 'Activo' ? 'Desactivar' : 'Activar'}">
+                        <i class="bi ${a.estado === 'Activo' ? 'bi-trash' : 'bi-check-circle'}"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderAreaPagination() {
+    const info = document.getElementById('area-pagination-info');
+    const pageInfo = document.getElementById('area-page-info');
+    const prevBtn = document.getElementById('area-prev-page');
+    const nextBtn = document.getElementById('area-next-page');
+    if (!info) return;
+
+    const start = areaState.total === 0 ? 0 : (areaState.page - 1) * areaState.limit + 1;
+    const end = Math.min(areaState.page * areaState.limit, areaState.total);
+    const maxPages = Math.ceil(areaState.total / areaState.limit) || 1;
+
+    info.textContent = `Mostrando ${start}–${end} de ${areaState.total}`;
+    if (pageInfo) pageInfo.textContent = `Página ${areaState.page} de ${maxPages}`;
+    if (prevBtn) prevBtn.disabled = (areaState.page <= 1);
+    if (nextBtn) nextBtn.disabled = (areaState.page >= maxPages);
+}
+
+function openNewAreaModal() {
+    areaState.currentEditId = null;
+    const title = document.getElementById('areaModalTitle');
+    if (title) title.textContent = 'Nueva Área de Bodega';
+    const form = document.getElementById('area-form');
+    if (form) form.reset();
+    document.getElementById('area-id').value = '';
+    const modalEl = document.getElementById('area-modal');
+    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+}
+
+async function openEditAreaModal(id) {
+    areaState.currentEditId = id;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/areas/${id}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al obtener datos del área');
+        const a = await res.json();
+        document.getElementById('area-id').value = a.id_area;
+        document.getElementById('area-nombre').value = a.nombre_area;
+        document.getElementById('area-sucursal-id').value = a.id_sucursal;
+        const title = document.getElementById('areaModalTitle');
+        if (title) title.textContent = `Editar Área: ${a.nombre_area}`;
+        const modalEl = document.getElementById('area-modal');
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+    } catch (e) {
+        showToast(e.message, 'danger');
+    }
+}
+
+async function openAreaDetailModal(id) {
+    const body = document.getElementById('area-detail-body');
+    if (!body) return;
+    body.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>';
+    const modalEl = document.getElementById('area-detail-modal');
+    bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+
+    try {
+        const res = await fetch(`${CATALOGOS_API}/areas/${id}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('No se pudo cargar la ficha');
+        const a = await res.json();
+        body.innerHTML = `
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">ID de Área</span>
+                    <strong class="font-monospace fs-6">#${a.id_area}</strong>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Estado</span>
+                    <span class="badge ${a.estado === 'Activo' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${a.estado}</span>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Nombre del Área</span>
+                    <strong class="fs-6">${a.nombre_area}</strong>
+                </div>
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">Sucursal Perteneciente</span>
+                    <span class="badge bg-teal-subtle text-teal fs-6">${a.sucursal_nombre || `ID #${a.id_sucursal}`}</span>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        body.innerHTML = `<div class="text-center text-danger py-4">${err.message}</div>`;
+    }
+}
+
+async function handleSaveArea(e) {
+    e.preventDefault();
+    const id = document.getElementById('area-id').value;
+    const nombre = document.getElementById('area-nombre').value.trim();
+    const idSuc = document.getElementById('area-sucursal-id').value;
+    if (!nombre || !idSuc) {
+        showToast('Complete los campos obligatorios.', 'warning');
+        return;
+    }
+
+    const payload = { id_sucursal: Number(idSuc), nombre_area: nombre };
+    const isEdit = Boolean(id);
+    const url = isEdit ? `${CATALOGOS_API}/areas/${id}` : `${CATALOGOS_API}/areas`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method: method,
+            headers: getCatalogAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Error al guardar el área');
+        }
+        showToast(`Área '${nombre}' ${isEdit ? 'actualizada' : 'creada'} con éxito.`, 'success');
+        const modalEl = document.getElementById('area-modal');
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        loadAreasTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+let pendingAreaDeactivate = null;
+
+function toggleAreaStatus(id, name, status) {
+    if (status === 'Activo') {
+        pendingAreaDeactivate = { id, name };
+        const text = document.getElementById('confirm-area-deactivate-text');
+        if (text) text.innerHTML = `¿Está seguro de desactivar el área <strong>${name}</strong>?`;
+        const modalEl = document.getElementById('confirm-area-deactivate-modal');
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+    } else {
+        activateArea(id, name);
+    }
+}
+
+async function confirmAreaDeactivate() {
+    if (!pendingAreaDeactivate) return;
+    const { id, name } = pendingAreaDeactivate;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/areas/${id}`, { method: 'DELETE', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error(await readCatalogError(res, 'Error al desactivar el área'));
+        showToast(`Área '${name}' desactivada exitosamente.`, 'info');
+        const modalEl = document.getElementById('confirm-area-deactivate-modal');
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        loadAreasTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function activateArea(id, name) {
+    try {
+        const res = await fetch(`${CATALOGOS_API}/areas/${id}/activar`, { method: 'POST', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al reactivar el área');
+        showToast(`Área '${name}' reactivada exitosamente.`, 'success');
+        loadAreasTable();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Listeners y Bindings globales del Bloque 2
+// ---------------------------------------------------------------------------
+
+function initBloque2Listeners() {
+    // 1. Subcategorías
+    const btnNewSubcat = document.getElementById('btn-new-subcat');
+    if (btnNewSubcat) btnNewSubcat.addEventListener('click', openNewSubcatModal);
+    const subcatForm = document.getElementById('subcat-form');
+    if (subcatForm) subcatForm.addEventListener('submit', handleSaveSubcat);
+    const btnConfirmSubcatDeact = document.getElementById('btn-confirm-subcat-deactivate');
+    if (btnConfirmSubcatDeact) btnConfirmSubcatDeact.addEventListener('click', confirmSubcatDeactivate);
+    const btnFilterSubcat = document.getElementById('btn-filter-subcat');
+    if (btnFilterSubcat) btnFilterSubcat.addEventListener('click', () => {
+        subcatState.page = 1;
+        subcatState.search = document.getElementById('filter-subcat-search')?.value.trim() || '';
+        subcatState.id_categoria = document.getElementById('filter-subcat-cat')?.value || '';
+        subcatState.status = document.getElementById('filter-subcat-status')?.value || '';
+        loadSubcategoriasTable();
+    });
+    const btnResetSubcat = document.getElementById('btn-reset-subcat');
+    if (btnResetSubcat) btnResetSubcat.addEventListener('click', () => {
+        subcatState.page = 1;
+        subcatState.search = '';
+        subcatState.id_categoria = '';
+        subcatState.status = '';
+        if (document.getElementById('filter-subcat-search')) document.getElementById('filter-subcat-search').value = '';
+        if (document.getElementById('filter-subcat-cat')) document.getElementById('filter-subcat-cat').value = '';
+        if (document.getElementById('filter-subcat-status')) document.getElementById('filter-subcat-status').value = '';
+        loadSubcategoriasTable();
+    });
+    const subcatPrev = document.getElementById('subcat-prev-page');
+    if (subcatPrev) subcatPrev.addEventListener('click', () => {
+        if (subcatState.page > 1) { subcatState.page--; loadSubcategoriasTable(); }
+    });
+    const subcatNext = document.getElementById('subcat-next-page');
+    if (subcatNext) subcatNext.addEventListener('click', () => {
+        const maxPages = Math.ceil(subcatState.total / subcatState.limit) || 1;
+        if (subcatState.page < maxPages) { subcatState.page++; loadSubcategoriasTable(); }
+    });
+    document.querySelectorAll('[data-subcat-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-subcat-sort');
+            subcatState.sortOrder = (subcatState.sortBy === col && subcatState.sortOrder === 'asc') ? 'desc' : 'asc';
+            subcatState.sortBy = col;
+            loadSubcategoriasTable();
+        });
+    });
+    document.getElementById('btn-export-subcat-excel')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/subcategorias/export?format=excel`, 'subcategorias.xlsx');
+    });
+    document.getElementById('btn-export-subcat-csv')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/subcategorias/export?format=csv`, 'subcategorias.csv');
+    });
+
+    // 2. Unidades
+    const btnNewUnidad = document.getElementById('btn-new-unidad');
+    if (btnNewUnidad) btnNewUnidad.addEventListener('click', openNewUnidadModal);
+    const unidadForm = document.getElementById('unidad-form');
+    if (unidadForm) unidadForm.addEventListener('submit', handleSaveUnidad);
+    const btnConfirmUnidadDeact = document.getElementById('btn-confirm-unidad-deactivate');
+    if (btnConfirmUnidadDeact) btnConfirmUnidadDeact.addEventListener('click', confirmUnidadDeactivate);
+    const btnFilterUnidad = document.getElementById('btn-filter-unidad');
+    if (btnFilterUnidad) btnFilterUnidad.addEventListener('click', () => {
+        unidadState.page = 1;
+        unidadState.search = document.getElementById('filter-unidad-search')?.value.trim() || '';
+        unidadState.status = document.getElementById('filter-unidad-status')?.value || '';
+        loadUnidadesTable();
+    });
+    const btnResetUnidad = document.getElementById('btn-reset-unidad');
+    if (btnResetUnidad) btnResetUnidad.addEventListener('click', () => {
+        unidadState.page = 1;
+        unidadState.search = '';
+        unidadState.status = '';
+        if (document.getElementById('filter-unidad-search')) document.getElementById('filter-unidad-search').value = '';
+        if (document.getElementById('filter-unidad-status')) document.getElementById('filter-unidad-status').value = '';
+        loadUnidadesTable();
+    });
+    const unidadPrev = document.getElementById('unidad-prev-page');
+    if (unidadPrev) unidadPrev.addEventListener('click', () => {
+        if (unidadState.page > 1) { unidadState.page--; loadUnidadesTable(); }
+    });
+    const unidadNext = document.getElementById('unidad-next-page');
+    if (unidadNext) unidadNext.addEventListener('click', () => {
+        const maxPages = Math.ceil(unidadState.total / unidadState.limit) || 1;
+        if (unidadState.page < maxPages) { unidadState.page++; loadUnidadesTable(); }
+    });
+    document.querySelectorAll('[data-unidad-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-unidad-sort');
+            unidadState.sortOrder = (unidadState.sortBy === col && unidadState.sortOrder === 'asc') ? 'desc' : 'asc';
+            unidadState.sortBy = col;
+            loadUnidadesTable();
+        });
+    });
+    document.getElementById('btn-export-unidades-excel')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/unidades/export?format=excel`, 'unidades_medida.xlsx');
+    });
+    document.getElementById('btn-export-unidades-csv')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/unidades/export?format=csv`, 'unidades_medida.csv');
+    });
+
+    // 3. Sucursales
+    const btnNewSucursal = document.getElementById('btn-new-sucursal');
+    if (btnNewSucursal) btnNewSucursal.addEventListener('click', openNewSucursalModal);
+    const sucursalForm = document.getElementById('sucursal-form');
+    if (sucursalForm) sucursalForm.addEventListener('submit', handleSaveSucursal);
+    const btnConfirmSucDeact = document.getElementById('btn-confirm-sucursal-deactivate');
+    if (btnConfirmSucDeact) btnConfirmSucDeact.addEventListener('click', confirmSucursalDeactivate);
+    const btnFilterSucursal = document.getElementById('btn-filter-sucursal');
+    if (btnFilterSucursal) btnFilterSucursal.addEventListener('click', () => {
+        sucursalState.page = 1;
+        sucursalState.search = document.getElementById('filter-sucursal-search')?.value.trim() || '';
+        sucursalState.status = document.getElementById('filter-sucursal-status')?.value || '';
+        sucursalState.fecha_desde = document.getElementById('filter-sucursal-from')?.value || '';
+        sucursalState.fecha_hasta = document.getElementById('filter-sucursal-to')?.value || '';
+        loadSucursalesTable();
+    });
+    const btnResetSucursal = document.getElementById('btn-reset-sucursal');
+    if (btnResetSucursal) btnResetSucursal.addEventListener('click', () => {
+        sucursalState.page = 1;
+        sucursalState.search = '';
+        sucursalState.status = '';
+        sucursalState.fecha_desde = '';
+        sucursalState.fecha_hasta = '';
+        if (document.getElementById('filter-sucursal-search')) document.getElementById('filter-sucursal-search').value = '';
+        if (document.getElementById('filter-sucursal-status')) document.getElementById('filter-sucursal-status').value = '';
+        if (document.getElementById('filter-sucursal-from')) document.getElementById('filter-sucursal-from').value = '';
+        if (document.getElementById('filter-sucursal-to')) document.getElementById('filter-sucursal-to').value = '';
+        loadSucursalesTable();
+    });
+    const sucPrev = document.getElementById('sucursal-prev-page');
+    if (sucPrev) sucPrev.addEventListener('click', () => {
+        if (sucursalState.page > 1) { sucursalState.page--; loadSucursalesTable(); }
+    });
+    const sucNext = document.getElementById('sucursal-next-page');
+    if (sucNext) sucNext.addEventListener('click', () => {
+        const maxPages = Math.ceil(sucursalState.total / sucursalState.limit) || 1;
+        if (sucursalState.page < maxPages) { sucursalState.page++; loadSucursalesTable(); }
+    });
+    document.querySelectorAll('[data-sucursal-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-sucursal-sort');
+            sucursalState.sortOrder = (sucursalState.sortBy === col && sucursalState.sortOrder === 'asc') ? 'desc' : 'asc';
+            sucursalState.sortBy = col;
+            loadSucursalesTable();
+        });
+    });
+    document.getElementById('btn-export-sucursales-excel')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/sucursales/export?format=excel`, 'sucursales.xlsx');
+    });
+    document.getElementById('btn-export-sucursales-csv')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/sucursales/export?format=csv`, 'sucursales.csv');
+    });
+
+    // 4. Áreas
+    const btnNewArea = document.getElementById('btn-new-area');
+    if (btnNewArea) btnNewArea.addEventListener('click', openNewAreaModal);
+    const areaForm = document.getElementById('area-form');
+    if (areaForm) areaForm.addEventListener('submit', handleSaveArea);
+    const btnConfirmAreaDeact = document.getElementById('btn-confirm-area-deactivate');
+    if (btnConfirmAreaDeact) btnConfirmAreaDeact.addEventListener('click', confirmAreaDeactivate);
+    const btnFilterArea = document.getElementById('btn-filter-area');
+    if (btnFilterArea) btnFilterArea.addEventListener('click', () => {
+        areaState.page = 1;
+        areaState.search = document.getElementById('filter-area-search')?.value.trim() || '';
+        areaState.id_sucursal = document.getElementById('filter-area-sucursal')?.value || '';
+        areaState.status = document.getElementById('filter-area-status')?.value || '';
+        loadAreasTable();
+    });
+    const btnResetArea = document.getElementById('btn-reset-area');
+    if (btnResetArea) btnResetArea.addEventListener('click', () => {
+        areaState.page = 1;
+        areaState.search = '';
+        areaState.id_sucursal = '';
+        areaState.status = '';
+        if (document.getElementById('filter-area-search')) document.getElementById('filter-area-search').value = '';
+        if (document.getElementById('filter-area-sucursal')) document.getElementById('filter-area-sucursal').value = '';
+        if (document.getElementById('filter-area-status')) document.getElementById('filter-area-status').value = '';
+        loadAreasTable();
+    });
+    const areaPrev = document.getElementById('area-prev-page');
+    if (areaPrev) areaPrev.addEventListener('click', () => {
+        if (areaState.page > 1) { areaState.page--; loadAreasTable(); }
+    });
+    const areaNext = document.getElementById('area-next-page');
+    if (areaNext) areaNext.addEventListener('click', () => {
+        const maxPages = Math.ceil(areaState.total / areaState.limit) || 1;
+        if (areaState.page < maxPages) { areaState.page++; loadAreasTable(); }
+    });
+    document.querySelectorAll('[data-area-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-area-sort');
+            areaState.sortOrder = (areaState.sortBy === col && areaState.sortOrder === 'asc') ? 'desc' : 'asc';
+            areaState.sortBy = col;
+            loadAreasTable();
+        });
+    });
+    document.getElementById('btn-export-areas-excel')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/areas/export?format=excel`, 'areas_bodega.xlsx');
+    });
+    document.getElementById('btn-export-areas-csv')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/areas/export?format=csv`, 'areas_bodega.csv');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initBloque2Listeners();
+});
+
+// ===========================================================================
+// BLOQUE 3: MOTIVOS DE MERMA, MÉTODOS DE PAGO, PROVEEDORES, DEPARTAMENTOS
+// Y MUNICIPIOS (dropdown dependiente departamento -> municipio)
+// ===========================================================================
+
+const B3_STATE = {
+    motivos: { page: 1, limit: 10, total: 0, sortBy: 'descripcion', sortOrder: 'asc', search: '', status: '', pending: null },
+    metodos: { page: 1, limit: 10, total: 0, sortBy: 'nombre', sortOrder: 'asc', search: '', status: '', pending: null },
+    proveedores: { page: 1, limit: 10, total: 0, sortBy: 'distribuidora', sortOrder: 'asc', search: '', status: '', fecha_desde: '', fecha_hasta: '', pending: null },
+    departamentos: { page: 1, limit: 10, total: 0, sortBy: 'nombre', sortOrder: 'asc', search: '', status: '', pending: null },
+    municipios: { page: 1, limit: 10, total: 0, sortBy: 'nombre', sortOrder: 'asc', search: '', status: '', id_departamento: '', pending: null },
+};
+
+const B3_CONFIG = {
+    motivos: { plural: 'motivos-merma', label: 'motivo de merma', singular: 'motivo' },
+    metodos: { plural: 'metodos-pago', label: 'método de pago', singular: 'metodo' },
+    proveedores: { plural: 'proveedores', label: 'proveedor', singular: 'proveedor' },
+    departamentos: { plural: 'departamentos', label: 'departamento', singular: 'departamento' },
+    municipios: { plural: 'municipios', label: 'municipio', singular: 'municipio' },
+};
+
+const B3_EXTRA_PARAMS = {
+    proveedores: (s) => ({ fecha_desde: s.fecha_desde, fecha_hasta: s.fecha_hasta }),
+    municipios: (s) => ({ id_departamento: s.id_departamento }),
+};
+
+function b3StatusBadge(estado) {
+    return estado === 'Activo'
+        ? '<span class="badge bg-success-subtle text-success">Activo</span>'
+        : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+}
+
+function b3JsStr(value) {
+    return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '');
+}
+
+function b3EmptyRow(message, cols) {
+    return `<tr><td colspan="${cols}" class="text-center py-4 text-muted"><i class="bi bi-inbox fs-2 d-block mb-1 opacity-50"></i>${message}</td></tr>`;
+}
+
+function b3ActionButtons(key, id, name, estado) {
+    return `
+        <button class="btn btn-sm btn-outline-info me-1" onclick="openB3Detail('${key}', ${id})" title="Ver ficha"><i class="bi bi-eye"></i></button>
+        <button class="btn btn-sm btn-outline-secondary me-1" onclick="openB3Edit('${key}', ${id})" title="Editar"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm ${estado === 'Activo' ? 'btn-outline-danger' : 'btn-outline-success'}" onclick="toggleB3Status('${key}', ${id}, '${b3JsStr(name)}', '${estado}')" title="${estado === 'Activo' ? 'Desactivar' : 'Activar'}">
+            <i class="bi ${estado === 'Activo' ? 'bi-trash' : 'bi-check-circle'}"></i>
+        </button>`;
+}
+
+function b3QueryString(state, plugin) {
+    const params = new URLSearchParams({
+        limit: state.limit,
+        offset: (state.page - 1) * state.limit,
+        sort_by: state.sortBy,
+        sort_order: state.sortOrder,
+    });
+    if (state.search) params.append('search', state.search);
+    if (state.status === 'Activo') params.append('is_active', 'true');
+    if (state.status === 'Inactivo') params.append('is_active', 'false');
+    if (plugin) {
+        Object.keys(plugin).forEach((k) => { if (plugin[k]) params.append(k, plugin[k]); });
+    }
+    return params;
+}
+
+async function loadB3Table(key, tbodyId, renderFn) {
+    const state = B3_STATE[key];
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando...</td></tr>';
+    const plugin = typeof B3_EXTRA_PARAMS[key] === 'function' ? B3_EXTRA_PARAMS[key](state) : null;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/${B3_CONFIG[key].plural}/paged?${b3QueryString(state, plugin).toString()}`, { headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error('Error al cargar los registros');
+        const data = await res.json();
+        state.total = data.total;
+        renderFn(data.items || []);
+        renderB3Pagination(key);
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-3 text-danger"><i class="bi bi-exclamation-circle me-1"></i> ${err.message}</td></tr>`;
+    }
+}
+
+function renderB3Pagination(key) {
+    const state = B3_STATE[key];
+    const info = document.getElementById(`${key}-pagination-info`);
+    const pageInfo = document.getElementById(`${key}-page-info`);
+    const prevBtn = document.getElementById(`${key}-prev-page`);
+    const nextBtn = document.getElementById(`${key}-next-page`);
+    if (!info) return;
+    const start = state.total === 0 ? 0 : (state.page - 1) * state.limit + 1;
+    const end = Math.min(state.page * state.limit, state.total);
+    const maxPages = Math.ceil(state.total / state.limit) || 1;
+    info.textContent = `Mostrando ${start}–${end} de ${state.total}`;
+    if (pageInfo) pageInfo.textContent = `Página ${state.page} de ${maxPages}`;
+    if (prevBtn) prevBtn.disabled = (state.page <= 1);
+    if (nextBtn) nextBtn.disabled = (state.page >= maxPages);
+}
+
+// ---------------------------------------------------------------------------
+// Render de tablas
+// ---------------------------------------------------------------------------
+
+function renderMotivosTable(items) {
+    const tbody = document.getElementById('motivos-table-body');
+    if (!tbody) return;
+    if (items.length === 0) { tbody.innerHTML = b3EmptyRow('No se encontraron motivos de merma.', 4); return; }
+    tbody.innerHTML = items.map(m => `
+        <tr>
+            <td><span class="font-monospace text-muted small">#${m.id_motivo}</span></td>
+            <td><strong class="text-dark">${m.descripcion}</strong></td>
+            <td>${b3StatusBadge(m.estado)}</td>
+            <td class="text-end">${b3ActionButtons('motivos', m.id_motivo, m.descripcion, m.estado)}</td>
+        </tr>`).join('');
+}
+
+function renderMetodosTable(items) {
+    const tbody = document.getElementById('metodos-table-body');
+    if (!tbody) return;
+    if (items.length === 0) { tbody.innerHTML = b3EmptyRow('No se encontraron métodos de pago.', 4); return; }
+    tbody.innerHTML = items.map(m => `
+        <tr>
+            <td><span class="font-monospace text-muted small">#${m.id_metodo_pago}</span></td>
+            <td><strong class="text-dark">${m.nombre}</strong></td>
+            <td>${b3StatusBadge(m.estado)}</td>
+            <td class="text-end">${b3ActionButtons('metodos', m.id_metodo_pago, m.nombre, m.estado)}</td>
+        </tr>`).join('');
+}
+
+function renderProveedoresTable(items) {
+    const tbody = document.getElementById('proveedores-table-body');
+    if (!tbody) return;
+    if (items.length === 0) { tbody.innerHTML = b3EmptyRow('No se encontraron proveedores.', 7); return; }
+    tbody.innerHTML = items.map(p => `
+        <tr>
+            <td><span class="font-monospace text-muted small">#${p.id_proveedor}</span></td>
+            <td><strong class="text-dark">${p.distribuidora}</strong></td>
+            <td>${p.nombre_contacto}</td>
+            <td>${p.telefono || '-'}</td>
+            <td>${b3StatusBadge(p.estado)}</td>
+            <td>${formatDate(p.fecha_creacion)}</td>
+            <td class="text-end">${b3ActionButtons('proveedores', p.id_proveedor, p.distribuidora, p.estado)}</td>
+        </tr>`).join('');
+}
+
+function renderDepartamentosTable(items) {
+    const tbody = document.getElementById('departamentos-table-body');
+    if (!tbody) return;
+    if (items.length === 0) { tbody.innerHTML = b3EmptyRow('No se encontraron departamentos.', 5); return; }
+    tbody.innerHTML = items.map(d => `
+        <tr>
+            <td><span class="font-monospace text-muted small">#${d.id_departamento}</span></td>
+            <td><strong class="text-dark">${d.nombre}</strong></td>
+            <td><span class="badge bg-secondary-subtle text-secondary">${d.total_municipios || 0} municipios</span></td>
+            <td>${b3StatusBadge(d.estado)}</td>
+            <td class="text-end">${b3ActionButtons('departamentos', d.id_departamento, d.nombre, d.estado)}</td>
+        </tr>`).join('');
+}
+
+function renderMunicipiosTable(items) {
+    const tbody = document.getElementById('municipios-table-body');
+    if (!tbody) return;
+    if (items.length === 0) { tbody.innerHTML = b3EmptyRow('No se encontraron municipios.', 5); return; }
+    tbody.innerHTML = items.map(m => `
+        <tr>
+            <td><span class="font-monospace text-muted small">#${m.id_municipio}</span></td>
+            <td><span class="badge bg-secondary-subtle text-secondary">${m.departamento_nombre || m.id_departamento}</span></td>
+            <td><strong class="text-dark">${m.nombre}</strong></td>
+            <td>${b3StatusBadge(m.estado)}</td>
+            <td class="text-end">${b3ActionButtons('municipios', m.id_municipio, m.nombre, m.estado)}</td>
+        </tr>`).join('');
+}
+
+const RENDER_B3 = {
+    motivos: renderMotivosTable,
+    metodos: renderMetodosTable,
+    proveedores: renderProveedoresTable,
+    departamentos: renderDepartamentosTable,
+    municipios: renderMunicipiosTable,
+};
+
+// ---------------------------------------------------------------------------
+// Acciones genéricas: detalle, edición, toggle de estado
+// ---------------------------------------------------------------------------
+
+function openB3Detail(key, id) {
+    const map = {
+        motivos: openMotivoDetailModal,
+        metodos: openMetodoDetailModal,
+        proveedores: openProveedorDetailModal,
+        departamentos: openDepartamentoDetailModal,
+        municipios: openMunicipioDetailModal,
+    };
+    if (map[key]) map[key](id);
+}
+
+function openB3Edit(key, id) {
+    const map = {
+        motivos: openEditMotivoModal,
+        metodos: openEditMetodoModal,
+        proveedores: openEditProveedorModal,
+        departamentos: openEditDepartamentoModal,
+        municipios: openEditMunicipioModal,
+    };
+    if (map[key]) map[key](id);
+}
+
+function toggleB3Status(key, id, name, status) {
+    if (status === 'Activo') {
+        B3_STATE[key].pending = { id, name };
+        const sing = B3_CONFIG[key].singular;
+        const text = document.getElementById(`confirm-${sing}-deactivate-text`);
+        if (text) text.innerHTML = `¿Está seguro de desactivar el ${B3_CONFIG[key].label} <strong>${name}</strong>?`;
+        const modalEl = document.getElementById(`confirm-${sing}-deactivate-modal`);
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+    } else {
+        activateB3(key, id, name);
+    }
+}
+
+async function confirmB3Deactivate(key) {
+    const pending = B3_STATE[key].pending;
+    if (!pending) return;
+    const plural = B3_CONFIG[key].plural;
+    const sing = B3_CONFIG[key].singular;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/${plural}/${pending.id}`, { method: 'DELETE', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error(await readCatalogError(res, `Error al desactivar el ${B3_CONFIG[key].label}`));
+        showToast(`${B3_CONFIG[key].label} '${pending.name}' desactivado exitosamente.`, 'info');
+        const modalEl = document.getElementById(`confirm-${sing}-deactivate-modal`);
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        loadB3Table(key, `${key}-table-body`, RENDER_B3[key]);
+    } catch (err) {
+        showToast(err.message, 'danger');
+        const modalEl = document.getElementById(`confirm-${sing}-deactivate-modal`);
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+    }
+}
+
+async function activateB3(key, id, name) {
+    const plural = B3_CONFIG[key].plural;
+    try {
+        const res = await fetch(`${CATALOGOS_API}/${plural}/${id}/activar`, { method: 'POST', headers: getCatalogAuthHeaders() });
+        if (!res.ok) throw new Error(await readCatalogError(res, `Error al reactivar el ${B3_CONFIG[key].label}`));
+        showToast(`${B3_CONFIG[key].label} '${name}' reactivado exitosamente.`, 'success');
+        loadB3Table(key, `${key}-table-body`, RENDER_B3[key]);
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers comunes de modales
+// ---------------------------------------------------------------------------
+
+function showB3Modal(id) {
+    const modalEl = document.getElementById(id);
+    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
+}
+
+function hideB3Modal(id) {
+    const modalEl = document.getElementById(id);
+    if (modalEl && bootstrap.Modal.getInstance(modalEl)) bootstrap.Modal.getInstance(modalEl).hide();
+}
+
+function loadB3DetailInto(id, innerHtml) {
+    const body = document.getElementById(id);
+    if (body) body.innerHTML = innerHtml;
+}
+
+function b3DetailRow(label, value) {
+    return `<div class="col-sm-6"><span class="text-muted small d-block">${label}</span><strong class="fs-6">${value}</strong></div>`;
+}
+
+async function fetchB3One(plural, id) {
+    const res = await fetch(`${CATALOGOS_API}/${plural}/${id}`, { headers: getCatalogAuthHeaders() });
+    if (!res.ok) throw new Error('No se pudo cargar el registro');
+    return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// MOTIVOS DE MERMA
+// ---------------------------------------------------------------------------
+
+function openNewMotivoModal() {
+    const title = document.getElementById('motivoModalTitle');
+    if (title) title.textContent = 'Nuevo Motivo de Merma';
+    const form = document.getElementById('motivo-form');
+    if (form) form.reset();
+    document.getElementById('motivo-id').value = '';
+    showB3Modal('motivo-modal');
+}
+
+async function openEditMotivoModal(id) {
+    const title = document.getElementById('motivoModalTitle');
+    if (title) title.textContent = 'Editar Motivo de Merma';
+    try {
+        const m = await fetchB3One('motivos-merma', id);
+        document.getElementById('motivo-id').value = m.id_motivo;
+        document.getElementById('motivo-descripcion').value = m.descripcion;
+        showB3Modal('motivo-modal');
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function handleSaveMotivo(e) {
+    e.preventDefault();
+    const id = document.getElementById('motivo-id').value;
+    const descripcion = document.getElementById('motivo-descripcion').value.trim();
+    if (!descripcion) { showToast('La descripción es obligatoria.', 'warning'); return; }
+    const isEdit = Boolean(id);
+    const url = isEdit ? `${CATALOGOS_API}/motivos-merma/${id}` : `${CATALOGOS_API}/motivos-merma`;
+    try {
+        const res = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: getCatalogAuthHeaders(), body: JSON.stringify({ descripcion }) });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Error al guardar el motivo'); }
+        showToast(`Motivo '${descripcion}' ${isEdit ? 'actualizado' : 'creado'} con éxito.`, 'success');
+        hideB3Modal('motivo-modal');
+        loadB3Table('motivos', 'motivos-table-body', renderMotivosTable);
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function openMotivoDetailModal(id) {
+    loadB3DetailInto('motivo-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    showB3Modal('motivo-detail-modal');
+    try {
+        const m = await fetchB3One('motivos-merma', id);
+        loadB3DetailInto('motivo-detail-body', `
+            <div class="row g-3">
+                ${b3DetailRow('ID de Motivo', `#${m.id_motivo}`)}
+                ${b3DetailRow('Estado', b3StatusBadge(m.estado))}
+                ${b3DetailRow('Descripción', m.descripcion)}
+            </div>`);
+    } catch (err) {
+        loadB3DetailInto('motivo-detail-body', `<div class="text-center text-danger py-4">${err.message}</div>`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MÉTODOS DE PAGO
+// ---------------------------------------------------------------------------
+
+function openNewMetodoModal() {
+    const title = document.getElementById('metodoModalTitle');
+    if (title) title.textContent = 'Nuevo Método de Pago';
+    const form = document.getElementById('metodo-form');
+    if (form) form.reset();
+    document.getElementById('metodo-id').value = '';
+    showB3Modal('metodo-modal');
+}
+
+async function openEditMetodoModal(id) {
+    const title = document.getElementById('metodoModalTitle');
+    if (title) title.textContent = 'Editar Método de Pago';
+    try {
+        const m = await fetchB3One('metodos-pago', id);
+        document.getElementById('metodo-id').value = m.id_metodo_pago;
+        document.getElementById('metodo-nombre').value = m.nombre;
+        showB3Modal('metodo-modal');
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function handleSaveMetodo(e) {
+    e.preventDefault();
+    const id = document.getElementById('metodo-id').value;
+    const nombre = document.getElementById('metodo-nombre').value.trim();
+    if (!nombre) { showToast('El nombre es obligatorio.', 'warning'); return; }
+    const isEdit = Boolean(id);
+    const url = isEdit ? `${CATALOGOS_API}/metodos-pago/${id}` : `${CATALOGOS_API}/metodos-pago`;
+    try {
+        const res = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: getCatalogAuthHeaders(), body: JSON.stringify({ nombre }) });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Error al guardar el método'); }
+        showToast(`Método '${nombre}' ${isEdit ? 'actualizado' : 'creado'} con éxito.`, 'success');
+        hideB3Modal('metodo-modal');
+        loadB3Table('metodos', 'metodos-table-body', renderMetodosTable);
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function openMetodoDetailModal(id) {
+    loadB3DetailInto('metodo-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    showB3Modal('metodo-detail-modal');
+    try {
+        const m = await fetchB3One('metodos-pago', id);
+        loadB3DetailInto('metodo-detail-body', `
+            <div class="row g-3">
+                ${b3DetailRow('ID de Método', `#${m.id_metodo_pago}`)}
+                ${b3DetailRow('Estado', b3StatusBadge(m.estado))}
+                ${b3DetailRow('Nombre', m.nombre)}
+            </div>`);
+    } catch (err) {
+        loadB3DetailInto('metodo-detail-body', `<div class="text-center text-danger py-4">${err.message}</div>`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PROVEEDORES
+// ---------------------------------------------------------------------------
+
+function openNewProveedorModal() {
+    const title = document.getElementById('proveedorModalTitle');
+    if (title) title.textContent = 'Nuevo Proveedor';
+    const form = document.getElementById('proveedor-form');
+    if (form) form.reset();
+    document.getElementById('proveedor-id').value = '';
+    showB3Modal('proveedor-modal');
+}
+
+async function openEditProveedorModal(id) {
+    const title = document.getElementById('proveedorModalTitle');
+    if (title) title.textContent = 'Editar Proveedor';
+    try {
+        const p = await fetchB3One('proveedores', id);
+        document.getElementById('proveedor-id').value = p.id_proveedor;
+        document.getElementById('proveedor-distribuidora').value = p.distribuidora;
+        document.getElementById('proveedor-nombre-contacto').value = p.nombre_contacto;
+        document.getElementById('proveedor-telefono').value = p.telefono || '';
+        document.getElementById('proveedor-correo').value = p.correo || '';
+        document.getElementById('proveedor-cuenta').value = p.cuenta_bancaria || '';
+        document.getElementById('proveedor-direccion').value = p.direccion || '';
+        showB3Modal('proveedor-modal');
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function handleSaveProveedor(e) {
+    e.preventDefault();
+    const id = document.getElementById('proveedor-id').value;
+    const distribuidora = document.getElementById('proveedor-distribuidora').value.trim();
+    const nombre_contacto = document.getElementById('proveedor-nombre-contacto').value.trim();
+    if (!distribuidora || !nombre_contacto) { showToast('Complete los campos obligatorios.', 'warning'); return; }
+    const payload = {
+        distribuidora,
+        nombre_contacto,
+        telefono: document.getElementById('proveedor-telefono').value.trim() || null,
+        correo: document.getElementById('proveedor-correo').value.trim() || null,
+        cuenta_bancaria: document.getElementById('proveedor-cuenta').value.trim() || null,
+        direccion: document.getElementById('proveedor-direccion').value.trim() || null,
+    };
+    const isEdit = Boolean(id);
+    const url = isEdit ? `${CATALOGOS_API}/proveedores/${id}` : `${CATALOGOS_API}/proveedores`;
+    try {
+        const res = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: getCatalogAuthHeaders(), body: JSON.stringify(payload) });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Error al guardar el proveedor'); }
+        showToast(`Proveedor '${distribuidora}' ${isEdit ? 'actualizado' : 'creado'} con éxito.`, 'success');
+        hideB3Modal('proveedor-modal');
+        loadB3Table('proveedores', 'proveedores-table-body', renderProveedoresTable);
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function openProveedorDetailModal(id) {
+    loadB3DetailInto('proveedor-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    showB3Modal('proveedor-detail-modal');
+    try {
+        const p = await fetchB3One('proveedores', id);
+        loadB3DetailInto('proveedor-detail-body', `
+            <div class="row g-3">
+                ${b3DetailRow('ID de Proveedor', `#${p.id_proveedor}`)}
+                ${b3DetailRow('Estado', b3StatusBadge(p.estado))}
+                ${b3DetailRow('Distribuidora', p.distribuidora)}
+                ${b3DetailRow('Contacto', p.nombre_contacto)}
+                ${b3DetailRow('Teléfono', p.telefono || '—')}
+                ${b3DetailRow('Correo', p.correo || '—')}
+                ${b3DetailRow('Cuenta Bancaria', p.cuenta_bancaria || '—')}
+                ${b3DetailRow('Dirección', p.direccion || '—')}
+                ${b3DetailRow('Fecha de Registro', formatDate(p.fecha_creacion))}
+            </div>`);
+    } catch (err) {
+        loadB3DetailInto('proveedor-detail-body', `<div class="text-center text-danger py-4">${err.message}</div>`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DEPARTAMENTOS
+// ---------------------------------------------------------------------------
+
+function openNewDepartamentoModal() {
+    const title = document.getElementById('departamentoModalTitle');
+    if (title) title.textContent = 'Nuevo Departamento';
+    const form = document.getElementById('departamento-form');
+    if (form) form.reset();
+    document.getElementById('departamento-id').value = '';
+    showB3Modal('departamento-modal');
+}
+
+async function openEditDepartamentoModal(id) {
+    const title = document.getElementById('departamentoModalTitle');
+    if (title) title.textContent = 'Editar Departamento';
+    try {
+        const d = await fetchB3One('departamentos', id);
+        document.getElementById('departamento-id').value = d.id_departamento;
+        document.getElementById('departamento-nombre').value = d.nombre;
+        showB3Modal('departamento-modal');
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function handleSaveDepartamento(e) {
+    e.preventDefault();
+    const id = document.getElementById('departamento-id').value;
+    const nombre = document.getElementById('departamento-nombre').value.trim();
+    if (!nombre) { showToast('El nombre es obligatorio.', 'warning'); return; }
+    const isEdit = Boolean(id);
+    const url = isEdit ? `${CATALOGOS_API}/departamentos/${id}` : `${CATALOGOS_API}/departamentos`;
+    try {
+        const res = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: getCatalogAuthHeaders(), body: JSON.stringify({ nombre }) });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Error al guardar el departamento'); }
+        showToast(`Departamento '${nombre}' ${isEdit ? 'actualizado' : 'creado'} con éxito.`, 'success');
+        hideB3Modal('departamento-modal');
+        loadB3Table('departamentos', 'departamentos-table-body', renderDepartamentosTable);
+        populateB3Departamentos();
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function openDepartamentoDetailModal(id) {
+    loadB3DetailInto('departamento-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    showB3Modal('departamento-detail-modal');
+    try {
+        const d = await fetchB3One('departamentos', id);
+        loadB3DetailInto('departamento-detail-body', `
+            <div class="row g-3">
+                ${b3DetailRow('ID de Departamento', `#${d.id_departamento}`)}
+                ${b3DetailRow('Estado', b3StatusBadge(d.estado))}
+                ${b3DetailRow('Nombre', d.nombre)}
+                ${b3DetailRow('N° Municipios', d.total_municipios || 0)}
+            </div>`);
+    } catch (err) {
+        loadB3DetailInto('departamento-detail-body', `<div class="text-center text-danger py-4">${err.message}</div>`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MUNICIPIOS (dropdown dependiente departamento -> municipio)
+// ---------------------------------------------------------------------------
+
+async function populateB3Departamentos() {
+    const filterSelect = document.getElementById('filter-municipio-departamento');
+    const formSelect = document.getElementById('municipio-departamento-id');
+    try {
+        const res = await fetch(`${CATALOGOS_API}/departamentos?include_inactive=false`, { headers: getCatalogAuthHeaders() });
+        if (res.ok) {
+            const deps = await res.json();
+            if (filterSelect) {
+                const current = filterSelect.value;
+                filterSelect.innerHTML = '<option value="">Todos los departamentos</option>' +
+                    deps.map(d => `<option value="${d.id_departamento}">${d.nombre}</option>`).join('');
+                filterSelect.value = current;
+            }
+            if (formSelect) {
+                formSelect.innerHTML = '<option value="">Seleccione departamento...</option>' +
+                    deps.map(d => `<option value="${d.id_departamento}">${d.nombre}</option>`).join('');
+            }
+        }
+    } catch (err) {
+        console.warn('Error al cargar departamentos en combos de municipios:', err);
+    }
+}
+
+function openNewMunicipioModal() {
+    const title = document.getElementById('municipioModalTitle');
+    if (title) title.textContent = 'Nuevo Municipio';
+    const form = document.getElementById('municipio-form');
+    if (form) form.reset();
+    document.getElementById('municipio-id').value = '';
+    populateB3Departamentos();
+    showB3Modal('municipio-modal');
+}
+
+async function openEditMunicipioModal(id) {
+    const title = document.getElementById('municipioModalTitle');
+    if (title) title.textContent = 'Editar Municipio';
+    try {
+        const m = await fetchB3One('municipios', id);
+        await populateB3Departamentos();
+        document.getElementById('municipio-id').value = m.id_municipio;
+        document.getElementById('municipio-departamento-id').value = String(m.id_departamento);
+        document.getElementById('municipio-nombre').value = m.nombre;
+        showB3Modal('municipio-modal');
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function handleSaveMunicipio(e) {
+    e.preventDefault();
+    const id = document.getElementById('municipio-id').value;
+    const idDepartamento = document.getElementById('municipio-departamento-id').value;
+    const nombre = document.getElementById('municipio-nombre').value.trim();
+    if (!idDepartamento || !nombre) { showToast('Complete los campos obligatorios.', 'warning'); return; }
+    const payload = { id_departamento: Number(idDepartamento), nombre };
+    const isEdit = Boolean(id);
+    const url = isEdit ? `${CATALOGOS_API}/municipios/${id}` : `${CATALOGOS_API}/municipios`;
+    try {
+        const res = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: getCatalogAuthHeaders(), body: JSON.stringify(payload) });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Error al guardar el municipio'); }
+        showToast(`Municipio '${nombre}' ${isEdit ? 'actualizado' : 'creado'} con éxito.`, 'success');
+        hideB3Modal('municipio-modal');
+        loadB3Table('municipios', 'municipios-table-body', renderMunicipiosTable);
+        loadB3Table('departamentos', 'departamentos-table-body', renderDepartamentosTable);
+    } catch (err) {
+        showToast(err.message, 'danger');
+    }
+}
+
+async function openMunicipioDetailModal(id) {
+    loadB3DetailInto('municipio-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    showB3Modal('municipio-detail-modal');
+    try {
+        const m = await fetchB3One('municipios', id);
+        loadB3DetailInto('municipio-detail-body', `
+            <div class="row g-3">
+                ${b3DetailRow('ID de Municipio', `#${m.id_municipio}`)}
+                ${b3DetailRow('Estado', b3StatusBadge(m.estado))}
+                ${b3DetailRow('Departamento', m.departamento_nombre || m.id_departamento)}
+                ${b3DetailRow('Nombre', m.nombre)}
+            </div>`);
+    } catch (err) {
+        loadB3DetailInto('municipio-detail-body', `<div class="text-center text-danger py-4">${err.message}</div>`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Listeners del Bloque 3
+// ---------------------------------------------------------------------------
+
+function initBloque3Listeners() {
+    // Motivos
+    const btnNewMotivo = document.getElementById('btn-new-motivo');
+    if (btnNewMotivo) btnNewMotivo.addEventListener('click', openNewMotivoModal);
+    const motivoForm = document.getElementById('motivo-form');
+    if (motivoForm) motivoForm.addEventListener('submit', handleSaveMotivo);
+    const btnConfirmMotivo = document.getElementById('btn-confirm-motivo-deactivate');
+    if (btnConfirmMotivo) btnConfirmMotivo.addEventListener('click', () => confirmB3Deactivate('motivos'));
+    const btnFilterMotivo = document.getElementById('btn-filter-motivo');
+    if (btnFilterMotivo) btnFilterMotivo.addEventListener('click', () => {
+        B3_STATE.motivos.page = 1;
+        B3_STATE.motivos.search = document.getElementById('filter-motivo-search')?.value.trim() || '';
+        B3_STATE.motivos.status = document.getElementById('filter-motivo-status')?.value || '';
+        loadB3Table('motivos', 'motivos-table-body', renderMotivosTable);
+    });
+    const btnResetMotivo = document.getElementById('btn-reset-motivo');
+    if (btnResetMotivo) btnResetMotivo.addEventListener('click', () => {
+        B3_STATE.motivos.page = 1; B3_STATE.motivos.search = ''; B3_STATE.motivos.status = '';
+        if (document.getElementById('filter-motivo-search')) document.getElementById('filter-motivo-search').value = '';
+        if (document.getElementById('filter-motivo-status')) document.getElementById('filter-motivo-status').value = '';
+        loadB3Table('motivos', 'motivos-table-body', renderMotivosTable);
+    });
+    const motivoPrev = document.getElementById('motivo-prev-page');
+    if (motivoPrev) motivoPrev.addEventListener('click', () => {
+        if (B3_STATE.motivos.page > 1) { B3_STATE.motivos.page--; loadB3Table('motivos', 'motivos-table-body', renderMotivosTable); }
+    });
+    const motivoNext = document.getElementById('motivo-next-page');
+    if (motivoNext) motivoNext.addEventListener('click', () => {
+        const maxPages = Math.ceil(B3_STATE.motivos.total / B3_STATE.motivos.limit) || 1;
+        if (B3_STATE.motivos.page < maxPages) { B3_STATE.motivos.page++; loadB3Table('motivos', 'motivos-table-body', renderMotivosTable); }
+    });
+    document.querySelectorAll('[data-motivo-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-motivo-sort');
+            B3_STATE.motivos.sortOrder = (B3_STATE.motivos.sortBy === col && B3_STATE.motivos.sortOrder === 'asc') ? 'desc' : 'asc';
+            B3_STATE.motivos.sortBy = col;
+            loadB3Table('motivos', 'motivos-table-body', renderMotivosTable);
+        });
+    });
+    document.getElementById('btn-export-motivos-excel')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/motivos-merma/export?format=excel`, 'motivos_merma.xlsx');
+    });
+    document.getElementById('btn-export-motivos-csv')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/motivos-merma/export?format=csv`, 'motivos_merma.csv');
+    });
+
+    // Métodos de pago
+    const btnNewMetodo = document.getElementById('btn-new-metodo');
+    if (btnNewMetodo) btnNewMetodo.addEventListener('click', openNewMetodoModal);
+    const metodoForm = document.getElementById('metodo-form');
+    if (metodoForm) metodoForm.addEventListener('submit', handleSaveMetodo);
+    const btnConfirmMetodo = document.getElementById('btn-confirm-metodo-deactivate');
+    if (btnConfirmMetodo) btnConfirmMetodo.addEventListener('click', () => confirmB3Deactivate('metodos'));
+    const btnFilterMetodo = document.getElementById('btn-filter-metodo');
+    if (btnFilterMetodo) btnFilterMetodo.addEventListener('click', () => {
+        B3_STATE.metodos.page = 1;
+        B3_STATE.metodos.search = document.getElementById('filter-metodo-search')?.value.trim() || '';
+        B3_STATE.metodos.status = document.getElementById('filter-metodo-status')?.value || '';
+        loadB3Table('metodos', 'metodos-table-body', renderMetodosTable);
+    });
+    const btnResetMetodo = document.getElementById('btn-reset-metodo');
+    if (btnResetMetodo) btnResetMetodo.addEventListener('click', () => {
+        B3_STATE.metodos.page = 1; B3_STATE.metodos.search = ''; B3_STATE.metodos.status = '';
+        if (document.getElementById('filter-metodo-search')) document.getElementById('filter-metodo-search').value = '';
+        if (document.getElementById('filter-metodo-status')) document.getElementById('filter-metodo-status').value = '';
+        loadB3Table('metodos', 'metodos-table-body', renderMetodosTable);
+    });
+    const metodoPrev = document.getElementById('metodo-prev-page');
+    if (metodoPrev) metodoPrev.addEventListener('click', () => {
+        if (B3_STATE.metodos.page > 1) { B3_STATE.metodos.page--; loadB3Table('metodos', 'metodos-table-body', renderMetodosTable); }
+    });
+    const metodoNext = document.getElementById('metodo-next-page');
+    if (metodoNext) metodoNext.addEventListener('click', () => {
+        const maxPages = Math.ceil(B3_STATE.metodos.total / B3_STATE.metodos.limit) || 1;
+        if (B3_STATE.metodos.page < maxPages) { B3_STATE.metodos.page++; loadB3Table('metodos', 'metodos-table-body', renderMetodosTable); }
+    });
+    document.querySelectorAll('[data-metodo-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-metodo-sort');
+            B3_STATE.metodos.sortOrder = (B3_STATE.metodos.sortBy === col && B3_STATE.metodos.sortOrder === 'asc') ? 'desc' : 'asc';
+            B3_STATE.metodos.sortBy = col;
+            loadB3Table('metodos', 'metodos-table-body', renderMetodosTable);
+        });
+    });
+    document.getElementById('btn-export-metodos-excel')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/metodos-pago/export?format=excel`, 'metodos_pago.xlsx');
+    });
+    document.getElementById('btn-export-metodos-csv')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/metodos-pago/export?format=csv`, 'metodos_pago.csv');
+    });
+
+    // Proveedores
+    const btnNewProveedor = document.getElementById('btn-new-proveedor');
+    if (btnNewProveedor) btnNewProveedor.addEventListener('click', openNewProveedorModal);
+    const proveedorForm = document.getElementById('proveedor-form');
+    if (proveedorForm) proveedorForm.addEventListener('submit', handleSaveProveedor);
+    const btnConfirmProveedor = document.getElementById('btn-confirm-proveedor-deactivate');
+    if (btnConfirmProveedor) btnConfirmProveedor.addEventListener('click', () => confirmB3Deactivate('proveedores'));
+    const btnFilterProveedor = document.getElementById('btn-filter-proveedor');
+    if (btnFilterProveedor) btnFilterProveedor.addEventListener('click', () => {
+        B3_STATE.proveedores.page = 1;
+        B3_STATE.proveedores.search = document.getElementById('filter-proveedor-search')?.value.trim() || '';
+        B3_STATE.proveedores.status = document.getElementById('filter-proveedor-status')?.value || '';
+        B3_STATE.proveedores.fecha_desde = document.getElementById('filter-proveedor-from')?.value || '';
+        B3_STATE.proveedores.fecha_hasta = document.getElementById('filter-proveedor-to')?.value || '';
+        loadB3Table('proveedores', 'proveedores-table-body', renderProveedoresTable);
+    });
+    const btnResetProveedor = document.getElementById('btn-reset-proveedor');
+    if (btnResetProveedor) btnResetProveedor.addEventListener('click', () => {
+        B3_STATE.proveedores.page = 1; B3_STATE.proveedores.search = ''; B3_STATE.proveedores.status = '';
+        B3_STATE.proveedores.fecha_desde = ''; B3_STATE.proveedores.fecha_hasta = '';
+        if (document.getElementById('filter-proveedor-search')) document.getElementById('filter-proveedor-search').value = '';
+        if (document.getElementById('filter-proveedor-status')) document.getElementById('filter-proveedor-status').value = '';
+        if (document.getElementById('filter-proveedor-from')) document.getElementById('filter-proveedor-from').value = '';
+        if (document.getElementById('filter-proveedor-to')) document.getElementById('filter-proveedor-to').value = '';
+        loadB3Table('proveedores', 'proveedores-table-body', renderProveedoresTable);
+    });
+    const provPrev = document.getElementById('proveedor-prev-page');
+    if (provPrev) provPrev.addEventListener('click', () => {
+        if (B3_STATE.proveedores.page > 1) { B3_STATE.proveedores.page--; loadB3Table('proveedores', 'proveedores-table-body', renderProveedoresTable); }
+    });
+    const provNext = document.getElementById('proveedor-next-page');
+    if (provNext) provNext.addEventListener('click', () => {
+        const maxPages = Math.ceil(B3_STATE.proveedores.total / B3_STATE.proveedores.limit) || 1;
+        if (B3_STATE.proveedores.page < maxPages) { B3_STATE.proveedores.page++; loadB3Table('proveedores', 'proveedores-table-body', renderProveedoresTable); }
+    });
+    document.querySelectorAll('[data-proveedor-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-proveedor-sort');
+            B3_STATE.proveedores.sortOrder = (B3_STATE.proveedores.sortBy === col && B3_STATE.proveedores.sortOrder === 'asc') ? 'desc' : 'asc';
+            B3_STATE.proveedores.sortBy = col;
+            loadB3Table('proveedores', 'proveedores-table-body', renderProveedoresTable);
+        });
+    });
+    document.getElementById('btn-export-proveedores-excel')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/proveedores/export?format=excel`, 'proveedores.xlsx');
+    });
+    document.getElementById('btn-export-proveedores-csv')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/proveedores/export?format=csv`, 'proveedores.csv');
+    });
+
+    // Departamentos
+    const btnNewDepartamento = document.getElementById('btn-new-departamento');
+    if (btnNewDepartamento) btnNewDepartamento.addEventListener('click', openNewDepartamentoModal);
+    const departamentoForm = document.getElementById('departamento-form');
+    if (departamentoForm) departamentoForm.addEventListener('submit', handleSaveDepartamento);
+    const btnConfirmDepartamento = document.getElementById('btn-confirm-departamento-deactivate');
+    if (btnConfirmDepartamento) btnConfirmDepartamento.addEventListener('click', () => confirmB3Deactivate('departamentos'));
+    const btnFilterDepartamento = document.getElementById('btn-filter-departamento');
+    if (btnFilterDepartamento) btnFilterDepartamento.addEventListener('click', () => {
+        B3_STATE.departamentos.page = 1;
+        B3_STATE.departamentos.search = document.getElementById('filter-departamento-search')?.value.trim() || '';
+        B3_STATE.departamentos.status = document.getElementById('filter-departamento-status')?.value || '';
+        loadB3Table('departamentos', 'departamentos-table-body', renderDepartamentosTable);
+    });
+    const btnResetDepartamento = document.getElementById('btn-reset-departamento');
+    if (btnResetDepartamento) btnResetDepartamento.addEventListener('click', () => {
+        B3_STATE.departamentos.page = 1; B3_STATE.departamentos.search = ''; B3_STATE.departamentos.status = '';
+        if (document.getElementById('filter-departamento-search')) document.getElementById('filter-departamento-search').value = '';
+        if (document.getElementById('filter-departamento-status')) document.getElementById('filter-departamento-status').value = '';
+        loadB3Table('departamentos', 'departamentos-table-body', renderDepartamentosTable);
+    });
+    const deptPrev = document.getElementById('departamento-prev-page');
+    if (deptPrev) deptPrev.addEventListener('click', () => {
+        if (B3_STATE.departamentos.page > 1) { B3_STATE.departamentos.page--; loadB3Table('departamentos', 'departamentos-table-body', renderDepartamentosTable); }
+    });
+    const deptNext = document.getElementById('departamento-next-page');
+    if (deptNext) deptNext.addEventListener('click', () => {
+        const maxPages = Math.ceil(B3_STATE.departamentos.total / B3_STATE.departamentos.limit) || 1;
+        if (B3_STATE.departamentos.page < maxPages) { B3_STATE.departamentos.page++; loadB3Table('departamentos', 'departamentos-table-body', renderDepartamentosTable); }
+    });
+    document.querySelectorAll('[data-departamento-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-departamento-sort');
+            B3_STATE.departamentos.sortOrder = (B3_STATE.departamentos.sortBy === col && B3_STATE.departamentos.sortOrder === 'asc') ? 'desc' : 'asc';
+            B3_STATE.departamentos.sortBy = col;
+            loadB3Table('departamentos', 'departamentos-table-body', renderDepartamentosTable);
+        });
+    });
+    document.getElementById('btn-export-departamentos-excel')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/departamentos/export?format=excel`, 'departamentos.xlsx');
+    });
+    document.getElementById('btn-export-departamentos-csv')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/departamentos/export?format=csv`, 'departamentos.csv');
+    });
+
+    // Municipios
+    const btnNewMunicipio = document.getElementById('btn-new-municipio');
+    if (btnNewMunicipio) btnNewMunicipio.addEventListener('click', openNewMunicipioModal);
+    const municipioForm = document.getElementById('municipio-form');
+    if (municipioForm) municipioForm.addEventListener('submit', handleSaveMunicipio);
+    const btnConfirmMunicipio = document.getElementById('btn-confirm-municipio-deactivate');
+    if (btnConfirmMunicipio) btnConfirmMunicipio.addEventListener('click', () => confirmB3Deactivate('municipios'));
+    const btnFilterMunicipio = document.getElementById('btn-filter-municipio');
+    if (btnFilterMunicipio) btnFilterMunicipio.addEventListener('click', () => {
+        B3_STATE.municipios.page = 1;
+        B3_STATE.municipios.search = document.getElementById('filter-municipio-search')?.value.trim() || '';
+        B3_STATE.municipios.id_departamento = document.getElementById('filter-municipio-departamento')?.value || '';
+        B3_STATE.municipios.status = document.getElementById('filter-municipio-status')?.value || '';
+        loadB3Table('municipios', 'municipios-table-body', renderMunicipiosTable);
+    });
+    const btnResetMunicipio = document.getElementById('btn-reset-municipio');
+    if (btnResetMunicipio) btnResetMunicipio.addEventListener('click', () => {
+        B3_STATE.municipios.page = 1; B3_STATE.municipios.search = ''; B3_STATE.municipios.id_departamento = ''; B3_STATE.municipios.status = '';
+        if (document.getElementById('filter-municipio-search')) document.getElementById('filter-municipio-search').value = '';
+        if (document.getElementById('filter-municipio-departamento')) document.getElementById('filter-municipio-departamento').value = '';
+        if (document.getElementById('filter-municipio-status')) document.getElementById('filter-municipio-status').value = '';
+        loadB3Table('municipios', 'municipios-table-body', renderMunicipiosTable);
+    });
+    const muniPrev = document.getElementById('municipio-prev-page');
+    if (muniPrev) muniPrev.addEventListener('click', () => {
+        if (B3_STATE.municipios.page > 1) { B3_STATE.municipios.page--; loadB3Table('municipios', 'municipios-table-body', renderMunicipiosTable); }
+    });
+    const muniNext = document.getElementById('municipio-next-page');
+    if (muniNext) muniNext.addEventListener('click', () => {
+        const maxPages = Math.ceil(B3_STATE.municipios.total / B3_STATE.municipios.limit) || 1;
+        if (B3_STATE.municipios.page < maxPages) { B3_STATE.municipios.page++; loadB3Table('municipios', 'municipios-table-body', renderMunicipiosTable); }
+    });
+    document.querySelectorAll('[data-municipio-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-municipio-sort');
+            B3_STATE.municipios.sortOrder = (B3_STATE.municipios.sortBy === col && B3_STATE.municipios.sortOrder === 'asc') ? 'desc' : 'asc';
+            B3_STATE.municipios.sortBy = col;
+            loadB3Table('municipios', 'municipios-table-body', renderMunicipiosTable);
+        });
+    });
+    document.getElementById('btn-export-municipios-excel')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/municipios/export?format=excel`, 'municipios.xlsx');
+    });
+    document.getElementById('btn-export-municipios-csv')?.addEventListener('click', () => {
+        downloadCatalogExport(`${CATALOGOS_API}/municipios/export?format=csv`, 'municipios.csv');
+    });
+}
+
+function initBloque3Tables() {
+    loadB3Table('motivos', 'motivos-table-body', renderMotivosTable);
+    loadB3Table('metodos', 'metodos-table-body', renderMetodosTable);
+    loadB3Table('proveedores', 'proveedores-table-body', renderProveedoresTable);
+    loadB3Table('departamentos', 'departamentos-table-body', renderDepartamentosTable);
+    loadB3Table('municipios', 'municipios-table-body', renderMunicipiosTable);
+    populateB3Departamentos();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initBloque3Listeners();
 });

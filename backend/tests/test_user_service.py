@@ -1,6 +1,6 @@
 import pytest
 from fastapi import HTTPException
-from app.db.models import Role, Department
+from app.db.models import Rol
 from app.services.user_service import ConcreteUserService
 from app.schemas import schemas
 
@@ -9,101 +9,93 @@ def service(uow):
     return ConcreteUserService(uow)
 
 
-async def seed_context(uow):
-    role = await uow.roles.create(Role(name="Cajero"))
+async def seed_role(uow, nombre="Cajero", estado="Activo"):
+    rol = Rol(nombre=nombre, estado=estado)
+    created = await uow.roles.create(rol)
     await uow.commit()
-    dept = await uow.departments.create(Department(name="General"))
-    await uow.commit()
-    return role.id, dept.id
+    return created.id_rol
 
 
-def make_user(role_id, department_id, code="U001", username="jperez", name="Juan", lastname="Perez"):
+def make_user(id_rol, username="jperez", nombre="Juan Pérez", password="secreto123"):
     return schemas.UserCreate(
-        name=name,
-        lastname=lastname,
-        code=code,
+        nombre_completo=nombre,
         username=username,
-        password="secreto123",
-        role_id=role_id,
-        department_id=department_id,
+        password=password,
+        id_rol=id_rol,
     )
 
 
-async def test_create_user_ok(uow):
-    role_id, dept_id = await seed_context(uow)
-    created = await service(uow).create_user(make_user(role_id, dept_id))
-    assert created.id is not None
-    assert created.username == "jperez"
-    assert created.role is not None
-    assert created.department is not None
+@pytest.mark.asyncio
+async def test_crear_usuario_exitoso(uow):
+    id_rol = await seed_role(uow)
+    creado = await service(uow).create_user(make_user(id_rol))
+    assert creado.id_usuario is not None
+    assert creado.username == "jperez"
+    assert creado.nombre_completo == "Juan Pérez"
+    assert creado.estado == "Activo"
+    assert creado.rol is not None
+    assert creado.rol.nombre == "Cajero"
 
 
-async def test_create_user_requires_valid_role_and_department(uow):
+@pytest.mark.asyncio
+async def test_crear_usuario_requiere_rol_valido(uow):
     svc = service(uow)
-    # Ni rol ni departamento existen en BD
     with pytest.raises(HTTPException) as exc:
-        await svc.create_user(make_user(999, 999))
+        await svc.create_user(make_user(id_rol=9999))
     assert exc.value.status_code == 400
+    assert "no existe" in exc.value.detail
 
 
-async def test_create_user_rejects_inactive_role(uow):
-    role_id, dept_id = await seed_context(uow)
-    role = await uow.roles.get_by_id(role_id)
-    role.is_active = False
-    await uow.roles.update(role)
-    await uow.commit()
-
+@pytest.mark.asyncio
+async def test_crear_usuario_rechaza_rol_inactivo(uow):
+    id_rol = await seed_role(uow, nombre="Rol Inactivo", estado="Inactivo")
+    svc = service(uow)
     with pytest.raises(HTTPException) as exc:
-        await service(uow).create_user(make_user(role_id, dept_id))
+        await svc.create_user(make_user(id_rol=id_rol))
     assert exc.value.status_code == 400
+    assert "inactivo" in exc.value.detail
 
 
-async def test_duplicate_username_rejected(uow):
-    role_id, dept_id = await seed_context(uow)
+@pytest.mark.asyncio
+async def test_nombre_usuario_duplicado_rechazado(uow):
+    id_rol = await seed_role(uow)
     svc = service(uow)
-    await svc.create_user(make_user(role_id, dept_id))
+    await svc.create_user(make_user(id_rol, username="duplicado"))
     with pytest.raises(HTTPException) as exc:
-        await svc.create_user(make_user(role_id, dept_id, code="U002"))
+        await svc.create_user(make_user(id_rol, username="duplicado"))
     assert exc.value.status_code == 400
+    assert "Ya existe" in exc.value.detail
 
 
-async def test_duplicate_code_rejected(uow):
-    role_id, dept_id = await seed_context(uow)
-    svc = service(uow)
-    await svc.create_user(make_user(role_id, dept_id))
+@pytest.mark.asyncio
+async def test_obtener_usuario_inexistente_404(uow):
     with pytest.raises(HTTPException) as exc:
-        await svc.create_user(make_user(role_id, dept_id, username="otro"))
-    assert exc.value.status_code == 400
+        await service(uow).get_user(9999)
+    assert exc.value.status_code == 404
 
 
-async def test_soft_delete_user(uow):
-    role_id, dept_id = await seed_context(uow)
+@pytest.mark.asyncio
+async def test_actualizar_usuario(uow):
+    id_rol = await seed_role(uow)
     svc = service(uow)
-    created = await svc.create_user(make_user(role_id, dept_id))
-    await svc.deactivate_user(created.id)
+    creado = await svc.create_user(make_user(id_rol, username="pedro", nombre="Pedro"))
+    actualizado = await svc.update_user(
+        creado.id_usuario,
+        schemas.UserUpdate(nombre_completo="Pedro Modificado")
+    )
+    assert actualizado.nombre_completo == "Pedro Modificado"
 
-    deactivated = await svc.get_user(created.id)
-    assert deactivated.is_active is False
 
-
-async def test_list_users_filters(uow):
-    role_id, dept_id = await seed_context(uow)
+@pytest.mark.asyncio
+async def test_desactivar_usuario_soft_delete(uow):
+    id_rol = await seed_role(uow)
     svc = service(uow)
-    u1 = await svc.create_user(make_user(role_id, dept_id, code="U001", username="jperez"))
-    await svc.create_user(make_user(role_id, dept_id, code="U002", username="mgarcia", name="Maria"))
+    creado = await svc.create_user(make_user(id_rol, username="inactivar"))
+    desactivado = await svc.deactivate_user(creado.id_usuario)
+    assert desactivado.estado == "Inactivo"
 
-    by_name = await svc.list_users(schemas.UserFilter(name="Juan"))
-    assert {u.username for u in by_name} == {"jperez"}
+    filtros = schemas.UserFilter(is_active=True)
+    activos = await svc.list_users(filtros)
+    usernames_activos = [u.username for u in activos]
+    assert "inactivar" not in usernames_activos
 
-    by_lastname = await svc.list_users(schemas.UserFilter(lastname="Perez"))
-    assert len(by_lastname) == 2
-
-    await svc.deactivate_user(u1.id)
-    active = await svc.list_users(schemas.UserFilter(is_active=True))
-    assert all(u.is_active for u in active)
-    assert {u.username for u in active} == {"mgarcia"}
-
-    by_code = await svc.list_users(schemas.UserFilter(code="U002"))
-    assert [u.username for u in by_code] == ["mgarcia"]
-
-    assert await svc.count_users(schemas.UserFilter(name="Juan")) == 1

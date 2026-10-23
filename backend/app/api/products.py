@@ -43,7 +43,7 @@ async def create_product(
     current_user: Usuario = Depends(get_current_user),
 ):
     """Inserta de forma atómica Producto + VarianteProducto + InventarioSucursal."""
-    return await service.create_product(payload)
+    return await service.create_product(payload, actor_id=current_user.id_usuario)
 
 
 @router.put("/{product_id}", response_model=schemas.ProductoOut)
@@ -53,7 +53,7 @@ async def update_product(
     service: ConcreteProductService = Depends(get_product_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    return await service.update_product(product_id, payload)
+    return await service.update_product(product_id, payload, actor_id=current_user.id_usuario)
 
 
 @router.delete("/{product_id}", response_model=schemas.ProductoOut)
@@ -63,4 +63,4 @@ async def deactivate_product(
     current_user: Usuario = Depends(get_current_user),
 ):
     """Eliminación lógica (soft delete): marca el producto como inactivo."""
-    return await service.deactivate_product(product_id)
+    return await service.deactivate_product(product_id, actor_id=current_user.id_usuario)

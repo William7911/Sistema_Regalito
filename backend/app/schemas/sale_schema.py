@@ -17,6 +17,8 @@ class PaymentCreate(BaseModel):
 class SaleCreate(BaseModel):
     id_sucursal: int = Field(..., description="Sucursal donde se realiza la venta")
     id_cliente: Optional[int] = Field(default=None, description="Cliente opcional (consumidor final si es None)")
+    nit_receptor: Optional[str] = Field(default=None, description="NIT para factura FEL (CF si consumidor final)")
+    nombre_receptor: Optional[str] = Field(default=None, description="Nombre del receptor para FEL")
     items: List[SaleItemCreate] = Field(..., min_length=1, description="Líneas de productos a vender")
     pagos: List[PaymentCreate] = Field(..., min_length=1, description="Métodos y montos de pago")
 

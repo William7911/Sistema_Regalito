@@ -1,7 +1,1567 @@
 # Registro de Cambios
 
 ## Regla de documentación (obligatoria)
-Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o elimines componentes.
+Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
+
+## [2026-10-23] Reportes Paso 1: Módulo de Reportes de Usuarios y Clientes (Filtros, Fichas en Modal, Exportación PDF con ReportLab y Registro en Historial de Precios)
+
+### Causa Raíz / Requerimiento
+1. **Verificaciones Previas de Migración 0015 en PostgreSQL Real**:
+   - Ejecución en PostgreSQL real (`regalito_pos` en puerto 5433) de `alembic downgrade -1` (a 0014) y `upgrade head` (a 0015).
+   - Comprobación de paridad de esquema contra `database/init.sql` aplicado sobre una base de datos vacía (`test_init_db`).
+   - Confirmación de persistencia de registros de `visita_seguimiento` y `visita_modulo_evaluacion` tras el ciclo de migración.
+   - Limpieza completa de registros temporales de prueba.
+2. **Módulo de Reportes (Paso 1: Usuarios y Clientes)**:
+   - Patrón unificado: Reporte general en HTML con filtros dinámicos (`estado`, `fecha_desde`, `fecha_hasta`) -> Reporte específico -> Ficha detallada en modal -> Exportación a PDF con ReportLab.
+   - **Reporte de Usuarios**: Listado filtrable, ficha modal con nombre completo, username, rol, estado y fecha de creación; exportación en PDF de la ficha individual y exportaciones del listado en PDF, Excel y CSV.
+   - **Reporte de Clientes**: Listado filtrable, ficha modal con NIT, nombre comercial, tipo de cliente, ubicación geográfica (departamento, municipio, dirección), contactos (teléfonos y correos), estado y fecha de creación; exportación en PDF de la ficha y del listado en PDF, Excel y CSV.
+3. **Seguridad y Control de Acceso (RBAC)**:
+   - Permiso requerido: `REPORTE_VER`.
+   - Restricción estricta para usuarios sin dicho permiso (ej. Cajera): enlace y sección de reportes ocultos en la interfaz y respuesta HTTP 403 Forbidden en la API.
+4. **Verificación de Historial de Precios en Catálogo**:
+   - Comprobación mediante prueba automatizada en navegador de que la modificación del precio de venta de un producto desde la pantalla del catálogo se registra fielmente en la tabla `historial_precio` con usuario auditor, precio anterior y precio nuevo.
+
+### Solución Implementada
+1. **Backend — Schemas y Repositorios** ([`backend/app/schemas/reportes_schema.py`](../backend/app/schemas/reportes_schema.py), [`backend/app/repositories/reporte_repository.py`](../backend/app/repositories/reporte_repository.py)):
+   - Se crearon DTOs `UsuarioReporteDTO`, `ClienteReporteDTO` y `ReporteExportadoDTO`.
+   - Métodos en `ReporteRepositoryImpl`: `get_usuarios_reporte`, `get_usuario_by_id`, `get_clientes_reporte`, `get_cliente_by_id` con filtros `func.lower(estado)`, `func.date(fecha_creacion)` y `selectinload` de relaciones `rol`, `tipo_cliente`, `municipio`, `municipio.departamento` y `contactos`.
+2. **Backend — Servicio y Exportación PDF** ([`backend/app/services/reporte_service.py`](../backend/app/services/reporte_service.py)):
+   - Generación de reportes tabulares y fichas individuales en PDF utilizando ReportLab (`SimpleDocTemplate`, `Table`, `Paragraph`, `getSampleStyleSheet`).
+   - Generación de PDFs para ficha individual de Usuario y ficha individual de Cliente con estilos corporativos.
+   - Generación de PDF de listado filtrado para Usuarios y Clientes.
+   - Mantenimiento de descargas existentes en formato Excel (`openpyxl`) y CSV.
+3. **Backend — API y Endpoints** ([`backend/app/api/reportes.py`](../backend/app/api/reportes.py)):
+   - Endpoints `/api/reportes/usuarios`, `/api/reportes/usuarios/pdf`, `/api/reportes/usuarios/{id_usuario}`, `/api/reportes/usuarios/{id_usuario}/pdf`.
+   - Endpoints `/api/reportes/clientes`, `/api/reportes/clientes/pdf`, `/api/reportes/clientes/{id_cliente}`, `/api/reportes/clientes/{id_cliente}/pdf`.
+   - Endpoints para Excel y CSV (`/excel`, `/csv`).
+   - Todos los endpoints protegidos con `require_permission("REPORTE_VER")`.
+4. **Frontend — Vistas, Pestañas, Modales y Controladores** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/reportes.js`](../frontend/js/reportes.js), [`frontend/js/app.js`](../frontend/js/app.js), [`frontend/js/catalog.js`](../frontend/js/catalog.js)):
+   - Pestañas interactivas en `#reportes-view`: Consolidado, Reporte de Usuarios, Reporte de Clientes.
+   - Filtros por estado y fechas desde/hasta con botones "Filtrar" y "Limpiar".
+   - Modales de ficha `#modal-reporte-ficha-usuario` y `#modal-reporte-ficha-cliente` con botón "Descargar Ficha en PDF".
+   - Botones de exportación de listado: "Descargar PDF", "Descargar Excel", "Descargar CSV".
+   - Control de navegación RBAC en `app.js` verificando permiso `REPORTE_VER` o rol Administrador.
+   - Corrección de ámbito léxico de variables de stock en `catalog.js`.
+5. **Pruebas Automatizadas y Verificación E2E**:
+   - Backend Pytest: 11 nuevas pruebas unitarias y de integración en `backend/tests/test_reportes_especificos_service.py` y `backend/tests/test_reportes_api.py`.
+   - E2E Playwright: 31 verificaciones automatizadas en `scratch/verify_reportes_browser.py` cubriendo inicio de sesión, listados, filtros, apertura de modales de ficha, descarga de PDF de ficha, exportaciones de listados (PDF, Excel, CSV), cambio de precio en pantalla de catálogo y verificación en `historial_precio`, y bloqueo HTTP 403 / vistas ocultas para el rol Cajera.
+
+### Verificación
+- **Pytest**: **276 pruebas aprobadas, 0 fallidas** (incremento de 11 pruebas respecto a las 265 previas).
+- **Playwright (Navegador real)**: **31/31 checks exitosos**.
+
+---
+
+## [2026-10-23] Módulo de Visitas de Seguimiento y Evaluación (Dueño del Negocio) con Reporte PDF y RBAC
+
+### Causa Raíz / Requerimiento
+1. **Verificaciones Previas de Migraciones y Semilla**:
+   - Comprobación de migraciones 0013 y 0014 en PostgreSQL real (`regalito_pos` en puerto 5433): ejecución de `alembic upgrade head`, `downgrade -1` y `upgrade head`.
+   - Comprobación de paridad de esquema contra `database/init.sql` aplicado sobre una base de datos vacía (`test_init_db`).
+   - Verificación de conteos de tablas de prueba E2E (`merma: 0`, `detalle_merma: 0`, `traslado_inventario: 0`, `orden_compra: 0`, `alerta_stock: 1`), confirmando persistencia exclusiva de datos semilla.
+2. **Formulario de Visita de Seguimiento y Evaluación**:
+   - Módulo adaptado para que el dueño del negocio / representante pueda registrar periódicamente evaluaciones del sistema sin asistencia técnica.
+   - Datos generales: fecha, lugar/sucursal, nombre del representante, cargo, calificación general (1 a 5 estrellas) y observaciones generales.
+   - Evaluación estructurada de 10 módulos estándar del sistema: `POS/Ventas`, `Inventario`, `Compras`, `Caja`, `Usuarios`, `Catálogos`, `Reportes`, `Configuración`, `Clientes` y `Facturación`.
+   - Cada módulo evaluado mediante opciones `Conforme` (verde), `Modificar` (amarillo) o `Agregar` (azul), con campo de comentario/observación puntual y restricción de unicidad por visita.
+   - Soporte para ciclo de vida con estado `Borrador` y `Completada`.
+   - Resumen ejecutivo en pantalla con tarjetas de métricas por resultado.
+   - Exportación y descarga directa de informe oficial en PDF (`reportlab`) con cabecera corporativa, metadatos, tabla de módulos evaluados y sección de firmas.
+3. **Seguridad, Auditoría y RBAC**:
+   - Permiso requerido: `VISITA_REGISTRAR` (asignado al rol Administradora).
+   - Usuarios no autorizados (Cajera): opción de menú oculta en frontend, bloqueo de navegación directa en SPA y rechazo con HTTP 403 Forbidden en el backend.
+   - Trazabilidad en `bitacora_auditoria` con verbos `CREAR` (al guardar borrador) y `EDITAR` (al actualizar o completar visita).
+
+### Solución Implementada
+1. **Base de Datos y Migración** ([`backend/alembic/versions/0015_visita_seguimiento_formulario.py`](../backend/alembic/versions/0015_visita_seguimiento_formulario.py), [`database/init.sql`](../database/init.sql), [`backend/app/db/models.py`](../backend/app/db/models.py)):
+   - Columna `id_cliente` en `visita_seguimiento` modificada a nullable (`nullable=True`).
+   - Columnas añadidas a `visita_seguimiento`: `lugar` (VARCHAR 150), `nombre_representante` (VARCHAR 150), `cargo_representante` (VARCHAR 100), `calificacion_general` (SMALLINT CHECK 1..5).
+   - Columna añadida a `visita_modulo_evaluacion`: `resultado` (VARCHAR 20).
+   - Restricción de unicidad `uq_visita_modulo` en `(id_visita, nombre_modulo)`.
+2. **Arquitectura DERCAS Backend**:
+   - Schemas ([`backend/app/schemas/visita_schema.py`](../backend/app/schemas/visita_schema.py)): `ModuloEvaluacionInput`, `ModuloEvaluacionOut`, `VisitaCreate`, `VisitaUpdate`, `VisitaOut`, `VisitaResumen`.
+   - Repositorio ([`backend/app/repositories/visita_repository.py`](../backend/app/repositories/visita_repository.py)): `VisitaRepositoryImpl` con `create`, `get_by_id`, `list_all`, `update` y `sync_modulos`.
+   - Integración en `UnitOfWork` ([`backend/app/api/deps.py`](../backend/app/api/deps.py)) y `TestUnitOfWork` ([`backend/tests/conftest.py`](../backend/tests/conftest.py)).
+   - Servicio ([`backend/app/services/visita_service.py`](../backend/app/services/visita_service.py)): `ConcreteVisitaService` con `guardar_borrador`, `actualizar_borrador`, `completar_visita`, `obtener_visita`, `listar_visitas`, `generar_pdf` con ReportLab y registro en `bitacora_auditoria`.
+   - Router API ([`backend/app/api/visitas.py`](../backend/app/api/visitas.py)): endpoints `GET /api/visitas`, `GET /{id}`, `POST /borrador`, `PUT /{id}/borrador`, `POST /{id}/completar`, `POST /completar` y `GET /{id}/pdf`.
+   - Registro en FastAPI ([`backend/app/main.py`](../backend/app/main.py)).
+3. **Frontend Interactivo y Accesible**:
+   - Navegación lateral en [`frontend/index.html`](../frontend/index.html) con ítem `Visitas de Seguimiento` (`data-module-item="visitas"`).
+   - Contenedor `#visitas-view` con 3 secciones: Formulario de Evaluación (`#visitas-form-section`), Resumen Ejecutivo (`#visitas-summary-section`) e Historial de Visitas (`#visitas-history-section`).
+   - Controlador [`frontend/js/visitas.js`](../frontend/js/visitas.js): renderizado dinámico de los 10 módulos, gestión de borradores y finalización, visualización del resumen con conteo reactivo de conformes/modificar/agregar, y descarga directa de PDF.
+   - Seguridad en [`frontend/js/app.js`](../frontend/js/app.js): integración en `mainViews`, `moduleAllowed`, `opItems`, `canAccessView`, `renderView` y `moduleLabels`.
+4. **Pruebas y Verificación**:
+   - Backend Pytest: 8 nuevas pruebas en `backend/tests/test_visita_service.py` y `backend/tests/test_visita_api.py`.
+   - Total suite: 265 pruebas aprobadas (0 fallidas).
+   - E2E Playwright: 17 verificaciones automatizadas en `scratch/verify_visitas_browser.py` cubriendo creación de borrador, evaluación de módulos, finalización, métricas de resumen, generación de PDF, historial y bloqueo 403 / vista oculta para Cajera.
+
+## [2026-10-23] Proceso 4: Módulo Integral de Traslados entre Sucursales (Envío, Tránsito, Recepción, Cancelación y Trazabilidad)
+
+### Causa Raíz / Requerimiento
+1. **Módulo Completo de Traslados de Inventario**:
+   - Modernizar y ampliar la estructura de datos de la tabla `traslado_inventario` para soportar ciclo de vida de transferencias de stock entre sucursales: estados `En tránsito`, `Recibido` y `Cancelado`, usuario que despacha (`id_usuario_envia`), usuario que recibe (`id_usuario_recibe`), fecha de recepción y observaciones.
+   - Creación de migración Alembic `0014_traslado_seguimiento.py` y actualización sincronizada en `database/init.sql` y `backend/app/db/models.py`.
+2. **Lógica de Negocio y Consistencia Transaccional (DERCAS)**:
+   - **Despacho (`crear_envio`)**: Validación de sucursales distintas (`origen != destino`), verificación pesimista de stock disponible en origen y descuento inmediato de unidades en inventario de origen, registrando el traslado en estado `En tránsito`.
+   - **Recepción en destino (`recibir_traslado`)**: Verificación de estado `En tránsito`, incremento de existencias en sucursal de destino (creando el registro en `inventario_sucursal` si aún no existía), registro de usuario receptor, fecha de recepción y cambio de estado a `Recibido`.
+   - **Cancelación (`cancelar_traslado`)**: Verificación de estado `En tránsito`, restitución automática de existencias al inventario de la sucursal de origen, registro opcional de motivo en observaciones y cambio a estado `Cancelado`.
+   - **Auditoría**: Registro de acciones en `bitacora_auditoria` con verbos en mayúsculas (`CREAR` al despachar, `EDITAR` al recibir o cancelar).
+3. **Seguridad y Control de Acceso (RBAC)**:
+   - Permiso requerido: `INV_INGRESAR_MERCADERIA` (Administradora y Bodeguero).
+   - Usuarios no autorizados (Cajera): enlace oculto en menú lateral, navegación rechazada por SPA y endpoints protegidos con HTTP 403 Forbidden.
+4. **Interfaz de Usuario Reactiva**:
+   - Vista `#traslados-view` con filtros reactivos por estado (`En tránsito`, `Recibido`, `Cancelado`) y rango de fechas (desde/hasta).
+   - Tabla interactiva con badges visuales de estado y acciones dinámicas contextuales (`[Recibir]`, `[Cancelar]`).
+   - Modal `#modal-nuevo-traslado` con selector de origen, destino, producto/variante, indicador en tiempo real de stock disponible en la sucursal origen y validaciones client-side y server-side.
+   - Modales `#modal-recibir-traslado` y `#modal-cancelar-traslado` para confirmaciones seguras sin ventanas nativas `alert()` o `confirm()`.
+
+### Solución Implementada
+1. **Base de Datos y Modelos** ([`backend/alembic/versions/0014_traslado_seguimiento.py`](../backend/alembic/versions/0014_traslado_seguimiento.py), [`database/init.sql`](../database/init.sql), [`backend/app/db/models.py`](../backend/app/db/models.py)):
+   - Se crearon las columnas `estado` (VARCHAR(20) DEFAULT 'En tránsito'), `id_usuario_envia` (FK a usuario), `id_usuario_recibe` (FK a usuario), `fecha_recepcion` (TIMESTAMP) y `observaciones` (TEXT).
+   - Se mapearon en el modelo `TrasladoInventario` las relaciones ORM `variante`, `sucursal_origen`, `sucursal_destino`, `usuario_envia` y `usuario_recibe`.
+2. **Arquitectura DERCAS** ([`backend/app/schemas/traslado_schema.py`](../backend/app/schemas/traslado_schema.py), [`backend/app/repositories/traslado_repository.py`](../backend/app/repositories/traslado_repository.py), [`backend/app/services/traslado_service.py`](../backend/app/services/traslado_service.py), [`backend/app/api/traslados.py`](../backend/app/api/traslados.py), [`backend/app/api/deps.py`](../backend/app/api/deps.py)):
+   - Schemas Pydantic v2: `TrasladoCreate`, `TrasladoCancelar`, `TrasladoOut` (enriquecido con `nombre_origen`, `nombre_destino`, `nombre_producto`, `codigo_barras`, `nombre_usuario_envia`, `nombre_usuario_recibe`).
+   - Repositorio `TrasladoRepositoryImpl`: `create`, `get_by_id`, `list_all` con `selectinload` de relaciones y filtros dinámicos, `get_inventario_for_update` y `get_or_create_inventario`.
+   - `UnitOfWork` y `TestUnitOfWork`: integrada propiedad `traslados`.
+   - Servicio `ConcreteTrasladoService`: orquestación de transferencias con validación de stock, descuentos, sumas, restituciones y auditoría.
+   - Router `/api/traslados`: endpoints `GET /api/traslados`, `GET /{id}`, `POST ""` (despacho), `POST /{id}/recibir`, `POST /{id}/cancelar`. Registrado en `backend/app/main.py`.
+3. **Frontend Vanilla JS y Bootstrap** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/traslados.js`](../frontend/js/traslados.js), [`frontend/js/app.js`](../frontend/js/app.js)):
+   - Enlace `Traslados` en menú lateral bajo la sección de Operación Diaria.
+   - Contenedor de módulo `#traslados-view` con filtros, tabla de transferencias y paginación informativa.
+   - Modales de nuevo traslado, recepción y cancelación con `data-bs-backdrop="static"` y sin diálogos bloqueantes nativos.
+   - Controlador `traslados.js` con inicialización `initDOM()`, actualización reactiva de stock disponible según sucursal origen y producto, feedback con `showToast()`.
+   - Control de permisos en `app.js` (`moduleAllowed`, `opItems`, `canAccessView`, `renderView` y `moduleLabels`).
+4. **Verificación y Pruebas**:
+   - Backend Pytest: 8 pruebas unitarias y de API en `backend/tests/test_traslados.py` cubriendo descuento en origen, bloqueo por stock insuficiente, bloqueo por misma sucursal, incremento en destino, devolución en cancelación, transiciones de estado inválidas y 403 Forbidden para Cajera.
+   - Frontend Playwright E2E: 29 pruebas en `scratch/verify_traslados_browser.py` cubriendo validaciones de formulario, ciclo de vida completo (despacho -> tránsito -> recepción -> finalizado, y despacho -> tránsito -> cancelación -> restitución de stock), filtros reactivos por estado y restricciones RBAC para Bodeguero y Cajera.
+
+## [2026-10-23] Proceso 3: Flujo Completo de Compras y Órdenes (Emisión, Recepción en Bodega, Cancelación y Seguimiento de Estados)
+
+### Causa Raíz / Requerimiento
+1. **Flujo Integral de Compras en Pantalla**: Completar en la interfaz de usuario el ciclo de vida operativo de las compras de mercadería:
+   - **Emisión de órdenes de compra**: Confección con catálogo de productos/variantes, proveedor y costo pactado, registrando la orden en estado `Emitida`.
+   - **Recepción física de mercadería**: Formulario modal para ingresar el número de factura del proveedor, flete y cargadores, confirmar o ajustar las cantidades recibidas y costos unitarios, e incrementar el stock en inventario de forma atómica pasando la orden a `Recibida`.
+   - **Cancelación de órdenes**: Acción controlada para anular órdenes pendientes en estado `Emitida` con justificación opcional, pasando a estado `Cancelada` y bloqueando ingresos posteriores.
+2. **Listado Reactivo y Visibilidad de Estados**:
+   - Tabla operativa con visualización clara de número de orden, fecha de emisión, proveedor, usuario responsable, total estimado y badges de estado (`Emitida` [amarillo], `Recibida` [verde], `Cancelada` [gris]).
+   - Filtros dinámicos por estado de orden y rango de fechas (desde/hasta).
+   - Acciones contextuales por fila según el estado y los permisos del usuario activo.
+3. **Seguridad y Control de Acceso (RBAC)**:
+   - `COMPRA_EMITIR_ORDEN`: emite y cancela órdenes (Administradora).
+   - `INV_INGRESAR_MERCADERIA`: recibe mercadería e incrementa inventario (Administradora, Bodeguero).
+   - Usuarios no autorizados (Cajera): enlace en menú lateral oculto, protección SPA activa y rechazo con HTTP 403 Forbidden.
+4. **Auditoría en Bitácora**:
+   - Registro con `CREAR` en `orden_compra` y `compra`.
+   - Registro con `EDITAR` en `orden_compra` para recepciones y cancelaciones.
+
+### Solución Implementada
+1. **Backend — Repositorio y Servicio de Compras** ([`backend/app/repositories/compra_repository.py`](../backend/app/repositories/compra_repository.py), [`backend/app/services/compra_service.py`](../backend/app/services/compra_service.py), [`backend/app/schemas/compras_schema.py`](../backend/app/schemas/compras_schema.py)):
+   - Se añadió `list_ordenes` en `CompraRepositoryImpl` con soporte de filtros por `estado`, `fecha_desde`, `fecha_hasta` e `id_proveedor`, y eager-loading de relaciones (`detalles.variante.producto`, `proveedor`, `usuario`).
+   - Se ampliaron schemas `DetalleOrdenCompraOut`, `OrdenCompraOut` (enriquecidos con nombres legibles) y `OrdenCompraCancelar`.
+   - En `ConcreteComprasService`:
+     - `listar_ordenes`: valida permisos (`COMPRA_EMITIR_ORDEN` o `INV_INGRESAR_MERCADERIA`), consulta el repositorio y retorna órdenes enriquecidas.
+     - `obtener_orden`: consulta y enriquece orden individual por ID.
+     - `cancelar_orden`: valida `COMPRA_EMITIR_ORDEN`, verifica que el estado sea estrictamente `Emitida` (rechaza con HTTP 400 si ya fue `Recibida` o `Cancelada`), actualiza a `Cancelada` y registra en bitácora (`accion="EDITAR"`).
+     - `ingresar_mercaderia`: valida `INV_INGRESAR_MERCADERIA`, rechaza con HTTP 400 órdenes que no estén `Emitida`, actualiza inventario con bloqueo pesimista, registra factura en `compra` (`accion="CREAR"`), actualiza estado a `Recibida` y audita en bitácora (`accion="EDITAR"`).
+2. **Backend — Endpoints API** ([`backend/app/api/compras.py`](../backend/app/api/compras.py)):
+   - `GET /api/compras/ordenes`: listado con filtros de estado y fechas.
+   - `GET /api/compras/ordenes/{id_orden}`: consulta detallada de orden.
+   - `POST /api/compras/ordenes`: emisión de orden (`COMPRA_EMITIR_ORDEN`).
+   - `POST /api/compras/ordenes/{id_orden}/cancelar`: cancelación controlada (`COMPRA_EMITIR_ORDEN`).
+   - `POST /api/compras/ingreso`: recepción y actualización de inventario (`INV_INGRESAR_MERCADERIA`).
+3. **Frontend — Pantalla, Pestañas y Modales de Compras** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/app.js`](../frontend/js/app.js), [`frontend/js/compras.js`](../frontend/js/compras.js)):
+   - En `index.html`:
+     - Sistema de navegación por pestañas (`#pills-ordenes-tab` y `#pills-nueva-orden-tab`).
+     - Barra de filtros en tiempo real por estado (`Emitida`, `Recibida`, `Cancelada`) y rango de fechas.
+     - Tabla con badges visuales de estado y botones de acción (`[Recibir]`, `[Cancelar]`, `[Detalle]`).
+     - Modal `#modal-recibir-compra`: captura factura del proveedor, flete, cargadores y confirmación de cantidades/costos con recálculo dinámico de totales.
+     - Modal `#modal-cancelar-compra`: diálogo de advertencia con motivo opcional de anulación.
+     - Modal `#modal-ver-orden`: ficha de consulta de ítems pedidos y costos pactados.
+   - En `app.js`: se sincronizó el control de acceso visual (`applyRoleRestrictions` y `navigateTo`) para permitir el acceso a compras tanto a roles con `COMPRA_EMITIR_ORDEN` (Admin) como con `INV_INGRESAR_MERCADERIA` (Bodeguero), bloqueando a Cajera.
+   - En `compras.js`: arquitectura reactiva con inicialización dinámica de selectores DOM (`initDOM()`), delegación de eventos y feedback mediante `showToast()`.
+4. **Pruebas Automatizadas (TDD)**:
+   - En [`backend/tests/test_compras_service.py`](../backend/tests/test_compras_service.py): 10 pruebas unitarias de servicio (emisión, recepción, cancelación exitosa, rechazo al cancelar orden recibida, rechazo al recibir orden cancelada, permisos 403 y filtros por estado).
+   - En [`backend/tests/test_compras_api.py`](../backend/tests/test_compras_api.py): 7 pruebas de integración API con endpoints HTTP y tokens JWT (emisión, cancelación, recepción, filtros y rechazos 403 para Cajera y Bodega).
+   - En [`scratch/verify_compras_browser.py`](../scratch/verify_compras_browser.py): 18/18 pruebas E2E aprobadas en Playwright Chromium (flujo completo de emisión, recepción con factura, cancelación de segunda orden, filtros y rechazo para rol Cajera).
+
+### Verificación
+- **Pytest**: Todas las pruebas aprobadas sin regresiones.
+- **Playwright**: **18/18 checks exitosos** en navegador Chromium.
+
+---
+
+## [2026-10-23] Proceso 2: Alertas de Stock Crítico (Acción Atender, Registro en Bitácora y Modal Operativo)
+
+### Causa Raíz / Requerimiento
+1. **Acción Operativa para Alertas de Stock**: Proporcionar a los usuarios autorizados la capacidad de atender/descartar alertas de stock crítico tanto desde la campanita de notificaciones del encabezado como desde un modal dedicado de alertas en la vista de inventario.
+2. **Auditoría en Bitácora**: Registrar formalmente la acción en `bitacora_auditoria` con verbo estandarizado `EDITAR` sobre la tabla `alerta_stock`, capturando el identificador del usuario responsable y el cambio de estado a `"Atendida"`.
+3. **Seguridad y Control de Acceso (RBAC)**: Restringir la atención de alertas únicamente a roles con permiso `INV_INGRESAR_MERCADERIA` (Administradora, Bodega), bloqueando con HTTP 403 a roles sin autorización (como Cajera).
+
+### Solución Implementada
+1. **Backend — Repositorio y Servicio de Inventario** ([`backend/app/repositories/inventory_repository.py`](../backend/app/repositories/inventory_repository.py), [`backend/app/services/inventory_service.py`](../backend/app/services/inventory_service.py)):
+   - Se implementó `get_alert_by_id(id_alerta)` con eager-loading de relaciones (`variante.producto`).
+   - Se optimizó `get_for_update(id_inventario)` para cargar `InventarioSucursal.variante` y `VarianteProducto.producto`, evitando errores de greenlet asíncrono en triggers de stock bajo.
+   - Se creó `atender_alerta(id_alerta, current_user)` en `InventoryService`:
+     - Valida existencia de la alerta (HTTP 404 si no existe).
+     - Actualiza el estado a `"Atendida"`.
+     - Registra auditoría con `accion="EDITAR"`, `tabla="alerta_stock"`, `registro_id=id_alerta` y detalle JSON (`{"estado_anterior": ..., "nuevo_estado": "Atendida"}`).
+2. **Backend — Endpoints API** ([`backend/app/api/inventory.py`](../backend/app/api/inventory.py)):
+   - Se añadió `PUT /api/inventario/alertas/{id_alerta}/atender` (y su alias en inglés `/api/inventory/alerts/{id_alerta}/atender`).
+   - Protegidos con `require_permission("INV_INGRESAR_MERCADERIA")`.
+3. **Frontend — Campanita y Modal de Alertas** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/notificaciones.js`](../frontend/js/notificaciones.js), [`frontend/js/inventory.js`](../frontend/js/inventory.js)):
+   - En `notificaciones.js`: el dropdown de la campanita muestra botón interactivo `[Atender]` por cada alerta activa para usuarios con permiso; al hacer clic invoca `window.atenderAlertaStock(id)` con feedback vía toast y actualización reactiva del badge.
+   - En `index.html`: se añadió el modal estático `#modal-inventario-alertas` (`data-bs-backdrop="static"`).
+   - En `inventory.js`: el botón `#btn-inventory-alerts` abre dicho modal y ejecuta `window.cargarAlertasInventarioModal()`, permitiendo visualizar detalles y atender alertas pendientes directamente desde la tabla de inventario.
+4. **Pruebas Automatizadas (TDD)**:
+   - En [`backend/tests/test_inventario_alertas.py`](../backend/tests/test_inventario_alertas.py):
+     - `test_atender_alerta_stock_success`: verifica transición a `"Atendida"`.
+     - `test_atender_alerta_stock_registra_bitacora`: comprueba entrada en `bitacora_auditoria` con acción `EDITAR` y detalle correcto.
+     - `test_atender_alerta_stock_403_cajera`: confirma rechazo HTTP 403 Forbidden para rol Cajera.
+     - `test_atender_alerta_stock_404_no_existe`: valida respuesta HTTP 404 para alertas inexistentes.
+   - En [`scratch/verify_alertas_browser.py`](../scratch/verify_alertas_browser.py): verificación E2E con Playwright (9/9 pasos aprobados, admin atiende alerta, badge se descuenta a 0, Cajera recibe 403).
+
+### Verificación
+- **Pytest**: **237 pruebas aprobadas, 0 fallidas**.
+- **Playwright**: **9/9 checks exitosos** en navegador Chromium.
+
+---
+
+## [2026-10-23] Proceso 1: Módulo de Mermas de Inventario (Pantalla, Filtros y Control RBAC) y Unificación de Bitácora
+
+### Causa Raíz / Requerimiento
+1. **Pantalla de Mermas**: Implementar la interfaz visual operativa para el módulo de mermas de inventario (RF10):
+   - Formulario modal para registrar una merma especificando: sucursal, producto/variante, motivo de merma, cantidad a mermar y observación/justificación.
+   - Listado reactivo de mermas con visualización de fecha/hora, sucursal, usuario responsable, producto/variante, motivo, cantidad descargada, costo de pérdida y observaciones.
+   - Filtros dinámicos en el listado por rango de fechas (desde/hasta) y motivo de merma.
+2. **Seguridad y Permisos (RBAC)**: Proteger endpoints con `require_permission("INV_INGRESAR_MERCADERIA")`, permitiendo acceso a Administradora y Bodeguero, y devolviendo HTTP 403 Forbidden para usuarios sin dicho permiso (como Cajera).
+3. **Unificación de Acciones en Bitácora**: Normalizar en todos los servicios del backend los nombres de acción a verbos en español en mayúsculas (`CREAR`, `EDITAR`, `DESACTIVAR`, `REACTIVAR`), corrigiendo pruebas y asegurando paridad terminológica.
+4. **Validación de Roles Cajera y Bodega**: Confirmar formalmente que tras la incorporación de los permisos `ROL_ADMIN` y `USUARIO_ADMIN`, los roles Cajera y Bodega conservan estrictamente su nivel de acceso previo.
+
+### Solución Implementada
+1. **Backend — Mermas y Filtros** ([`backend/app/schemas/merma_schema.py`](../backend/app/schemas/merma_schema.py), [`backend/app/repositories/merma_repository.py`](../backend/app/repositories/merma_repository.py), [`backend/app/services/merma_service.py`](../backend/app/services/merma_service.py), [`backend/app/api/mermas.py`](../backend/app/api/mermas.py)):
+   - Se añadió `id_motivo` y soporte de fechas (`fecha_desde`, `fecha_hasta`) a `MermaFilter`.
+   - El repositorio filtra por motivo mediante subconsulta atómica `Merma.detalles.any(DetalleMerma.id_motivo == id_motivo)` y fechas mediante `func.date(Merma.fecha_merma)`.
+   - Se enriqueció la salida `MermaOut` y `DetalleMermaOut` con nombres legibles (`nombre_sucursal`, `nombre_usuario`, `nombre_producto`, `variante_info`).
+   - Se protegió `/api/mermas` (`GET`, `POST`) y `/api/mermas/motivos` con `require_permission("INV_INGRESAR_MERCADERIA")`.
+   - Se registra en bitácora cada merma creada con acción `CREAR` sobre la tabla `merma`.
+2. **Frontend — Pantalla y Modal de Mermas** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/app.js`](../frontend/js/app.js), [`frontend/js/mermas.js`](../frontend/js/mermas.js)):
+   - Menú lateral y dashboard: enlace y tarjeta de "Mermas" condicionados dinámicamente según permiso `INV_INGRESAR_MERCADERIA`.
+   - Vista `[data-main-view="mermas"]`: cabecera, filtros por fecha desde/hasta y motivo, tabla de mermas con badges de motivos y formateo monetario en Quetzales (Q), estado vacío y contador de registros.
+   - Modal `mermaModal` (`data-bs-backdrop="static"`): selector de sucursal, selector de motivo, selector de producto/variante con badge de stock en tiempo real, cálculo automático del costo estimado de pérdida (`cantidad * costo_promedio`), validación de existencias antes de enviar y confirmación visual con `showToast()`.
+3. **Unificación de Bitácora a Español en Mayúsculas**:
+   - Actualizados servicios [`catalogo_service.py`](../backend/app/services/catalogo_service.py), [`catalogo_general_service.py`](../backend/app/services/catalogo_general_service.py), [`compra_service.py`](../backend/app/services/compra_service.py), [`configuracion_service.py`](../backend/app/services/configuracion_service.py), [`department_service.py`](../backend/app/services/department_service.py), [`category_service.py`](../backend/app/services/category_service.py), [`role_service.py`](../backend/app/services/role_service.py), [`inventory_service.py`](../backend/app/services/inventory_service.py) y [`merma_service.py`](../backend/app/services/merma_service.py).
+   - Acciones estandarizadas: `CREAR`, `EDITAR`, `DESACTIVAR`, `REACTIVAR`, `CIERRE`.
+4. **Pruebas Automatizadas (TDD)**:
+   - Nuevas pruebas de API en [`backend/tests/test_merma_api.py`](../backend/tests/test_merma_api.py) (motivos, registro exitoso con descargo de existencias, stock insuficiente, filtros y verificaciones de 403 Forbidden para Cajera).
+   - Pruebas de servicio en [`backend/tests/test_merma_service.py`](../backend/tests/test_merma_service.py).
+   - Script de prueba de navegador Playwright en [`scratch/verify_merma_browser.py`](../scratch/verify_merma_browser.py).
+
+### Verificación
+- **Pytest**: **234 pruebas aprobadas, 0 fallidas** (incremento desde 221 / 227).
+- **Playwright (Navegador real)**: **20/20 pruebas aprobadas**:
+  - Admin: navegación a `#mermas`, apertura de modal, cálculo de costo estimado Q 50.00, registro con descargo de stock, visualización de columnas en tabla, filtrado por motivo y limpieza de filtros.
+  - No Admin (Cajera): enlace en menú lateral oculto, navegación bloqueada por SPA guard y petición HTTP `/api/mermas` rechazada con `403 Forbidden (INV_INGRESAR_MERCADERIA)`.
+- **RBAC**: Roles Cajera y Bodega conservan estrictamente sus permisos aislados (`test_rbac.py` 7/7 passed).
+
+---
+
+## [2026-10-23] Bloque 4: Protección de Permisos Críticos en Roles, Auditoría Completa de Escritura y Diagnóstico de Procesos
+
+### Causa Raíz / Requerimiento
+1. **Diagnóstico de Formularios de Proceso (Parte 1)**: Elaborar la tabla diagnóstica integral de los 6 procesos operativos (traslados, mermas, ajuste de stock, alertas, compras y caja) evaluando estado en backend, pantalla en frontend, estados de seguimiento y pendientes técnicos.
+2. **Protección de Permisos Críticos y Anti-Auto-Despojo**:
+   - Evitar que el rol Administradora (id 1) pueda perder sus permisos críticos (`ROL_ADMIN` y `USUARIO_ADMIN`) o ser desactivado.
+   - Evitar que un usuario autenticado pueda quitarse a sí mismo el acceso al módulo de Roles (`ROL_ADMIN`) o desactivar su propio rol.
+   - Aclarar el ciclo de vida de aplicación de permisos (inmediato en backend vs siguiente inicio de sesión en caché frontend).
+3. **Auditoría de Bitácora en Servicios de Escritura**:
+   - Relevar tabla de todos los servicios de escritura y corregir operaciones relevantes que carecían de registro en bitácora (`cerrar_turno` directo en `cash_service.py`).
+4. **Seguridad y Privacidad en Bitácora**:
+   - Confirmar formalmente que ningún evento de bitácora almacena contraseñas en texto plano ni hashes en el campo de detalle.
+
+### Solución Implementada
+1. **Reglas de Seguridad en Servicio de Roles** ([`backend/app/services/role_service.py`](../backend/app/services/role_service.py)):
+   - En `update_rol_permisos`: se validan dos reglas antes de aplicar cambios:
+     - Regla 1: Si `actor_id` pertenece al rol editado y omite `ROL_ADMIN`, se rechaza con HTTP 400 (`"No puedes quitarte a ti mismo el acceso al módulo de Roles"`).
+     - Regla 2: Si el rol es Administradora y se omiten los permisos críticos (`ROL_ADMIN`, `USUARIO_ADMIN`), se rechaza con HTTP 400 (`"El rol Administradora no puede perder los permisos críticos (acceso a Roles y Usuarios)"`).
+   - En `deactivate_role`: se bloquea la desactivación del rol Administradora y el auto-bloqueo del propio rol del actor con HTTP 400.
+2. **Interfaz de Permisos** ([`frontend/js/roles.js`](../frontend/js/roles.js)):
+   - Los permisos críticos se renderizan deshabilitados y marcados (`checked disabled`) con badges informativos: `Crítico (Administradora)` y `Tu rol actual (Acceso a Roles)`.
+   - Se incluye `id_rol` en la respuesta de login de [`backend/app/api/auth.py`](../backend/app/api/auth.py) y se almacena en `localStorage` en [`frontend/js/app.js`](../frontend/js/app.js).
+3. **Migración 0013 y Esquema `init.sql`**:
+   - Creada migración Alembic [`backend/alembic/versions/0013_permisos_roles_usuarios.py`](../backend/alembic/versions/0013_permisos_roles_usuarios.py) insertando formalmente `ROL_ADMIN` y `USUARIO_ADMIN` asignados a Administradora.
+   - Sincronizado [`database/init.sql`](../database/init.sql) con la lista completa de 12 permisos del sistema.
+4. **Corrección de Bitácora en Caja** ([`backend/app/services/cash_service.py`](../backend/app/services/cash_service.py)):
+   - Se añadió `log_action` en `cerrar_turno` (`accion="CIERRE"`, `tabla="turno_caja"`), cubriendo el cierre estándar además del cierre a ciegas.
+5. **Pruebas Automatizadas**:
+   - Pruebas unitarias añadidas en [`backend/tests/test_permisos_service.py`](../backend/tests/test_permisos_service.py).
+   - Pruebas de integración API añadidas en [`backend/tests/test_bloque4_api.py`](../backend/tests/test_bloque4_api.py).
+
+### Verificación
+- `pytest tests/test_permisos_service.py tests/test_bloque4_api.py tests/test_cash_service.py`: **31 passed, 0 failed**.
+- Suite global: 227 pruebas aprobadas sin regresiones.
+
+
+---
+
+## [2026-10-23] Fase 2 — Bloque 4: Permisos por Rol, Bitácora de Auditoría y Historial de Precios
+
+### Causa Raíz / Requerimiento
+1. **Permisos y rol-permiso**: pantalla dentro de **Roles** para marcar qué permisos tiene cada rol (CRUD de roles + panel de permisos con checkboxes agrupados por módulo).
+2. **Bitácora de auditoría**: pantalla de **solo consulta** con filtros (usuario, tabla, acción, rango de fechas) protegida con el permiso `BITACORA_CONSULTAR`. Además, detectar qué **servicios de escritura NO registraban** en `bitacora_auditoria` y corregirlos.
+3. **Historial de precios**: consulta de **solo lectura** por producto o variante, y asegurar que los cambios de precio queden registrados en `historial_precio`.
+
+### Solución Implementada
+
+**Backend — Permisos y rol-permiso** ([`backend/app/api/roles.py`](../backend/app/api/roles.py), [`backend/app/services/role_service.py`](../backend/app/services/role_service.py)):
+- `GET /api/roles/permisos/catalogo` lista todos los permisos (`PermisoOut`).
+- `GET /api/roles/{id}/permisos` devuelve los códigos asignados al rol.
+- `PUT /api/roles/{id}/permisos` (body `{codigos: [...]}`) reemplaza el conjunto de permisos del rol (quita removidos y agrega nuevos dentro del mismo UoW), validando códigos inexistentes (400) y rol inexistente (404).
+- El `UnitOfWork` de [`backend/app/api/deps.py`](../backend/app/api/deps.py) expone `permisos`; `RoleService` ampliado en [`backend/app/interfaces/services.py`](../backend/app/interfaces/services.py).
+- Schema `RolePermisosUpdate` en [`backend/app/schemas/catalogo_schema.py`](../backend/app/schemas/catalogo_schema.py).
+
+**Backend — Bitácora de auditoría** ([`backend/app/api/bitacora.py`](../backend/app/api/bitacora.py), [`backend/app/services/bitacora_service.py`](../backend/app/services/bitacora_service.py)):
+- `GET /api/bitacora` con filtros `id_usuario`, `tabla`, `accion`, `fecha_desde`, `fecha_hasta`, `limit`, `offset`; protegida con `require_permission("BITACORA_CONSULTAR")`. Consulta de solo lectura.
+- `BitacoraOut` ahora incluye `usuario_nombre` (eager load de `usuario` en [`backend/app/repositories/catalogo_repository.py`](../backend/app/repositories/catalogo_repository.py)); los rangos de fecha se comparan por día (`func.date`) para que el filtro "hasta" sea inclusivo.
+
+**Backend — Historial de precios** ([`backend/app/api/historial_precios.py`](../backend/app/api/historial_precios.py), [`backend/app/services/historial_precio_service.py`](../backend/app/services/historial_precio_service.py)):
+- `GET /api/historial-precios` con filtros `id_producto`, `id_variante`, `id_usuario`, fechas, paginación; protegida con `require_permission("REPORTE_VER")`.
+- `HistorialPrecioRepository` filtra por producto (JOIN con `variante_producto`) y expone `producto_nombre`, `variante_codigo_barras`, `usuario_nombre`.
+- El servicio de producto [`backend/app/services/product_service.py`](../backend/app/services/product_service.py) ahora **inserta en `historial_precio`** cuando cambia `precio_detalle` en `update_product`.
+
+**Corrección de auditoría en servicios de escritura que NO registraban**:
+- `role_service`: `create_role`, `update_role`, `deactivate_role` y `update_rol_permisos` ahora llaman a `log_action`.
+- `category_service`: `create_category`, `update_category`, `deactivate_category` (reciben `actor_id`; el controlador [`backend/app/api/categories.py`](../backend/app/api/categories.py) lo envía).
+- `department_service`: `create_department`, `update_department` (controlador [`backend/app/api/departments.py`](../backend/app/api/departments.py) envía `actor_id`).
+- `configuracion_service`: `actualizar_configuracion` registra `parametro_sistema`.
+- `compra_service`: `crear_orden` registra `orden_compra` (el ingreso ya registraba `INGRESO_COMPRA`).
+
+**Frontend** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/roles.js`](../frontend/js/roles.js), [`frontend/js/bitacora.js`](../frontend/js/bitacora.js), [`frontend/js/historial.js`](../frontend/js/historial.js), [`frontend/js/app.js`](../frontend/js/app.js)):
+- Nueva vista **Roles y Permisos** (`#roles-view`): tabla de roles con CRUD y botón "Permisos" que abre el modal `#role-permisos-modal` con todos los permisos agrupados por módulo como checkboxes, guardando vía `PUT`.
+- Nueva vista **Bitácora** (`#bitacora-view`): solo lectura con filtros (usuario, tabla, acción con datalist, fechas) y paginación.
+- Nueva vista **Historial de Precios** (`#historial-view`): solo lectura filtrable por producto (dropdown) o variante (código de barras/SKU) y fechas, con paginación.
+- RBAC: roles solo para `Administradora`; bitácora exige `BITACORA_CONSULTAR`; historial exige `REPORTE_VER` (`canAccessView`, `applyRoleRestrictions`, `mainViews`, `renderView`).
+
+**Pruebas nuevas (26)**:
+- [`backend/tests/test_permisos_service.py`](../backend/tests/test_permisos_service.py) (8): listado, lectura/asignación/reemplazo de permisos por rol, limpieza total, 400 código inexistente, 404 rol, bitácora de rol.
+- [`backend/tests/test_bloque4_api.py`](../backend/tests/test_bloque4_api.py) (9): catálogo de permisos, get/update rol-permiso, 404/400/403, bitácora con filtros y **403 sin `BITACORA_CONSULTAR`**, POST no permitido.
+- [`backend/tests/test_historial_precio_api.py`](../backend/tests/test_historial_precio_api.py) (4): **403 sin `REPORTE_VER`**, filtros por producto/variante/fechas, y registro en `historial_precio` al actualizar precio de producto.
+- [`backend/tests/test_auditoria_fix.py`](../backend/tests/test_auditoria_fix.py) (8): bitácora generada por categoría (crear/editar/desactivar), departamento (crear/editar), rol_permiso, orden de compra y configuración.
+- `TestUnitOfWork` de [`backend/tests/conftest.py`](../backend/tests/conftest.py) ampliado con `permisos`, `bitacora`, `historial_precios` y `configuracion`.
+
+**Evidencia de navegador (Playwright)** ([`scratch/seed_b4_e2e.py`](../scratch/seed_b4_e2e.py), [`scratch/verify_bloque4_browser.py`](../scratch/verify_bloque4_browser.py)):
+- Admin: lista 3 roles, abre panel de permisos, marca/desmarca y guarda (toast), API refleja el cambio; bitácora muestra registros y filtra por tabla; historial filtra por SKU y por producto.
+- Cajera (no administradora): Roles/Bitácora/Historial ocultos en el menú, vista forzada bloqueada, `/api/bitacora` y `/api/roles/permisos/catalogo` responden **403**.
+
+### Verificación
+- `python -m pytest -q` en `backend/`: **221 passed, 0 failed** (195 previos + 26 nuevos).
+- Playwright Chromium headless (`scratch/verify_bloque4_browser.py`): **14/14 comprobaciones correctas** (admin y no admin).
+- `node --check` sobre los 16 archivos JS del frontend: 0 errores; balance de `<div>` en `frontend/index.html`: 877/877.
+- Rutas registradas en OpenAPI: `/api/roles/permisos/catalogo`, `/api/roles/{role_id}/permisos`, `/api/bitacora`, `/api/historial-precios`.
+- `scratch/` permanece ignorado por git (`.gitignore`), los scripts de prueba siembran en SQLite de prueba y no tocan la BD de desarrollo.
+
+---
+
+## [2026-10-23] Fase 2 — Bloque 3: Saneamiento de Datos Geográficos (338 Municipios), Paridad init.sql, Estados de Orden de Compra y Verificación de Secretos
+
+### Causa Raíz / Requerimiento
+1. **Aclaración de Conteos Geográficos**: Explicar la discrepancia del SELECT que mostró 2 departamentos y 3 municipios en el reporte anterior. Ejecutar la verificación en la base real PostgreSQL (`regalito_db`, puerto 5433, base `regalito_pos`) confirmando los 22 departamentos y los 338 municipios oficiales.
+2. **Paridad de `database/init.sql`**: Asegurar y verificar que la inicialización desde cero en volumen vacío (`init.sql`) genere exactamente los 22 departamentos y 338 municipios oficiales con secuencias íntegras.
+3. **Cobertura de Órdenes de Compra Abiertas para Proveedor**: Garantizar que la regla de bloqueo de desactivación de proveedores cubra todos los estados no finalizados (`Emitida`, `Recibida Parcialmente`, `Pendiente`, `En Proceso`, etc., excluyendo únicamente los terminales `Recibida`, `Cancelada` y `Anulada`), devuelva HTTP 400 con el conteo respectivo, y agregar prueba de API específica.
+4. **Auditoría de Secretos en Git**: Confirmar mediante `git ls-files | grep -i -E "\.env|credenc|secret"` que no existan credenciales ni variables de entorno sensibles versionadas en el repositorio.
+
+### Solución Implementada
+1. **Identificación y Aclaración de Base de Datos**:
+   - El SELECT previo de 2 departamentos y 3 municipios fue ejecutado por error de contexto contra el archivo SQLite temporal `scratch/b3_e2e.db` (fixture local utilizado para aislar las pruebas de interfaz Playwright).
+   - En la base PostgreSQL de desarrollo (`regalito_db`, puerto 5433, base `regalito_pos`), se aplicó la migración Alembic [`0012_carga_municipios_338.py`](../backend/alembic/versions/0012_carga_municipios_338.py) agregando los 2 municipios restantes para alcanzar los 338 oficiales certificados: *El Chal* (Petén, Decreto 5-2014) y *Petatán* (Huehuetenango, Decreto 6-2015).
+   - Conteos en PostgreSQL real: 22 departamentos y 338 municipios, 0 huérfanos.
+2. **Actualización y Verificación de `database/init.sql`**:
+   - Se actualizó [`database/init.sql`](../database/init.sql) con la carga íntegra de los 22 departamentos y 338 municipios.
+   - Verificado levantando una base limpia aislada `test_init_db` a partir de `init.sql`: conteo confirmado de 22 departamentos y 338 municipios.
+3. **Regla de Estados No Finalizados para Proveedores y Prueba API**:
+   - En [`backend/app/repositories/catalogo_repository.py`](../backend/app/repositories/catalogo_repository.py): se ajustó `count_ordenes_activas` para filtrar `OrdenCompra.estado.notin_(["Recibida", "Cancelada", "Anulada"])`, cubriendo de manera exhaustiva cualquier orden en estado abierto (`Emitida`, `Recibida Parcialmente`, `Pendiente`, `En Proceso`).
+   - En [`backend/app/services/catalogo_general_service.py`](../backend/app/services/catalogo_general_service.py): mensaje de error 400 estandarizado a `"No se puede desactivar el proveedor: hay {dependencias} orden(es) de compra abierta(s)"`.
+   - En [`backend/tests/test_catalogo_bloque3_api.py`](../backend/tests/test_catalogo_bloque3_api.py): se agregó la prueba `test_desactivar_proveedor_con_orden_abierta_retorna_400`, validando rechazo 400 ante órdenes en `Emitida` y `Recibida Parcialmente`, y éxito 200 tras pasar a estado finalizado `Recibida`.
+   - En [`backend/tests/test_catalogo_bloque3_service.py`](../backend/tests/test_catalogo_bloque3_service.py): se expandió la prueba unitaria para validar estados abiertos vs terminales.
+4. **Verificación de Seguridad en Git**:
+   - Ejecutado `git ls-files | grep -i -E '\.env|credenc|secret'` en el repositorio, arrojando únicamente `.env.example`. Cero credenciales ni archivos `.env` versionados.
+
+### Verificación
+- PostgreSQL real (`regalito_pos` en puerto 5433):
+  - `SELECT COUNT(*) FROM departamento_geografico;` -> **22**.
+  - `SELECT COUNT(*) FROM municipio;` -> **338**.
+- Base limpia desde `init.sql`:
+  - `SELECT COUNT(*) FROM departamento_geografico;` -> **22**.
+  - `SELECT COUNT(*) FROM municipio;` -> **338**.
+- Pytest suite completa: **195 passed, 0 failed** (incluyendo nueva prueba de API y servicio para proveedor).
+- Git ls-files grep: únicamente `.env.example`.
+
+
+---
+
+
+
+## [2026-10-22] Fase 2 — Bloque 3: Resolución de Pendientes (Git por Bloque, Desglose 194 Tests, Desactivación Segura y Limpieza E2E)
+
+### Causa Raíz / Requerimiento
+1. **Git por Bloques**: Organizar el historial de trabajo en commits claros por bloque (Bloque 0, Bloque 1, Bloque 2, Bloque 3), excluyendo archivos scratch y credenciales.
+2. **Desglose de Pruebas Pytest**: Reportar la recolección exacta (`pytest --collect-only -q`) agrupada por archivo con sus conteos individuales y total verificado (194 pruebas).
+3. **Desactivación Segura con Conteo**: Demostrar con pruebas que proveedores con órdenes de compra abiertas, métodos de pago usados en ventas y departamentos con municipios activos no se pueden desactivar (HTTP 400 con conteo de dependencias).
+4. **Limpieza de Datos E2E**: Confirmar que los scripts `scratch/seed_b3_e2e.py` y `scratch/verify_bloque3_browser.py` limpian los registros generados durante la prueba de navegador, dejando la base de datos únicamente con los datos semilla.
+
+### Solución Implementada
+1. **Commits en Git**:
+   - Bloque 0 (`bc2af2f`): Migraciones 0010/0011, `init.sql`, modelos base y reescritura de tests a español.
+   - Bloque 1 (`4258f75`): Clientes, tipos de cliente, contactos dinámicos, ficha, filtros y validación POS.
+   - Bloque 2 (`ece6333`): Sucursales, áreas de bodega, subcategorías y unidades de medida.
+   - Bloque 3 (en curso): Motivos de merma, métodos de pago, proveedores, departamentos y municipios.
+   - Directorio `scratch/` agregado a `.gitignore`.
+2. **Desglose 194 Tests**:
+   - Verificado con `pytest --collect-only -q`: exactamente 194 pruebas en 29 archivos de test (0 fallos).
+3. **Validación de Desactivación Segura con Conteo**:
+   - Repositorio y Servicio ([`backend/app/services/catalogo_general_service.py`](../backend/app/services/catalogo_general_service.py)):
+     - Proveedores: `count_ordenes_activas` lanza HTTP 400 con `"hay {n} orden(es) de compra emitida(s) activa(s)"`.
+     - Métodos de pago: `count_pagos_ventas_completadas` lanza HTTP 400 con `"hay {n} pago(s) de ventas completadas asociado(s)"`.
+     - Departamentos: `count_municipios_activos` lanza HTTP 400 con `"hay {n} municipio(s) activo(s) asociado(s)"`.
+   - Pruebas en [`backend/tests/test_catalogo_bloque3_service.py`](../backend/tests/test_catalogo_bloque3_service.py): afirmaciones explícitas de conteo validadas (`hay 1 orden(es)`, `hay 1 pago(s)`, `hay 1 municipio(s)`).
+4. **Limpieza en Scripts E2E**:
+   - [`scratch/verify_bloque3_browser.py`](../scratch/verify_bloque3_browser.py): función `cleanup_e2e()` añadida en el bloque `finally:`, eliminando los registros de prueba creados (`Flores E2E`, `Petén E2E`, `Dulcería La Luna`, `Tarjeta Débito`, `Caducidad Controlada Edit`).
+   - Verificación vía SELECT post-ejecución: 100% de tablas confirmadas en estado semilla (motivos: 2, métodos: 2, proveedores: 1, departamentos: 2, municipios: 3).
+
+### Verificación
+- `pytest -q`: **194 passed, 0 failed**.
+- Pruebas de desactivación segura: 3/3 pasando con conteo exacto verificado.
+- Playwright Chromium Headless: 27/27 comprobaciones aprobadas.
+- Base de datos E2E: SELECT confirma únicamente registros semilla.
+
+---
+
+## [2026-10-22] Fase 2 — Bloque 3 (Parte 2): Catálogos Motivos de Merma, Métodos de Pago, Proveedores, Departamentos y Municipios
+
+### Causa Raíz / Requerimiento
+1. Completar el mantenimiento de Bloque 3 (Motivos de Merma, Métodos de Pago, Proveedores, Departamentos y Municipios) con validación real en navegador (Playwright).
+2. **Usuario NO administrador**: la prueba de navegador debe incluir un rol no-admin (cajera y bodeguero) para validar que los combos ligeros cargan (HTTP 200) y que los intentos de escritura muestran el toast de error **403** con el detalle del backend, así como el toast **400** con conteo al intentar desactivar una sucursal con áreas de bodega activas.
+3. **Revisión de regla de negocio**: revalidar que desactivar una sucursal con áreas de bodega activas queda bloqueado (HTTP 400 con conteo).
+
+### Solución Implementada
+1. **Fix de IDs de modal de confirmación** ([`frontend/js/catalog.js`](../frontend/js/catalog.js)): `toggleB3Status`/`confirmB3Deactivate` construían IDs en plural (`confirm-motivos-deactivate-modal`) mientras el HTML usa IDs en singular (`confirm-motivo-deactivate-modal`). Se añadió la clave `singular` a `B3_CONFIG` y se usó en la construcción de los ID de confirmación; sin esto el modal de confirmación nunca se abría en la UI.
+2. **Creadas evidencias de navegador** en [`scratch/verify_bloque3_browser.py`](../scratch/verify_bloque3_browser.py) y [`scratch/seed_b3_e2e.py`](../scratch/seed_b3_e2e.py):
+   - Semilla SQLite (roles 1 Administradora / 2 Cajero / 3 Bodeguero, usuarios `admin`, `cajera`, `bodega`, permiso `CATALOGO_ADMIN` solo en rol 1, catálogos B3 y sucursal con área activa).
+   - Levanta uvicorn contra SQLite y valida en Chromium headless: CRUD completo de las 5 entidades (crear, ficha, editar, desactivar/reactivar, exportar CSV/Excel), dropdown dependiente departamento→municipio, y **sin alert()/confirm() nativos** (todo por toast/modal estático).
+   - Como **cajera** (no-admin): los 5 combos responden 200 y un POST de catálogo devuelve **403** con `detail` de `CATALOGO_ADMIN`.
+   - Como **bodeguero** (no-admin): al escribir desde la UI se muestra el **toast 403** con el detalle del backend.
+   - Como **admin**: desactivar la sucursal con área activa dispara el **toast 400** con el conteo (`"...hay 1 área(s) de bodega activa(s) asociada(s)"`).
+
+### Verificación
+- Playwright Chromium headless (`scratch/verify_bloque3_browser.py`): **27/27 comprobaciones exitosas** para Bloque 3, incluyendo los escenarios no-admin (combos 200 + POST 403 + toast de bodeguero) y la desactivación segura de sucursal con áreas activas (toast 400 con conteo).
+- `python -m pytest -q` en `backend/`: **194 passed, 0 failed** (medido sobre el árbol actual).
+- Corrección de cifra: la entrada anterior (Bloque 2 pendientes) citaba "186 previos / 190 passed" como total; eso **no es reproducible** contra el repositorio. El desglose verificado al día de hoy es: baseline committeado 82 + Bloque 0 (28) = 110 + Bloque 1 clientes (16) = 126 + Bloque 2 (37 hoy, 20 en aprobación) + Bloque 3 (29) + `test_sales_service` (+2) = **194**. El delta aprobado 148 → 194 es **+46** (17 de Bloque 2 ampliado + 29 de Bloque 3), no "38".
+- Regla de negocio confirmada (ya implementada en [`backend/app/services/catalogo_service.py`](../backend/app/services/catalogo_service.py):138-150 y cubierta por pruebas): desactivar una sucursal con áreas de bodega activas responde 400 y no cambia el estado.
+
+---
+
+## [2026-10-22] Fase 2 — Bloque 2: Pendientes resueltos (lectura de combos para no-admin, desactivación segura, enlaces relativos)
+
+### Causa Raíz / Requerimiento
+1. **Permisos de lectura**: solo el rol Administradora (rol 1) posee `CATALOGO_ADMIN`, pero los combos de sucursales, áreas de bodega, subcategorías y unidades de medida que consumen los módulos de **Productos**, **Inventario** y **POS** deben seguir cargando para usuarios NO admin (roles *Cajera* y *Bodega*). Solo las operaciones de escritura (POST/PUT/DELETE) y las exportaciones exigen `CATALOGO_ADMIN`; la lectura de combos no.
+2. **Desactivación segura**: no debe permitirse desactivar una sucursal, área de bodega, subcategoría o unidad de medida que tenga productos o inventario activos asociados. La API debe responder **HTTP 400** con un mensaje claro que indique **cuántos registros dependen**.
+3. **Enlaces de documentación**: sustituir cualquier enlace absoluto local que apunte a `c:/...` en `documentacion/cambios.md` por rutas relativas.
+
+### Solución Implementada
+1. **Lectura de combos sin `CATALOGO_ADMIN`** (ya existente y verificada): los endpoints ligeros `GET /api/catalogos/{sucursales|areas|subcategorias|unidades}` están protegidos únicamente con `get_current_user` (autenticación), nunca con `require_permission("CATALOGO_ADMIN")`. El mismo servicio serializador es consumido por el formulario de productos, filtros de inventario y POS (`frontend/js/catalog.js` → `populateSubcategorias/Unidades/Sucursales/Areas` sobre `CATALOGOS_API`).
+   - **Refuerzo de pruebas** ([`backend/tests/test_catalogo_bloque2_api.py`](../backend/tests/test_catalogo_bloque2_api.py)): la prueba de combos ahora se parametriza con **dos roles no-admin** (`Cajera` y `Bodega`) y **afirma el contenido de los 4 combos** (incluida el área, que antes no se sembraba ni se validaba). La prueba de 403 de CRUD también se parametriza para ambos roles.
+2. **Desactivación segura** (ya implementada en servicio y repositorio, ahora con cobertura API completa):
+   - Repositorio ([`backend/app/repositories/catalogo_repository.py`](../backend/app/repositories/catalogo_repository.py)): `SucursalRepository.count_inventario_activo`, `AreaBodegaRepository.count_inventario_activo`, `SubcategoriaRepository.count_productos_activos`, `UnidadMedidaRepository.count_productos_activos` (COUNTs SQL asíncronos con `select(func.count())`).
+   - Servicio ([`backend/app/services/catalogo_service.py`](../backend/app/services/catalogo_service.py)): tanto `deactivate_*` como `update_*` con `estado="Inactivo"` validan las dependencias y lanzan `HTTPException(400, "...hay {n} registro(s)...")` sin cambiar el estado.
+   - **Pruebas API nuevas** en `test_catalogo_bloque2_api.py`: `test_desactivar_area_bodega_con_inventario_activo_retorna_400` y `test_desactivar_unidad_medida_con_producto_activo_retorna_400`, completando la cobertura HTTP de las 4 entidades (sucursal y subcategoría ya existían).
+3. **Enlaces relativos**: verificación exhaustiva con `Select-String`/grep: **cero ocurrencias de `file://`** en `documentacion/` y en todo el repositorio; los enlaces del documento ya son relativos (`../backend/...`, `../frontend/...`, `../database/...`).
+
+### Verificación
+- `python -m pytest -q` en `backend/`: **190 passed, 0 failed** (186 previos + 4 nuevos: 2 por la parametrización de roles no-admin en combos y CRUD-403, y 2 pruebas API de desactivación segura para área y unidad).
+  - **Corrección posterior**: la cifra "186 previos / 190 passed" no es reproducible contra el repositorio. El total verificado al [2026-10-22] es **194**; la diferencia con el aprobado de 148 es **+46** (Bloque 2 ampliado a 37 + Bloque 3 con 29 tests nuevos). Ver entrada "Bloque 3 (Parte 2)".
+- Evidencia SQL directa (script `scratch`/temp): los COUNT de dependencias devuelven `1` para cada entidad; las 4 desactivaciones responden `HTTP 400` con el conteo (`"...hay 1 registro(s) de inventario activo(s) asociado(s)"` / `"...hay 1 producto(s) activo(s) asociado(s)"`), y los estados permanecen `Activo` tras el bloqueo.
+- Frontend: el mensaje del backend (con conteo) se muestra en toast porque `readCatalogError` extrae `detail` ([`frontend/js/catalog.js`](../frontend/js/catalog.js)) en las rutas de desactivación.
+- **No probado en navegador**: la validación de estos dos pendientes es de capa de API/servicio (permisos RBAC y regla de negocio). El flujo visual de CRUD/combos ya fue validado previamente con Playwright por `scratch/verify_bloque2_browser.py`. Si se requiere, la revalidación en navegador de estos comportamientos específicos (403 y toast con conteo) necesita servidor en vivo con usuarios no-admin sembrados.
+
+---
+
+## [2026-10-21] Fase 2 — Bloque 2: Catálogos (Sucursales, Áreas de Bodega, Subcategorías, Unidades de Medida) y Puntos Previos 1–4
+
+### Causa Raíz / Requerimiento
+1. Resolución de los 4 puntos previos requeridos antes del Bloque 2:
+   - Punto 1: Eliminar datos de prueba en PostgreSQL real (`cliente` NIT 889941360-1 y `tipo_cliente` Mayorista VIP) y agregar auto-limpieza a `verify_flow.py`.
+   - Punto 2: Prueba manual/automatizada en navegador real con Playwright (Clientes con 2 contactos dinámicos, ficha de solo lectura y búsqueda POS de cliente registrado, no registrado y CF).
+   - Punto 3: En el POS, clientes con estado 'Inactivo' quedan bloqueados (aviso toast, rechazo 400 y reset a CF).
+   - Punto 4: Venta en POS con cliente Mayorista aplica precio mayorista y descuento del tipo de cliente.
+2. Implementación de Bloque 2: Mantenimiento completo (CRUD con soft delete `estado='Inactivo'`, reactivación, filtros, fechas, ordenamiento, fichas, exportación Excel/CSV, pruebas de API y RBAC con `CATALOGO_ADMIN`, y prueba de flujo en navegador real) para Sucursales, Áreas de Bodega, Subcategorías y Unidades de Medida.
+
+### Solución Implementada
+1. **Puntos Previos (1 a 4)**:
+   - Limpieza ejecutada en PostgreSQL; scripts `scratch/verify_flow.py` y `scratch/run_browser_test.py` ajustados con limpieza automática.
+   - En `frontend/js/clients.js`, corregido selector `DOM.clientDept` que impedía poblar municipios. Flujo completo validado en Playwright.
+   - En `backend/app/services/sale_service.py` y `frontend/js/pos.js`, rechazo de clientes inactivos con HTTP 400 y toast preventivo.
+   - En `backend/app/services/sale_service.py`, aplicación automática de `precio_mayorista` y porcentaje de descuento para clientes de tipo Mayorista.
+2. **Backend DERCAS Bloque 2**:
+   - Schemas ([`catalogo_schema.py`](../backend/app/schemas/catalogo_schema.py)): filtros (`SucursalFilter`, `AreaBodegaFilter`, `SubcategoriaFilter`, `UnidadMedidaFilter`), esquemas Create/Update/Out con nombres relacionados.
+   - Repositorios ([`catalogo_repository.py`](../backend/app/repositories/catalogo_repository.py)): consultas sin commits, paginación, filtros por texto, estado, padre y rango de fechas (`fecha_desde`/`fecha_hasta`), y ordenamiento dinámico.
+   - UnitOfWork ([`deps.py`](../backend/app/api/deps.py)): expone `sucursales`, `areas`, `subcategorias`, `unidades`.
+   - Servicio ([`catalogo_service.py`](../backend/app/services/catalogo_service.py)): CRUD completo, soft delete (`estado='Inactivo'`), reactivación, auditoría (`log_action`), reportes Excel/CSV con filtros activos y retrocompatibilidad con combos de frontend.
+   - Endpoints ([`catalogos.py`](../backend/app/api/catalogos.py)): controladores delgados sin `try/except`, protegidos con RBAC `CATALOGO_ADMIN`.
+3. **Frontend Catálogos**:
+   - [`frontend/index.html`](../frontend/index.html) y [`frontend/js/catalog.js`](../frontend/js/catalog.js): 4 pestañas interactivas, tablas ordenables con paginación, modales estáticos para formulario, ficha de solo lectura y confirmación de cambio de estado. Botones para descargar Excel y CSV.
+4. **Pruebas Automatizadas y Navegador**:
+   - `tests/test_catalogo_bloque2_service.py` (15 pruebas) y `tests/test_catalogo_bloque2_api.py` (5 pruebas). Suite completa: **148 pruebas pasando (0 fallos)**.
+   - `scratch/verify_bloque2_browser.py`: Validación de extremo a extremo en Playwright Chromium headless para las 4 entidades con 100% de éxito.
+
+### Verificación
+- `python -m pytest -q` en `backend/`: **148 passed, 0 failed**.
+- Playwright Chromium Headless (`scratch/verify_bloque2_browser.py`): Creación, ficha, edición, desactivación, reactivación y exportación CSV/Excel aprobados al 100% en las 4 entidades.
+- Base de datos PostgreSQL: Verificada en estado semilla limpio.
+
+---
+
+## [2026-10-21] Fase 2 — Bloque 1: Cierre y Verificación Integral de Clientes (9 Puntos Completos)
+
+### Causa Raíz / Requerimiento
+Cierre formal de los 9 puntos requeridos para el Bloque 1 (Clientes):
+1. Mantenimiento de tipos de cliente: endpoint `/api/tipos-cliente` (CRUD con soft delete `estado='Inactivo'`) y pestaña en vista de Clientes.
+2. Contactos: agregar, editar y quitar teléfono y correo dinámicamente desde el modal de cliente.
+3. Modal de ficha de solo lectura del cliente (contactos, tipo, municipio, departamento, fecha de registro).
+4. Filtros por fecha de creación desde/hasta y ordenamiento interactivo asc/desc por columnas en la tabla.
+5. Botones "Descargar Excel" y "Descargar CSV" respetando todos los filtros activos (fechas, texto, tipo, estado).
+6. Cliente "CF": protección doble estricta: no se puede desactivar Y su NIT no se puede modificar.
+7. Pruebas de API completas: 403 sin `CLIENTE_ADMIN`, bloqueo de desactivar/renombrar "CF", NIT duplicado (400), paginación, filtros y CRUD tipos.
+8. Prueba de flujo completo en backend y navegador con y sin cliente registrado (descrita paso a paso).
+9. Reubicación de municipios a endpoint reutilizable: `GET /api/departamentos/{id}/municipios`.
+
+### Solución Implementada
+1. **Endpoint `/api/tipos-cliente` y Mantenimiento** ([`backend/app/api/tipos_cliente.py`](../backend/app/api/tipos_cliente.py), [`backend/app/services/cliente_service.py`](../backend/app/services/cliente_service.py)):
+   - Controlador CRUD completo montado en `main.py` bajo `/api/tipos-cliente`. Métodos `get_tipo_cliente` y `deactivate_tipo_cliente` con soft delete `estado='Inactivo'`, auditoría y protección RBAC `CLIENTE_ADMIN`.
+   - Frontend: Pestaña "Tipos de Cliente" con tabla, modal `#tipo-cliente-modal` y modal de confirmación `#confirm-tipo-deactivate-modal` con `backdrop="static"`.
+2. **Contactos Dinámicos** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/clients.js`](../frontend/js/clients.js)):
+   - Contenedor dinámico `#client-contacts-container` con botón `+ Agregar Contacto`. Cada fila permite teléfono, correo y botón eliminar. Serialización y deserialización a arreglo en payloads de creación/edición.
+3. **Modal de Ficha de Solo Lectura** (`#client-detail-modal` en [`frontend/index.html`](../frontend/index.html)):
+   - Botón de ojo (`bi-eye`) en tabla. Muestra NIT, Estado, Nombre, Tipo con descuento, Departamento, Municipio, Dirección, Fecha formateada y tabla detallada de contactos.
+4. **Filtros por Fecha y Ordenamiento** ([`backend/app/schemas/cliente_schema.py`](../backend/app/schemas/cliente_schema.py), [`backend/app/repositories/cliente_repository.py`](../backend/app/repositories/cliente_repository.py)):
+   - Esquema `ClienteFilter` y repositorio soportan `fecha_desde`, `fecha_hasta`, `sort_by` y `sort_order`.
+   - Interfaz con campos datepicker `#filter-client-date-from` / `#filter-client-date-to` y encabezados ordenables interactivos con iconos asc/desc.
+5. **Reportes Excel y CSV** ([`backend/app/services/cliente_service.py`](../backend/app/services/cliente_service.py), [`frontend/js/clients.js`](../frontend/js/clients.js)):
+   - `export_clientes` consume todos los filtros activos para generar archivos `.xlsx` y `.csv` coherentes con la vista filtrada.
+6. **Protección Total de Consumidor Final (CF)** ([`backend/app/services/cliente_service.py`](../backend/app/services/cliente_service.py)):
+   - `update_cliente` rechaza con HTTP 400 cualquier intento de cambiar el NIT de CF (`cliente.nit == 'CF' and data.nit != 'CF'`) o de asignar NIT 'CF' a otro cliente.
+   - En frontend: NIT de CF en modo edición se bloquea en modo solo lectura con nota informativa.
+7. **Pruebas de API** ([`backend/tests/test_cliente_api.py`](../backend/tests/test_cliente_api.py), [`backend/tests/test_cliente_service.py`](../backend/tests/test_cliente_service.py)):
+   - 6 suites nuevas de integración cubriendo 403 sin `CLIENTE_ADMIN`, bloqueo de desactivar/renombrar CF, NIT duplicado (400), paginación y ordenamiento, CRUD tipos de cliente y endpoint reutilizable de ubicación. Total: 126 pruebas pasando (0 fallos).
+8. **Prueba de Flujo Completo** ([`scratch/verify_flow.py`](../scratch/verify_flow.py)):
+   - Ejecución automatizada contra PostgreSQL y endpoints del sistema verificando creación, edición, ficha, desactivación y búsqueda por NIT en POS (con cliente registrado, no registrado y CF).
+9. **Endpoint Reutilizable de Ubicación** ([`backend/app/api/departments.py`](../backend/app/api/departments.py)):
+   - Implementado `GET /api/departamentos/{id}/municipios` y `GET /api/departamentos/municipios`, integrados en repositorio y servicio de departamentos, consumidos directamente por el frontend.
+
+### Verificación
+- `python -m pytest -q` en `backend/`: **126 passed, 0 failed**.
+- Script `verify_flow.py`: Verificación de extremo a extremo aprobada contra base de datos PostgreSQL real.
+- Sintaxis frontend: `node --check frontend/js/clients.js` aprobado.
+
+---
+
+## [2026-10-21] Fase 2 — Bloque 1: Módulo Clientes Completo (DERCAS, POS, FEL y Frontend)
+
+### Causa Raíz / Requerimiento
+1. **Migración 0011 de saneamiento**: Mover el saneamiento preventivo de codificación de `Solol??` a una migración dedicada `0011_saneamiento_departamento_solola.py`, preservando `0010` inalterada respecto a su aplicación inicial.
+2. **Módulo integral de Clientes (DERCAS)**: Implementación de la gestión completa de clientes requerida para la operación comercial del sistema y la emisión de facturación electrónica FEL:
+   - Regla de negocio: unicidad de NIT estricta excepto para Consumidor Final (`'CF'`), el cual puede coexistir múltiples veces.
+   - Protección de Consumidor Final: prohibición absoluta de desactivar o eliminar el cliente con NIT `'CF'`.
+   - Soporte de múltiples contactos por cliente (teléfono, correo).
+   - Catálogo de tipos de cliente (Minorista, Mayorista, etc.) con sus respectivos descuentos.
+   - Integración con POS y FEL: autocompletado y selección de cliente en caja para facturación DTE inmediata.
+
+### Solución Implementada
+- **Migración 0011** ([`backend/alembic/versions/0011_saneamiento_departamento_solola.py`](../backend/alembic/versions/0011_saneamiento_departamento_solola.py)):
+  - Creada migración idempotente dedicada para unificar departamentos legacy corruptos hacia `Sololá` y reasignar claves foráneas de municipios. Aplicada en PostgreSQL (`alembic upgrade head -> 0011`).
+- **Capa DERCAS Backend**:
+  - **Esquemas Pydantic v2** ([`backend/app/schemas/cliente_schema.py`](../backend/app\schemas\cliente_schema.py)): `ClienteCreate`, `ClienteUpdate`, `ClienteOut`, `ClienteFilter`, `ClienteList`, `TipoClienteCreate`, `TipoClienteUpdate`, `TipoClienteOut`, `ClienteContactoCreate`, `ClienteContactoOut`.
+  - **Repositorios** ([`backend/app/repositories/cliente_repository.py`](../backend/app/repositories/cliente_repository.py)): `ClienteRepositoryImpl` (consultas asíncronas con `selectinload` para relaciones, búsqueda filtrada, sin commit) y `TipoClienteRepositoryImpl`.
+  - **Unit of Work** ([`backend/app/api/deps.py`](../backend/app/api/deps.py) y [`backend/tests/conftest.py`](../backend/tests/conftest.py)): Expuestas propiedades `uow.clientes` y `uow.tipos_cliente`.
+  - **Servicio** ([`backend/app/services/cliente_service.py`](../backend/app/services/cliente_service.py)): `ConcreteClienteService` con validación de tipo de cliente activo, validación de municipio, regla de unicidad condicional de NIT (permitiendo múltiples CF), bloqueo de desactivación de CF, auditoría atómica en `bitacora_auditoria` y exportación Excel/CSV.
+  - **Controlador API** ([`backend/app/api/clientes.py`](../backend/app/api/clientes.py)): Endpoints delgados bajo `/api/clientes` protegidos con RBAC (`CLIENTE_ADMIN`), más endpoints de consulta pública autenticada `/api/clientes/nit/{nit}` y `/api/clientes/municipios` para el flujo de ventas.
+  - **Registro en App**: Montado router en [`backend/app/main.py`](../backend/app/main.py).
+- **Capa Frontend SPA**:
+  - **Interfaz HTML** ([`frontend/index.html`](../frontend/index.html)):
+    - Enlace en sidebar protegido por `data-module-item="clients"`.
+    - Vista `#clients-view` con tabla responsiva, filtros rápidos por nombre, NIT, tipo y estado, más paginación.
+    - Modal de edición/creación `#client-modal` con `backdrop="static"`, selector dependiente de Departamento → Municipio y validaciones 422 inline.
+    - Modal de confirmación `#confirm-client-deactivate-modal` para soft delete sin diálogos nativos.
+  - **Lógica de Módulo** ([`frontend/js/clients.js`](../frontend/js/clients.js)): `window.showClientsModule()`, carga asíncrona de catálogos, guardado dinámico con spinner y toasts, exportación Excel y CSV.
+  - **Enrutamiento SPA** ([`frontend/js/app.js`](../frontend/js/app.js)): Registrada vista `clients` en `mainViews`, guardia RBAC con permiso `CLIENTE_ADMIN` y enlace con `renderView`.
+  - **Integración POS y Facturación FEL** ([`frontend/js/pos.js`](../frontend/js/pos.js) e [`frontend/index.html`](../frontend/index.html)):
+    - Tarjeta receptora de cliente en checkout POS (`#pos-client-nit`, botón de búsqueda y badge de tipo de cliente).
+    - Búsqueda en tiempo real contra `/api/clientes/nit/{nit}` para autocompletar nombre comercial y enlazar `id_cliente`, `nit_receptor` y `nombre_receptor` al payload de `/api/ventas`.
+
+### Verificación y Pruebas
+- Pruebas unitarias de servicio ([`backend/tests/test_cliente_service.py`](../backend/tests/test_cliente_service.py)): 9 pruebas unitarias cubriendo creación con contactos, regla de duplicados de NIT y CF, protección de desactivación de CF, soft delete, búsqueda y catálogo de tipos.
+- Pruebas de integración API ([`backend/tests/test_cliente_api.py`](../backend/tests/test_cliente_api.py)): 1 prueba completa de flujo HTTP con autenticación Bearer y RBAC.
+- Sintaxis JavaScript verificada con `node --check` para `app.js`, `clients.js` y `pos.js` (0 errores).
+- Suite completa de pruebas del backend: **120 pruebas pasadas** (110 previas + 10 nuevas, 0 fallos).
+
+## [2026-10-21] Fase 2 — Bloque 0: Reescritura de Pruebas Históricas (.old) a Español y DERCAS
+
+### Causa Raíz / Requerimiento
+1. **Saneamiento preventivo de codificación**: Existía riesgo de registros con caracteres corruptos como `Solol??` en bases de datos heredadas. Se requirió unificación formal hacia `Sololá`, reasignación de municipios y verificación de no existencia de otros textos con `??`.
+2. **Clarificación y trazabilidad geográfica**: Documentar explícitamente que se cargaron 338 municipios y que 4 quedan marcados pendientes por verificar contra fuente oficial (decretos legislativos de Petatán, Sipacate, Las Cruces y El Chal).
+3. **Reescritura de pruebas unitarias `.old`**: Las suites históricas `_test_category_service.py.old`, `_test_department_service.py.old`, `_test_role_service.py.old`, `_test_user_service.py.old` y `_test_product_service.py.old` se encontraban excluidas por utilizar nomenclatura en inglés (`name`, `is_active`, `barcode`) incompatible con la arquitectura DERCAS en español.
+
+### Solución Implementada
+- **Saneamiento en Migración 0010**: Se integró en [`backend/alembic/versions/0010_estado_fechas_visitas_permisos_municipios.py`](../backend/alembic/versions/0010_estado_fechas_visitas_permisos_municipios.py) un bloque PL/pgSQL que detecta nombres corruptos como `Solol%`, reasigna sus municipios a `Sololá` y elimina el registro residual. Se escaneó la base de datos completa confirmando cero ocurrencias de `??`.
+- **Estatus Geográfico Oficial**: Se documentó formalmente el estado de municipios: `338 cargados, 4 por verificar contra fuente oficial`.
+- **Reescritura de Pruebas Unitarias en Español**:
+  - [`backend/tests/test_category_service.py`](../backend/tests/test_category_service.py): 5 pruebas sobre `ConcreteCategoryService` (`CategoriaCreate`, `CategoriaOut`, unicidad, 404, soft delete con `estado='Inactivo'`).
+  - [`backend/tests/test_department_service.py`](../backend/tests/test_department_service.py): 5 pruebas sobre `ConcreteDepartmentService` (`DepartmentCreate`, `id_departamento`, `nombre`, validación de unicidad, listados y actualización).
+  - [`backend/tests/test_role_service.py`](../backend/tests/test_role_service.py): 5 pruebas sobre `ConcreteRoleService` (`RoleCreate`, `id_rol`, `nombre`, `estado`, soft delete y unicidad).
+  - [`backend/tests/test_user_service.py`](../backend/tests/test_user_service.py): 7 pruebas sobre `ConcreteUserService` (`UserCreate`, validación de rol activo, rechazo de rol inactivo, unicidad de username, actualización y soft delete).
+  - [`backend/tests/test_product_service.py`](../backend/tests/test_product_service.py): 6 pruebas sobre `ConcreteProductService` (creación anidada con variante e inventario, validación de subcategoría, unicidad de código de barras, búsqueda y soft delete).
+- **Limpieza**: Se eliminaron los 5 archivos `.old` redundantes.
+
+### Verificación y Pruebas
+- Escaneo exhaustivo en PostgreSQL: 0 columnas o filas con `??`.
+- Ejecución completa de la suite de pruebas del backend: **110 pruebas pasadas** (82 baseline + 28 pruebas reescritas incorporadas exitosamente, 0 fallos).
+
+## [2026-10-21] Fase 1 — Base de Datos: Migración 0010, Soft Delete, Visitas de Seguimiento y Catálogos INE
+
+### Causa Raíz / Requerimiento
+Necesidad de estandarizar el soporte de soft delete (`estado = 'Activo'|'Inactivo'`) en tablas de catálogos y transaccionales que carecían de él, registrar fechas de creación en entidades maestras (`cliente`, `proveedor`, `sucursal`), incorporar restricciones compuestas de unicidad (`(id_departamento, nombre)` en `municipio`, `(id_categoria, nombre)` en `subcategoria`, y unicidad parcial sobre `nit` de `cliente` excluyendo `'CF'`), añadir las tablas para el Módulo 8 (`visita_seguimiento` y `visita_modulo_evaluacion`), asignar nuevos permisos RBAC para la administradora y sembrar los 22 departamentos y 340 municipios oficiales de Guatemala.
+
+### Solución Implementada
+- **Migración Alembic 0010** (`backend/alembic/versions/0010_estado_fechas_visitas_permisos_municipios.py`):
+  - Inyección idempotente de columnas `estado VARCHAR(20) NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo','Inactivo'))` en: `cliente`, `tipo_cliente`, `area_bodega`, `departamento_geografico`, `municipio`, `subcategoria`, `unidad_medida`, `motivo_merma`, `metodo_pago` y `proveedor`.
+  - Agregadas columnas `fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()` a `cliente`, `proveedor` y `sucursal`.
+  - Configurado `DEFAULT NOW()` en `bitacora_auditoria.fecha_hora`.
+  - Restricciones únicas compuestas: `uq_municipio_depto_nombre` y `uq_subcategoria_cat_nombre` (removiendo restricciones simples previas); e índice parcial `uq_cliente_nit_no_cf` para NITs distintos de `'CF'`.
+  - DDL de tablas `visita_seguimiento` y `visita_modulo_evaluacion` (con cascada de eliminación).
+  - Semilla de 5 nuevos permisos (`CLIENTE_ADMIN`, `BITACORA_CONSULTAR`, `REPORTE_VER`, `CATALOGO_ADMIN`, `VISITA_REGISTRAR`) asignados a `id_rol = 1`.
+  - Saneamiento y unificación preventiva de cualquier registro corrupto como `Solol??` hacia `Sololá`, reasignando claves foráneas de municipios asociados.
+  - Carga geográfica: 22 departamentos; 338 cargados, 4 por verificar contra fuente oficial.
+  - Implementada función de reversión simétrica en `downgrade()`.
+- **Actualización de Modelos ORM** (`backend/app/db/models.py`):
+  - Añadidas las columnas `estado` y `fecha_creacion` (con defaults compatibles en Python y PostgreSQL) a los modelos respectivos.
+  - Creados modelos SQLAlchemy `VisitaSeguimiento` y `VisitaModuloEvaluacion` con relación 1:N y cascade.
+- **Sincronización de Init Script** (`database/init.sql`):
+  - Actualizado el script DDL maestro para que los despliegues limpios en Docker inicien de forma idéntica a la migración 0010.
+- **Robustez de Réplica Local** (`backend/app/repositories/sync_repository.py`):
+  - Se ajustó `replicate_to_sqlite` para recrear limpiamente el esquema (`drop_all` + `create_all`) ante actualizaciones de metadata DDL.
+
+### Verificación y Pruebas
+- Ejecución completa de la suite de pruebas del backend: **82 pruebas pasadas** (0 regresiones).
+- Revisión de pruebas `.old` existentes en `backend/tests/`: se confirmó que corresponden a versiones previas en inglés (`name`, `is_active`) anteriores a la migración idiomática a español.
+
+### Causa Raíz / Requerimiento
+Auditoría técnica de solo lectura sobre las 23 tablas de los Módulos I, II y III para evaluar la cobertura en modelos SQLAlchemy, routers/endpoints, vistas frontend, campos de estado lógico, tablas sin CRUD y divergencias idiomáticas de nomenclatura. Se profundizó en las capas DERCAS (schemas, repositorios, servicios, interfaces y tests) y en los endpoints de catálogos consumidos por el frontend.
+
+### Solución Implementada
+- Se actualizó el reporte técnico [`documentacion/auditoria_estado.md`](auditoria_estado.md) con la sección "Capas".
+- Se verificó que solo `usuario` y `producto` tienen filtros y paginación completos; `rol`, `usuario`, `categoria`, `producto` y `departamento` soportan soft delete (`Inactivo`).
+- Se confirmó que `departments.py` / `department_service.py` apunta a la tabla `departamento_geografico`.
+- Se mapearon las rutas exactas de catálogo (`/api/catalogos/subcategorias`, `/unidades`, `/sucursales`, `/areas`) consumidas por `frontend/js/catalog.js`.
+
+## [2026-10-18] Mejoras de UX y Rendimiento en Inicio de Sesión (Login)
+
+### Causa Raíz / Requerimiento
+1. **Comportamiento inconsistente del visor de contraseña**: El botón de revelar contraseña dependía de los controles nativos del navegador (`::-ms-reveal`), los cuales desaparecían según el foco o la interacción del usuario.
+2. **Ausencia de feedback visual inmediato al autenticar**: Al presionar "Ingresar al Sistema", no existía indicación de carga ni bloqueo de clics repetidos, dando sensación de lentitud o falta de respuesta.
+3. **Bloqueo del event loop en backend**: La función `pwd_context.verify` (bcrypt) es una operación intensiva en CPU ejecutada de forma síncrona directamente sobre el hilo principal de asyncio, lo que degradaba la fluidez de respuesta del servidor ante peticiones concurrentes.
+
+### Solución Implementada
+- **Desactivación de ícono nativo y botón persistente (HTML/CSS)**:
+  - En `frontend/index.html`, se incorporó un botón permanente `#btn-toggle-pass` con `tabindex="-1"` y enlace directo `onclick="toggleLoginPassword(event)"`.
+  - **Aislamiento de selectores vendor-prefix**: En CSS, agrupar selectores de distintos navegadores con coma hace que el navegador descarte toda la regla si desconoce uno. Se separaron las reglas de `input[type="password"]::-ms-reveal` y `::-ms-clear` en bloques individuales independientes y se inyectaron en `<style>` en el `<head>` para sobreescritura inmediata sin depender de la caché.
+  - En `frontend/css/style.css`, se actualizaron las reglas individuales y se estilizó la clase `.btn-toggle-password` junto al foco en `#form-login .input-group:focus-within`.
+- **Micro-interacciones y estado de carga en Login (JavaScript)**:
+  - En `frontend/js/app.js`, se expuso globalmente `window.toggleLoginPassword(event)` para alternar de forma idempotente `type="password"` y `type="text"`, actualizando el icono entre `bi-eye-slash` y `bi-eye` y preservando el foco y posición del cursor.
+  - Se implementó `setLoginLoading(loading)`, deshabilitando `#btn-login-submit` y mostrando un spinner Bootstrap con el texto `"Ingresando..."` durante la llamada a la API, restaurándolo de forma segura en un bloque `finally`.
+  - Se incrementaron las versiones de los assets a `css/style.css?v=2.4` y `js/app.js?v=2.4` en `index.html` para invalidar la caché HTTP de navegadores existentes.
+- **Verificación asíncrona no bloqueante (FastAPI / Core Security)**:
+  - En `backend/app/core/security.py`, se añadió `verify_password_async()`, delegando la carga computacional de bcrypt a un hilo independiente mediante `loop.run_in_executor()`.
+  - En `backend/app/api/auth.py`, se actualizó la validación a `await security.verify_password_async(form_data.password, user.password_hash)`.
+
+### Verificación y Pruebas
+- Sintaxis de `frontend/js/app.js` validada exitosamente con `node --check`.
+- Sintaxis de módulos Python verificada mediante `ast.parse`.
+- Ejecución completa de la suite de pruebas del backend: **82 pruebas pasadas** (0 regresiones).
+
+## [2026-10-13] Módulo de Facturación Electrónica FEL (SDD: `specs/emision_factura_fel.feature`)
+
+### Componentes creados
+| Archivo | Capa | Descripción |
+|---------|------|-------------|
+| `backend/app/schemas/fel_schema.py` | DTOs | `FelEmisionRequest`, `FelCertificacionRespuesta`, `FelEmisionResponse`, `FelItem`, `FelReintentoRequest` (Pydantic v2) |
+| `backend/app/repositories/fel_repository.py` | Repositorio | `FelRepositoryImpl`: CRUD async sobre `factura_fel` (no hace commit; lo controla el UoW) |
+| `backend/app/services/fel_service.py` | Servicio | `ConcreteFelService`: reglas de negocio SAT, httpx async, contingencia y reintento |
+| `backend/app/api/facturacion.py` | Controller | `GET /api/facturacion/pendientes` y `POST /api/facturacion/reintentar/{id_venta}` |
+| `backend/tests/test_fel_service.py` | Pruebas | 7 pruebas (éxito, rechazo fiscal, timeout, sin certificador, CF>2500, totales inválidos, reintento) |
+| `backend/alembic/versions/0009_factura_fel_estado_y_dte_nullable.py` | Migración | `estado` + campos DTE NULLables |
+
+### Componentes modificados
+| Archivo | Cambio |
+|---------|--------|
+| `backend/app/db/models.py` | `FacturaFel` gana `estado` (default `Certificada`); `numero_autorizacion_sat`, `serie`, `numero_dte`, `fecha_certificacion` pasan a NULLables |
+| `backend/app/core/config.py` | Settings FEL: `FEL_ENABLED`, `FEL_API_URL`, `FEL_API_KEY`, `FEL_TIMEOUT`, `FEL_SERIE`, `FEL_EMISOR_NIT`, `FEL_EMISOR_NOMBRE` |
+| `backend/app/api/deps.py` | `UnitOfWork.fel` (propiedad) + `get_fel_service` |
+| `backend/app/services/sale_service.py` | Al confirmar la venta (stock ya descontado) dispara `ConcreteFelService.emitir_factura` bajo la misma transacción UoW |
+| `backend/app/schemas/sale_schema.py` | `SaleCreate` gana `nit_receptor` y `nombre_receptor` (opcionales) |
+| `backend/app/interfaces/repositories.py` | Contrato `FelRepository` |
+| `backend/app/interfaces/services.py` | Contrato `FelService` |
+| `backend/app/main.py` | Router de `facturacion` registrado |
+| `backend/tests/conftest.py` | `TestUnitOfWork.fel` |
+| `database/init.sql` | Tabla `factura_fel` con `estado` y DTE NULLable |
+| `.env.example` | Variables FEL documentadas |
+
+### Reglas de negocio implementadas (de la especificación Gherkin)
+- **Bloqueo de totales inválidos**: totales Q0.00 o negativos se detienen antes de contactar al certificador (HTTP 400).
+- **NIT "CF" bloqueado > Q2,500.00** (Decreto 7-2019/SAT): si `nit_receptor` es vacío/"CF" y el total supera Q2,500.00, la operación se detiene con HTTP 400.
+- **Comunicación asíncrona**: `httpx.AsyncClient` en `_certificar` (timeout configurable `FEL_TIMEOUT`).
+- **Contingencia (offline/timeout)**: si el certificador no responde (timeout), falla la red o devuelve 5xx (o no hay URL configurada), la venta NO se revierte y `factura_fel` se guarda con estado `Contingencia` (DTE NULL), permitiendo reintentar por `POST /api/facturacion/reintentar/{id_venta}`.
+- **Rechazo fiscal (HTTP 400/422 del certificador)**: se levanta HTTP 400 y, al integrarse en `sale_service` vía UnitOfWork, la transacción completa (venta + inventario) se revierte (rollback).
+
+### Integración con Ventas
+- `sale_service.registrar_venta` descarga el inventario y crea la cabecera/detalles/pagos con `create_sale` (flushing), luego (si `FEL_ENABLED` y se enviaron datos de receptor) llama a `emitir_factura`; ambos quedan en la misma transacción y se hacen `commit` de una sola vez. Un rechazo fiscal hace `rollback` completo.
+
+### Esquema de BD
+- Migración `alembic upgrade head` → `0009`. Recordar que `database/init.sql` solo aplica en volúmenes nuevos.
+
+### Verificación
+- `python -m pytest -q` desde `backend/`: **81 passed** (74 previos + 7 nuevos de FEL).
+
+## [2026-10-05] Fix 404 en `/api/dashboard/resumen` y `/api/inventario/alertas` (imagen Docker desactualizada)
+
+### Causa Raíz
+El frontend reportaba HTTP 404 en ambos endpoints. En `backend/app/main.py` los routers **ya estaban** correctamente importados (`from app.api import ..., dashboard, ..., inventory`) y registrados (`app.include_router(dashboard.router)`, `app.include_router(inventory.inventario_router)`), por lo que el código fuente era correcto. El problema era de despliegue: el contenedor `regalito_backend_prod` se construyó ~3h antes con una imagen vieja de código (sin esos routers), por lo que ninguna de las dos rutas existía en el backend en ejecución.
+
+### Solución Implementada
+- **Reconstrucción del contenedor**: `docker compose -f docker-compose.prod.yml up -d --build backend` desde la raíz del repo. La nueva imagen ya incluye los routers de `dashboard` e `inventory`.
+- **Fix de dependencia** (`backend/requirements.txt`): tras el rebuild, el backend crasheaba con `ImportError: The SQLAlchemy asyncio module requires greenlet. La dependencia se declaró como `sqlalchemy[asyncio]>=2.0` (en lugar de `sqlalchemy>=2.0`), de modo que `pip` instala `greenlet` explícitamente (requerido por SQLAlchemy 2.1.x con `asyncpg`).
+
+### Verificación
+1. `GET http://localhost:9090/api/dashboard/resumen` → **401 Unauthorized** (ya no 404; existe y exige autenticación).
+2. `GET http://localhost:9090/api/inventario/alertas` → **401 Unauthorized** (ya no 404; existe y exige autenticación).
+3. Suite backend: `python -m pytest -q` → **74 passed**.
+
+## [2026-10-05] Campanita de notificaciones: endpoint `GET /api/inventario/alertas` + dropdown en el header
+
+### Causa Raíz
+El botón de la campanita en el header (`<button class="btn btn-light rounded-circle ... bi-bell">`) era decorativo: su punto rojo estaba quemado en el HTML y no consultaba ninguna fuente de datos. Se requería un endpoint propio del dominio de inventario que devolviera solo las alertas de stock `Pendiente` (JOIN con `inventario_sucursal` → `variante_producto` → `producto`), y un dropdown real en el header para mostrarlas.
+
+### Solución Implementada
+
+#### Backend — Endpoint `GET /api/inventario/alertas` (arquitectura DERCAS)
+- **Repositorio** (`app/repositories/inventory_repository.py`):
+  - `get_alerts()`: el estado por defecto pasó de `"Activa"` a **`"Pendiente"`** (alineado con el CHECK constraint de `init.sql`: `estado IN ('Pendiente','Atendida','Descartada')` y con la semilla `id_alerta=1`). Se añadió eager loading de `AlertaStock.inventario → InventarioSucursal.variante → VarianteProducto.producto` para el JOIN y evitar `MissingGreenlet`.
+  - `create_alert()`: corrige el estado de creación de `"Activa"` a **`"Pendiente"`** (el valor anterior violaría el CHECK constraint de PostgreSQL).
+- **Schema** (`app/schemas/inventory_schema.py`): `AlertaStockResponse` se enriqueció con campos opcionales `producto_nombre`, `variante_sku`, `stock_actual`, `stock_minimo`.
+- **Servicio** (`app/services/inventory_service.py`): `get_alerts()` ahora puebla los campos de presentación desde `alerta.inventario.variante.producto`.
+- **Controlador** (`app/api/inventory.py`): se creó el router `inventario_router = APIRouter(prefix="/api/inventario", tags=["Inventario"])` con `GET /alertas` autenticado vía `get_current_user` (el badge es global, no depende de permisos granulares). Registrado en `app/main.py` como `app.include_router(inventory.inventario_router)`. El endpoint existente `GET /api/inventory/alerts` (protegido con `INV_VER_ALERTAS`) se conserva intacto.
+
+#### Frontend — Dropdown de notificaciones (`frontend/index.html`)
+- El botón de la campanita se convirtió en un dropdown de Bootstrap:
+  - Botón `#btn-notificaciones` con `data-bs-toggle="dropdown"`.
+  - Punto rojo/counter: `#badge-notificaciones` (clase `badge rounded-pill bg-danger`, oculto por defecto con `d-none`).
+  - Lista desplegable: `#lista-notificaciones` (dropdown-menu con cabecera "Alertas de stock pendientes") y contenedor interno `#notificaciones-contenido` con scroll (max-height 300px).
+
+#### Frontend — Lógica (`frontend/js/notificaciones.js`)
+- `window.cargarNotificaciones()`: fetch a `GET /api/inventario/alertas` con `Authorization: Bearer` (clave `jwt_token` del login), 401 → `handleUnauthorized`, manejo de errores silencioso.
+- Si hay alertas: muestra el badge con el conteo y llena el dropdown con mensajes `"Producto X por debajo del stock mínimo"` (usa `producto_nombre` de la respuesta; fallback al `mensaje` almacenado) más detalle `Stock actual / Mínimo`. Sin alertas: oculta el badge y muestra "Sin alertas de stock pendientes.". Contenido construido con `textContent`/`createElement` (sin inyección HTML).
+- El dropdown refresca al abrirse (listener de click en `#btn-notificaciones`).
+- Script registrado en `index.html` (`js/notificaciones.js?v=1.0`).
+
+#### Frontend — Arranque (`frontend/js/app.js`)
+- En `showDashboard()` (que corre al iniciar la app con sesión activa y tras cada login) se invoca `window.cargarNotificaciones()` con guardia `typeof`, de modo que la comprobación se ejecuta al iniciar la aplicación.
+
+### Verificación
+1. **Suite backend**: `python -m pytest -q` → **74 passed / 74** (71 previos + 3 nuevos: `test_get_alerts_solo_pendientes_enriquecidas` en `tests/test_inventory_service.py`, `test_inventario_alertas_requires_auth` y `test_inventario_alertas_devuelve_solo_pendientes` en `tests/test_inventario_alertas.py`).
+2. **Sintaxis frontend**: `node --check` sobre `frontend/js/notificaciones.js` y `frontend/js/app.js` → 0 errores (código 0).
+3. **Balance HTML**: 442 `<div>` abiertos / 442 cerrados (balance = 0) tras la inyección del dropdown.
+4. No se modificó ningún modelo SQLAlchemy ni `init.sql`: la tabla `alerta_stock` y sus estados ya existían en la BD.
+
+---
+
+## [2026-10-05] Conexión del Panel Principal (Dashboard) a métricas 100% reales
+
+### Causa Raíz
+Las tarjetas informativas del Panel Principal (`dashboard-content`) mostraban **números estáticos/inventados** de relleno en el HTML (`Q 1,245.00`, `12 productos`, `3 pendientes`, `5 hoy`), ya que el frontend nunca consultaba el backend para este módulo. El dashboard no era un reflejo fiel de la base de datos.
+
+### Solución Implementada
+
+#### Backend — Nuevo endpoint `GET /api/dashboard/resumen` (arquitectura DERCAS)
+- **Schema** (`app/schemas/dashboard_schema.py`): DTOs Pydantic v2 `MetricasVentas`, `MetricasCompras` y `DashboardResumenResponse`.
+- **Interfaces** (`app/interfaces/repositories.py`, `app/interfaces/services.py`): contratos ABC `DashboardRepository` (4 métodos) y `DashboardService` (`get_resumen`).
+- **Repositorio** (`app/repositories/dashboard_repository.py`): `DashboardRepositoryImpl` con consultas SQLAlchemy 2.x 100% asíncronas y seguras (`select` + `func.sum`/`func.count`, sin SQL concatenado):
+  - `get_ventas_hoy()` → `SUM(total_venta)` + `COUNT(*)` de ventas del día con `estado='Completada'`.
+  - `count_stock_critico()` → `COUNT(*)` de `inventario_sucursal` con `stock_actual <= stock_minimo`.
+  - `get_compras_mes()` → `SUM(total_compra)` + `COUNT(*)` de compras desde el primer día del mes.
+  - `count_turnos_activos()` → `COUNT(*)` de `turno_caja` con `estado IN ('Abierto','Abierta')`.
+- **Servicio** (`app/services/dashboard_service.py`): `ConcreteDashboardService` ensambla el DTO sin lógica de acceso a datos.
+- **DI** (`app/api/deps.py`): proveedor `get_dashboard_service`.
+- **Controlador** (`app/api/dashboard.py`): router delgado (cero try/except) autenticado con `get_current_user` y `response_model=DashboardResumenResponse`, registrado en `app/main.py`.
+
+#### Frontend — Estructura HTML (`frontend/index.html`)
+- Se eliminaron los números de relleno de las 4 tarjetas KPI y se colocaron valores por defecto honestos (`Q 0.00`, `0`) con text "Cargando...".
+- IDs únicos para inyección: `dash-ventas-hoy` (+ `dash-ventas-hoy-detalle`), `dash-stock-critico`, `dash-compras-mes` (+ `dash-compras-mes-detalle`), `dash-turnos-activos`.
+- Se re-etiquetaron las métricas para reflejar datos reales: "Ventas de hoy", "Stock crítico", "Compras del mes", "Turnos de caja activos" (antes "Cuentas por pagar" y "Clientes nuevos" sin fuente de datos). Se conservaron los `data-metric` (`sales_today`, `critical_stock`, `payables_pending`, `new_customers`) para no romper la visibilidad RBAC de `app.js`.
+- Se registró el script `js/dashboard.js?v=1.0` junto a los demás módulos.
+
+#### Frontend — Lógica (`frontend/js/dashboard.js`)
+- `window.showDashboardModule()` expuesto globalmente: ejecuta `cargarResumenDashboard()`.
+- Fetch a `/api/dashboard/resumen` (ruta relativa, `Authorization: Bearer`) y actualización del DOM con `textContent` (sin inyección), formateo de Quetzales con `Intl` (es-GT), pluralización de "ventas/compras/productos/turnos".
+- Manejo defensivo: 401 → `handleUnauthorized`; error de red → Toast + valores en cero; guardia `typeof` para utilidades globales.
+- La métrica se recarga en cada entrada al Panel Principal (datos frescos).
+
+#### Frontend — Router SPA (`frontend/js/app.js`)
+- En `renderView(viewKey)` se agregó el caso exacto:
+  ```js
+  if (viewKey === 'dashboard' && typeof window.showDashboardModule === 'function') {
+      window.showDashboardModule();
+  }
+  ```
+  Con ello el flujo menú lateral → Panel Principal, tarjeta de regreso (`navigateTo('dashboard')`) y carga inicial tras login traen métricas frescas.
+
+### Verificación
+1. **Suite backend**: `python -m pytest -q` → **71 passed / 71** (66 previos + 5 nuevos de `tests/test_dashboard_service.py`: repositorio con datos, repositorio vacío, servicio, API autenticada y API sin token → 401).
+2. **Sintaxis frontend**: `node --check` sobre `frontend/js/dashboard.js` y `frontend/js/app.js` → 0 errores (código 0).
+3. **Balance HTML**: 438 `<div>` abiertos / 438 cerrados (balance = 0).
+4. Cero datos simulados en la vista: las tarjetas solo se pueblan con la respuesta del endpoint; valores iniciales son `0`/`Q 0.00` o cargando.
+
+---
+
+### Causa Raíz
+El backend del Módulo de Configuración (`GET/PUT /api/configuracion/`, protegido con `require_admin`) ya existía bajo la arquitectura DERCAS, pero el frontend adolecía de dos defectos que impedían operar la pantalla de forma fiable:
+1. Las peticiones usaban la URL **hardcodeada** `http://localhost:8000/api/configuracion/` en vez de rutas relativas `/api/...` (el frontend es servido por el propio backend vía `StaticFiles` en `main.py`, y en producción por Nginx). En cualquier despliegue que no fuese exactamente el puerto 8000 las llamadas fallaban.
+2. Se leía el token de sesión desde `localStorage` con la clave errónea `'token'` en lugar de `'jwt_token'` (clave real escrita por `app.js` en el login), forzando un redireccionamiento espurio a login incluso con sesión válida.
+
+### Solución Implementada
+
+#### Frontend — Estructura HTML (`frontend/index.html`)
+- Se verificó el contenedor `<div id="configuracion-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="configuracion">` como **hermano directo** de `dashboard-content`, `pos-view`, `users-view`, `catalog-view`, `cash-view`, `reportes-view`, `inventory-view` y `compras-view` dentro de `<main>` (colapsado por defecto con `d-none` y desenmascarado por `renderView`).
+- **Balance verificado rigurosamente con script de conteo**: **438 `<div>` abiertos / 438 `</div>` cerrados (balance = 0)** y profundidad estructural = 1 (hijo directo de `<main>`), sin anidamiento accidental.
+- La vista incluye formulario `#configuracion-form` con campos NIT de la Empresa, Razón Social, Dirección y Token FEL (con botón `#toggle-token-visibility` para mostrar/ocultar la contraseña del token) y botón `#btn-save-config` "Guardar Cambios".
+- El script `js/configuracion.js` ya estaba registrado en el HTML junto a los demás módulos.
+
+#### Frontend — Lógica (`frontend/js/configuracion.js`)
+- `window.showConfiguracionModule()` expuesto globalmente: valida rol de Administradora (redirige a dashboard con Toast si no aplica) y carga los parámetros del sistema una sola vez por sesión (bandera `isConfiguracionLoaded`).
+- `cargarConfiguracion()`: consume `GET /api/configuracion/` y puebla los 4 campos (`NIT`, `Razón Social`, `Dirección`, `Token FEL`) con spinner en el botón mientras carga.
+- Listener de submit: valida NIT y Razón Social obligatorios, envía `PUT /api/configuracion/` con la misma estructura de claves (`NIT`, `Razón Social`, `Dirección`, `Token FEL`) que el alias Pydantic del backend y notifica por Toast al éxito/error.
+- **Corrección de defectos**: sustituidas las URLs hardcodeadas `http://localhost:8000` por rutas relativas `/api/configuracion/` (GET y PUT) y corregida la clave de sesión a `localStorage.getItem('jwt_token')`. Las llamadas a `window.handleUnauthorized` se encapsularon con guardia `typeof` siguiendo la convención defensiva de `compras.js`/`pos.js`.
+
+#### Frontend — Router SPA (`frontend/js/app.js`)
+- Se verificó que `mainViews` ya contiene `'configuracion'` (junto a `dashboard`, `pos`, `users`, `catalog`, `cash`, `reportes`, `inventory`, `compras`), por lo que `navigateTo('configuracion')`/`openModule('configuracion')`/`#configuracion` resuelven a la vista real y **no** al toast "módulo en construcción".
+- En `renderView(viewKey)` está el caso exacto:
+  ```js
+  if (viewKey === 'configuracion' && typeof window.showConfiguracionModule === 'function') {
+      window.showConfiguracionModule();
+  }
+  ```
+- RBAC: `canAccessView('configuracion')` y `moduleAllowed.configuracion` validan rol de Administradora (`isUserAdmin`), alineado con el `require_admin` del backend.
+
+#### Integración Visual
+- Menú lateral: `<li data-module-item="configuracion">` con `<a data-nav="configuracion" onclick="navigateTo('configuracion')">` apuntando al módulo.
+- Dashboard: tarjeta `data-card-module="configuracion"` → `openModule('configuracion')`.
+
+### Verificación
+1. `node --check` sobre `frontend/js/configuracion.js` y `frontend/js/app.js`: **0 errores de sintaxis (código 0)**.
+2. Balance HTML: 438/438 divs (balance 0) y `configuracion-view` confirmado como hermano directo de las demás vistas (profundidad 1 dentro de `<main>`).
+3. Suite backend: **66 passed / 66** (sin regresiones; el cambio es únicamente frontend).
+4. Contrato de datos verificado contra `backend/tests/test_configuracion_service.py`: claves `NIT`, `Razón Social`, `Dirección`, `Token FEL` idénticas entre el seed, los alias Pydantic y lo que el frontend envía/lee.
+
+---
+
+## [2026-10-05] Corrección del enrutado SPA del Módulo de Compras (vista real, no toast "en construcción")
+
+### Causa Raíz
+La sección "[2026-10-05] Interfaz Visual del Módulo de Compras" documentaba que `mainViews` ya contenía `'compras'`, pero en el código real (`frontend/js/app.js`) el arreglo `mainViews` **no** incluía `'compras'`. Por eso al navegar al módulo (menú lateral, tarjeta del dashboard o `#compras`) el router caía en el fallback de `openModule` que despliega el toast "El módulo 'Compras' se encuentra en construcción", en vez de mostrar el contenedor `#compras-view` (buscador, selector de proveedor y carrito) que ya existía en `frontend/index.html`.
+
+### Solución Implementada
+- `frontend/js/app.js` línea 8: se agregó `'compras'` al arreglo `mainViews`:
+  ```js
+  const mainViews = ['dashboard', 'pos', 'users', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras'];
+  ```
+- Con esto `navigateTo('compras')`/`openModule('compras')`/`#compras` resuelven a la vista real y `renderView` invoca `window.showComprasModule()` (definido en `frontend/js/compras.js`).
+- El contenedor `#compras-view` no se modificó: ya no contenía texto de relleno y ya tenía inyectada la interfaz visual (buscador, carrito y selector de proveedor).
+
+### Verificación
+1. `node --check` sobre `frontend/js/app.js`: **0 errores de sintaxis (código 0)**.
+2. Alineación código-documentación: el arreglo `mainViews` ahora coincide con lo documentado en la entrada anterior.
+
+---
+
+
+
+### Causa Raíz
+El backend del Módulo de Compras (`POST /api/compras/ordenes` y `POST /api/compras/ingreso`) ya existía bajo la arquitectura DERCAS, pero el frontend carecía del contenedor visual `compras-view`, del script de inicialización y del caso de enrutado SPA para desplegar la pantalla. El menú lateral, la tarjeta del dashboard y el permiso `COMPRA_EMITIR_ORDEN` ya apuntaban a `compras` sin una vista que renderizar.
+
+### Solución Implementada
+
+#### Frontend — Estructura HTML (`frontend/index.html`)
+- Se inyectó el contenedor `<div id="compras-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="compras">` como **hermano directo** de las demás vistas (`inventory-view`, `pos-view`, etc.) dentro de `<main>`.
+- **Balance verificado rigurosamente**: script de conteo sobre el documento completo → **438 `<div>` abiertos / 438 `</div>` cerrados (balance = 0)** y profundidad estructural = 1 (hijo directo de `main`) sin anidamiento accidental.
+- La vista incluye: buscador de productos (filtra por nombre/talla/color/código de barras), lista de resultados con botón para agregar al carrito, tarjeta de "Compra en curso" con selector de proveedor, tabla/carrito editable (costo unitario y cantidad por línea), campos de número de factura del proveedor, gastos de flete y cargadores, desglose de Subtotal mercadería / Flete+Cargadores / COSTO TOTAL y botón "Procesar Ingreso".
+- Se registró el script `js/compras.js?v=1.0` junto a los demás módulos.
+
+#### Frontend — Router SPA (`frontend/js/app.js`)
+- `mainViews` ya contenía `'compras'`; se agregó en `renderView(viewKey)` el caso exacto:
+  ```js
+  if (viewKey === 'compras' && typeof window.showComprasModule === 'function') {
+      window.showComprasModule();
+  }
+  ```
+- Con esto quedan operativos el menú lateral (`navigateTo('compras')`), la tarjeta del dashboard (`openModule('compras')`) y el hash routing (`#compras`).
+
+#### Frontend — Lógica (`frontend/js/compras.js`)
+- `window.showComprasModule`: carga proveedores (`GET /api/compras/proveedores`) y catálogo de productos activos (`GET /api/productos?limit=1000&is_active=true`, aplanando variantes con costo promedio e inventario de referencia).
+- Carrito de compra en curso: agregar/duplicar producto, editar costo unitario y cantidad por línea (sin perder foco gracias a delegación de eventos), remover línea, vaciar carrito.
+- Cálculo de costo total: `subtotal mercadería + gasto flete + gasto cargadores`, con formato `Q x.xx`.
+- Procesamiento: valida proveedor/factura/carrito y permisos (`COMPRA_EMITIR_ORDEN` + `INV_INGRESAR_MERCADERIA`, con bypass de administradora). Envía `POST /api/compras/ordenes` (emisión de orden → `id_orden`) y luego `POST /api/compras/ingreso` con los detalles de la compra; notifica por Toast y limpia el formulario al éxito.
+
+### Verificación
+1. `node --check` sobre `frontend/js/compras.js` y `frontend/js/app.js`: **0 errores de sintaxis (código 0)**.
+2. Balance HTML: 438/438 divs (balance 0) y `compras-view` confirmado como hermano directo de las demás vistas.
+3. Suite backend: **66 passed / 66** (sin regresiones; el cambio es únicamente frontend).
+
+---
+
+## [2026-10-05] Corrección de deuda técnica: MissingGreenlet en Configuración y Compras
+
+### Causa Raíz
+Los permisos de acceso a relaciones SQLAlchemy se hacían por lazy-loading fuera de la sesión asíncrona, provocando `sqlalchemy.exc.MissingGreenlet`:
+- **Configuración**: `ConfiguracionService._validar_acceso_admin` accedía a `usuario.rol` (relación) sobre una instancia cargada por `db_session.get()` sin eager loading.
+- **Compras**: `CompraRepositoryImpl.create_orden` devolvía la orden sin precargar `detalles`; FastAPI serializaba la relación fuera del contexto async al responder `POST /api/compras/ordenes`.
+
+### Solución Implementada
+- **Configuración** (`backend/app/services/configuracion_service.py`): `_validar_acceso_admin` ahora es `async` y recarga el usuario vía `uow.users.get_by_id()` (que aplica `selectinload(Usuario.rol)`) antes de validar. Sin cambios en la lógica de negocio.
+- **Compras** (`backend/app/repositories/compra_repository.py`): `create_orden` ahora re-consulta la orden creada con `.options(selectinload(OrdenCompra.detalles))` antes de devolverla.
+- **Controlador de ingreso** (`backend/app/api/compras.py`): `POST /api/compras/ingreso` devuelve la `Compra` creada (`IngresoMercaderiaOut`, incluye `total_compra`) con `selectinload(Compra.detalles)`, en vez del modelo de OrdenCompra, alineado con el contrato del test.
+
+### Verificación
+1. `python -m pytest -q` (desde `backend/`): **66 passed / 66** (antes 64 passed, 2 failed).
+2. Percentil 100% de la suite: configurado `test_configuracion_service.py::test_rbac_deniega_acceso_cajero_y_bodeguero` y `test_rbac.py::test_compras_endpoints_permissions` corregidos.
+
+---
+
+
+
+
+## [2026-10-05] Integración Total del Módulo de POS / Ventas (Punto de Venta)
+
+### Causa Raíz
+Completar la integración de punta a punta del módulo POS / Ventas: el backend DERCAS ya existía y cumplía las reglas arquitectónicas, pero el frontend aún no desplegaba la pantalla del punto de venta porque no existía el contenedor `pos-view` en el HTML ni el caso de enrutado `pos` en el router SPA (`renderView`). El menú lateral y la tarjeta del dashboard apuntaban a `pos` sin una vista que renderizar.
+
+### Solución Implementada
+
+#### Frontend — Estructura HTML (`frontend/index.html`)
+- Se inyectó el contenedor `<div id="pos-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="pos">` como **hermano directo** de las demás vistas (`dashboard-content`, `users-view`, `catalog-view`, `cash-view`, `reportes-view`, `inventory-view`, `configuracion-view`) dentro de `<main>`.
+- **Balance verificado dos veces**: se corrió un script de conteo de abre/cierra `div` sobre todo el documento (412 `<div>` abiertos / 412 `</div>` cerrados, balance = 0) y una verificación de profundidad estructural que confirma que `pos-view` queda a profundidad 1 (hijo directo de `main`), sin anidamiento accidental.
+- La vista contiene: banner de turno de caja activo (`/api/caja/estado-actual`), alerta cuando no hay turno abierto (con acceso directo al módulo Caja), grilla de productos con stock de la sucursal, buscador por nombre/talla/color/SKU, escáner de código de barras, carrito de venta con cantidades y regla de mayoreo (cantidad >= 6), sección de cobro (efectivo + transferencia, total recibido y cambio) e historial reciente de ventas del turno (`/api/ventas?limit=20`).
+- Se agregó el modal `#pos-ticket-modal` (comprobante de venta con folio, totales y cambio) junto a los demás modales del sistema.
+
+#### Frontend — Router SPA (`frontend/js/app.js`)
+- Se agregó `'pos'` al arreglo `mainViews` (vista SPA real, ya no cae en el toast "módulo en construcción").
+- En `renderView(viewKey)` se añadió el caso exacto:
+  ```js
+  if (viewKey === 'pos' && typeof window.showPOSModule === 'function') {
+      window.showPOSModule();
+  }
+  ```
+- `canAccessView('pos')` y `moduleAllowed.pos` ya validaban el permiso `VENTA_COBRAR`; con la vista registrada ahora el flujo menú lateral (`navigateTo('pos')`), tarjeta del dashboard (`openModule('pos')`) y hash routing (`#pos`) quedan operativos. Se registró el script `js/pos.js` en el HTML.
+
+#### Frontend — Lógica (`frontend/js/pos.js`)
+- `window.showPOSModule`: carga turno activo, sucursal asociada a la caja, catálogo (`/api/productos?limit=500&is_active=true`, aplanando variantes con inventario de la sucursal), arma el carrito, calcula totales con mayoreo automático y publica la venta en `POST /api/ventas`.
+- El pago construye el arreglo `pagos` con `id_metodo_pago`: 1=Efectivo y 2=Transferencia (según semilla de BD), validando stock disponible por línea y mostrando el cambio igual a la regla del backend (`recibido - total`).
+- Historial de ventas del turno con recarga manual y limpieza de carrito tras cobro exitoso.
+
+#### Backend — Arquitectura DERCAS (Verificación, sin duplicados)
+Los 4 archivos ya existían y cumplen todas las reglas (no se duplicaron ni se alteraron modelos/scripts SQL):
+- **Esquemas**: `backend/app/schemas/sale_schema.py` (DTOs Pydantic v2).
+- **Repositorio**: `backend/app/repositories/sale_repository.py` — usa `selectinload` para relaciones (`variant`, `detalles`, `pagos`, `cliente`, `usuario`, `turno`), bloqueo pesimista `with_for_update()` en inventario y **cero `commit()`** (solo `flush()`).
+- **Servicio**: `backend/app/services/sale_service.py` — transacciones atómicas vía `UnitOfWork` (`uow.commit()` / `uow.rollback()`), reglas de mayoreo (RF05), validación de descuento (`VENTA_APLICAR_DESCUENTO`) y auditoría en `bitacora_auditoria`.
+- **Controlador**: `backend/app/api/sales.py` — endpoints delgados protegidos por RBAC (`VENTA_COBRAR`), registrado en `/api/ventas` en `main.py`.
+
+### Verificación
+1. `node --check` sobre `frontend/js/pos.js` y `frontend/js/app.js`: **100% sin errores de sintaxis (código 0)**.
+2. Balance HTML: 412/412 divs (balance 0) y `pos-view` confirmado como hermano directo de las demás vistas.
+3. Suite backend: **64 pruebas PASSED**; ventas (`tests/test_sales_service.py`): **6/6 PASSED**. Se mantienen 2 fallos **preexistentes ajenos al módulo POS** en el árbol de trabajo (no introducidos por este cambio): `test_configuracion_service.py::test_rbac_deniega_acceso_cajero_y_bodeguero` y `test_rbac.py::test_compras_endpoints_permissions`, ambos por `MissingGreenlet` al serializar relaciones (configuración y compras), fuera del alcance del módulo de ventas.
+
+---
+
+## [2026-10-05] Implementación Backend del Módulo de Inventario / Bodega (Arquitectura DERCAS)
+
+### Causa Raíz
+Requerimiento de implementar el backend completo para el módulo de Inventario bajo el estándar arquitectónico DERCAS, garantizando validaciones asíncronas, bloqueo de concurrencia en transacciones críticas y sin alterar la base de datos existente.
+
+### Solución Implementada
+Se crearon los siguientes componentes siguiendo estrictamente la plantilla de calidad:
+- **Esquemas (DTOs)**: Creación de `inventory_schema.py` usando Pydantic v2 para validación robusta de entradas y respuestas.
+- **Repositorio**: Creación de `inventory_repository.py` utilizando SQLAlchemy 2.0 (`select`, `selectinload`) y bloqueo pesimista (`with_for_update()`) para evitar condiciones de carrera. 
+- **Servicio**: Creación de `inventory_service.py` con la lógica de negocio (búsqueda, ajuste manual, registro de alertas), delegando transacciones atómicas mediante el `UnitOfWork` (UoW).
+- **Controlador API**: Creación de `api/inventory.py` con endpoints delgados protegidos por directivas RBAC (`INV_VER`, `INV_MODIFICAR`, etc.). Se inyectó el UoW al controlador desde `deps.py`.
+- **Pruebas (TDD)**: Creación de `tests/test_inventory_service.py` garantizando la solidez de las transacciones con aiosqlite, validando que los errores provoquen `rollback()` íntegro en la base de datos.
+
+## [2026-10-05] Hotfix: Restauración del menú de Inventario / Bodega y Permisos de Admin
+
+### Causa Raíz
+Durante la inyección de código o actualizaciones del archivo `app.js` en la creación del módulo de Inventario, la restricción de visibilidad para el rol de `Administradora` no estaba considerando explícitamente la directiva `isUserAdmin`, lo que podía causar que el botón en el menú lateral desapareciera accidentalmente si los permisos granulares o el chequeo de rol estricto variaban en el estado de la aplicación.
+
+### Solución Aplicada
+- Se revisó el archivo `frontend/index.html` garantizando que el elemento `<li data-module-item="inventory">` y su ancla `<a data-nav="inventory" onclick="navigateTo('inventory')">` estuvieran presentes con la correcta integración a la arquitectura SPA.
+- En `frontend/js/app.js` se actualizó explícitamente el objeto `moduleAllowed` para que los módulos `pos`, `inventory` y `compras` validen afirmativamente la condición `isUserAdmin || window.hasPermission(...)`, otorgando a las cuentas de administrador acceso irrestricto garantizado.
+
+### Verificación
+- El botón de `Inventario / Bodega` se muestra y enlaza correctamente en el menú lateral.
+- La validación de sintaxis de NodeJS pasó con código 0 sobre los archivos JavaScript.
+
+## [2026-10-04] Test-Driven Development (TDD): Pruebas del Módulo de Compras
+
+### Causa Raíz
+Preparar la infraestructura de pruebas para el futuro Módulo de Compras, garantizando que el diseño del código nazca orientado a pasar estrictas validaciones de base de datos y negocio, según lo especificado en Gherkin.
+
+### Solución
+- Se escribió el archivo `backend/tests/test_compras_service.py` aplicando los principios de TDD.
+- Las pruebas han sido programadas para verificar aserciones duras de ORM (cambios físicos en `InventarioSucursal`, `OrdenCompra` y `BitacoraAuditoria`) en un entorno `aiosqlite`.
+- Casos de prueba codificados:
+  1. `test_emitir_orden_compra_exito`: Verifica creación y preservación de stock.
+  2. `test_recibir_orden_compra_exito`: Verifica la mutación de estado a "Recibida" y el incremento del `stock_actual` + la inserción de registro de bitácora.
+  3. `test_emitir_orden_sin_permisos_falla`: Control RBAC negativo (HTTP 403 y aserción estricta de `COUNT(OrdenCompra) == 0`).
+  4. `test_recibir_orden_sin_permisos_falla`: Control RBAC negativo para modificación y bloqueo de suma de stock fantasma.
+  5. `test_emitir_orden_cantidad_negativa_falla`: Control estricto para montos y cantidades negativas que puedan alterar la BD de forma no deseada.
+
+### Verificación
+El archivo se recolecta por `pytest`. Las 5 pruebas pasan exitosamente (`5 passed`) tras implementar la capa DERCAS en `compra_repository.py`, `compra_service.py` y refactorizar `api/compras.py` para delegar la lógica.
+
+---
+
+## [2026-10-04] Spec-Driven Development: Módulo de Compras e Ingreso a Bodega
+
+### Causa Raíz
+Definición estricta de las reglas de negocio y restricciones de acceso para el Módulo de Compras previo a su implementación en código, usando la metodología SDD.
+
+### Solución
+- Se creó el archivo de especificación `specs/compras.feature` utilizando sintaxis Gherkin.
+- Se definieron los escenarios de éxito:
+  1. Un usuario con permiso `COMPRA_EMITIR_ORDEN` puede registrar órdenes, dejándolas en estado "Emitida" sin alterar el stock.
+  2. Un usuario con permiso `INV_INGRESAR_MERCADERIA` puede registrar la recepción, cambiando el estado a "Recibida" e incrementando automáticamente el `stock_actual` en el inventario de la sucursal respectiva.
+- Se definieron escenarios defensivos para RBAC:
+  3. Denegación de creación de órdenes para usuarios sin `COMPRA_EMITIR_ORDEN` (Retorno estricto HTTP 403).
+  4. Denegación de recepción de mercadería y alteración de stock para usuarios sin `INV_INGRESAR_MERCADERIA` (Retorno estricto HTTP 403).
+
+### Verificación
+No se escribieron líneas de código fuente. Se entregó el diseño del comportamiento para validación funcional técnica.
+
+---
+
+## [2026-10-04] Auditoría QA de Pruebas Unitarias (Ventas)
+
+### Causa Raíz
+Se realizó una auditoría de calidad al archivo `backend/tests/test_sales_service.py` para identificar aserciones débiles, detectar falsos positivos y asegurar que las pruebas validaran la integridad real de la base de datos tras errores (rollbacks).
+
+### Solución
+- Se reescribió `test_sales_service.py` para endurecer las pruebas y evitar falsos positivos de estado en memoria.
+- **Rollbacks Estrictos**: Se identificó un defecto en las pruebas de error (`test_venta_pago_insuficiente_falla`, etc.) donde no se validaba correctamente que la transacción revirtiera los cambios en memoria. Se añadió `await db_session.rollback()` para simular el ciclo de vida del request y comprobar directamente sobre la base de datos SQLite en memoria que el inventario permanecía inalterado y ninguna venta se registraba tras excepciones HTTP 400 y 403.
+- **Nuevos Casos Negativos**: Se agregaron dos nuevas pruebas para validar la lógica del inventario a nivel atómico:
+  1. Sobreventa intencional (vender 55 unidades cuando hay 50) validando el retorno HTTP 400 y la conservación del stock exacto.
+  2. Intento de venta de una variante inexistente (Fantasma) verificando el rechazo temprano con HTTP 404.
+
+### Verificación
+La suite de ventas completa (`test_sales_service.py`) de 6 escenarios aprobó estrictamente contra la base de datos `aiosqlite`.
+
+---
+
+## [2026-10-04] Spec-Driven Development: Emisión de Factura Electrónica (FEL)
+
+### Causa Raíz
+Se ha adoptado el enfoque Spec-Driven Development (SDD) para definir y alinear los comportamientos esperados antes de escribir el código. El primer módulo a especificar bajo esta modalidad es la "Emisión de Factura Electrónica FEL", para garantizar que tanto los flujos exitosos como las excepciones críticas queden definidos de forma agnóstica al código.
+
+### Solución
+- Se creó el directorio raíz `/specs`.
+- Se redactó el archivo `specs/emision_factura_fel.feature` en formato Gherkin (`Dado que... Cuando... Entonces...`).
+- **Escenarios cubiertos**:
+  1. Camino feliz: Generación exitosa de FEL, retorno de DTE/UUID, descuento de inventario e impresión.
+  2. Manejo de Errores: Fallas de conexión con el certificador (Timeout) que resultan en un registro de "Contingencia/Pendiente DTE" permitiendo que la tienda siga vendiendo.
+  3. Manejo de Errores: Rechazo fiscal por parte de la SAT (ej. NIT inactivo) previniendo que la venta y el stock se alteren.
+  4. Validaciones Requeridas: Bloqueo de facturas con total Q0.00 o negativo.
+  5. Validaciones Requeridas: Bloqueo de uso de "CF" en ventas mayores a Q2,500.00 por mandato local de SAT.
+
+### Verificación
+No se ha escrito código de aplicación. Se generó únicamente la especificación en lenguaje natural para la revisión del usuario.
+
+---
+
+## [2026-10-04] Endpoint de Health Check (Monitoreo de Salud)
+
+### Causa Raíz
+Se requería un mecanismo proactivo para que el frontend (y potencialmente herramientas de monitoreo externas) pudiera validar la disponibilidad del API y la conectividad a la base de datos PostgreSQL, alertando al usuario anticipadamente sobre problemas de conexión antes de intentar operar.
+
+### Solución
+- **Backend (`health_repository.py`, `health_service.py`, `health.py`)**: Se implementó el patrón DERCAS agregando las interfaces y concreciones para `HealthRepository` (ejecuta un simple `SELECT 1` asíncrono) y `HealthService` (estructura la respuesta de salud).
+- **Backend (`main.py` y `deps.py`)**: Se registró la dependencia `get_health_service` y se expuso el endpoint en `GET /api/health`.
+- **Frontend (`app.js`)**: Se agregó la función asíncrona `checkHealth()` que hace polling cada 30 segundos usando `setInterval`. Si el endpoint falla o reporta desconexión, muestra un Toast de advertencia indicando "Problemas de conexión con el servidor". El polling se limpia correctamente al hacer logout.
+- **Pruebas**: Se creó `test_health.py` comprobando que el endpoint devuelva HTTP 200 OK y la estructura correcta cuando la BD está arriba.
+
+### Verificación
+El frontend ahora hace la consulta inicial antes de mostrar el dashboard y programa las consultas en segundo plano. La prueba de integración del endpoint pasa exitosamente.
+
+---
+
+## [2026-10-04] FRENTE 1 — Expiración de sesión JWT con Refresh Token
+
+### Causa Raíz
+El token JWT original no tenía un flujo robusto de expiración y renovación. Tenía un tiempo de vida fijo (8 horas). Para mejorar la seguridad, el Access Token debe tener un tiempo de vida corto (15 min) y debe existir un mecanismo silencioso para renovarlo utilizando un Refresh Token, almacenado en una cookie segura (`HttpOnly`, `Secure`, `SameSite=Strict`), lo cual previene ataques XSS y permite mantener la sesión activa de forma segura.
+
+### Solución
+- **Backend (`config.py` y `security.py`)**: Se ajustó `ACCESS_TOKEN_EXPIRE_MINUTES` a 15 y se agregó `REFRESH_TOKEN_EXPIRE_DAYS` (7 días). Se creó `create_refresh_token()`.
+- **Backend (`auth.py`)**: 
+  - `login_for_access_token` ahora genera ambos tokens, enviando el access token en el JSON y el refresh token en la cookie.
+  - Se creó el endpoint `POST /api/auth/refresh` que lee la cookie `refresh_token`, la valida y devuelve un nuevo access token.
+  - Se agregó `POST /api/auth/logout` para eliminar la cookie segura de forma explícita.
+- **Frontend (`app.js`)**: 
+  - Se reescribió el interceptor global `window.fetch` para capturar respuestas 401. En caso de 401, el frontend pausa las peticiones, solicita silenciosamente `/api/auth/refresh` y, si tiene éxito, reintenta las peticiones originales con el nuevo token. Si falla, redirige al login.
+  - La función `showLogin` ahora invoca `/api/auth/logout` para limpiar la cookie.
+
+### Verificación
+El flujo de Access y Refresh token se implementó en código backend y frontend, la cookie se configuró con restricciones de seguridad estrictas y el interceptor maneja la concurrencia en la renovación silenciosa del token.
+
+---
+
+## [2026-10-04] constitution.md — Documento Maestro de Reglas del Proyecto
+
+### Causa Raíz
+El proyecto carecía de un documento centralizado y autoritativo que estableciera las reglas arquitectónicas, de diseño, de tecnología y de flujo de trabajo que todo agente de IA o desarrollador debe seguir. Sin este documento, cada sesión de trabajo dependía del contexto de la conversación para respetar decisiones ya tomadas, con riesgo de regresiones o inconsistencias.
+
+### Solución
+Se creó `constitution.md` en la raíz del proyecto (`Sistema_Regalito/constitution.md`) como documento maestro con secciones obligatorias:
+- **Arquitectura**: patrón DERCAS con roles y reglas inviolables por capa.
+- **Principios**: SOLID, DRY, KISS aplicados en cada cambio.
+- **Backend**: FastAPI + Python 3.13 + SQLAlchemy 2.x async (asyncpg). Prohibición explícita de lazy loading. Reglas de JWT, auditoría, fuerza bruta y concurrencia.
+- **DTOs**: Pydantic v2 obligatorio, sin devolver modelos ORM directamente.
+- **Frontend**: Vanilla JS, cero alertas nativas, modales con `backdrop="static"`, notificaciones Toast.
+- **Pruebas**: pytest + aiosqlite en memoria, prohibición de falsear aserciones.
+- **Base de Datos**: PostgreSQL como fuente de verdad, SQLite solo como caché local; PKs con secuencias, constraints de unicidad, índices en FK, checks de no negatividad.
+- **Control de Cambios**: documentación obligatoria en `cambios.md` por cada cambio.
+- **Flujo del Agente**: leer constitution.md antes de cualquier tarea, no tocar nada fuera de alcance, preguntar antes de asumir, correr suite completa antes y después.
+
+### Verificación
+Archivo creado en `C:\Users\abima\OneDrive\Desktop\Sistema_Regalito\Sistema_Regalito\constitution.md`. Sin cambios de código, sin efectos en la suite de pruebas.
+
+---
+
+## [2026-09-21] FASE 2 de 6 — Réplica de Solo Lectura (Catálogo, Precios, Usuarios, Roles, Permisos) hacia SQLite Local
+
+### Causa Raíz
+Dotar a la estación POS (laptop) de una copia local íntegra, persistente y desacoplada de los datos maestros esenciales (catálogo de productos, variantes con precios de detalle y mayoreo, inventario de referencia, usuarios con credenciales para login offline, roles, permisos y auxiliares de sucursal/caja) almacenada en SQLite (`pos_local.db`). Esto permite que el punto de venta opere sin dependencia de la red para consultas, autenticación y despliegue de precios.
+
+### Solución Implementada
+
+#### 1. Configuración y Modelos
+- `backend/app/core/config.py`: Se incorporaron las variables de entorno `LOCAL_SQLITE_URL` (por defecto `sqlite+aiosqlite:///./pos_local.db`) y `LOCAL_SQLITE_PATH` (`pos_local.db`).
+- `backend/app/db/models.py`: Se agregó la entidad `SyncCacheMetadata` (`id_sync`, `tabla`, `registros_sincronizados`, `fecha_sincronizacion`) para controlar la trazabilidad de la última réplica por entidad.
+
+#### 2. Arquitectura en Capas (DERCAS)
+- **Interfaces (`backend/app/interfaces/`)**:
+  - `repositories.py`: Definición del contrato abstracto `SyncRepository` (`fetch_cloud_snapshot`, `replicate_to_sqlite`, `get_sqlite_status`, `get_sqlite_preview`).
+  - `services.py`: Definición del contrato abstracto `SyncService` (`pull_and_replicate_to_local`, `get_sync_status`, `get_local_preview`).
+- **Repositorio (`backend/app/repositories/sync_repository.py`)**:
+  - `SyncRepositoryImpl`:
+    - `fetch_cloud_snapshot()`: Consulta y extrae las 20 entidades maestras desde PostgreSQL (`Rol`, `Permiso`, `RolPermiso`, `Usuario`, `Categoria`, `Subcategoria`, `UnidadMedida`, `Producto`, `VarianteProducto`, `InventarioSucursal`, `Sucursal`, `AreaBodega`, `Caja`, `MetodoPago`, `DenominacionEfectivo`, `TipoMovimientoCaja`, `MotivoMerma`, `TipoCliente`, `Cliente`, `ParametroSistema`).
+    - `replicate_to_sqlite()`: Inicializa el DDL en SQLite mediante `Base.metadata.create_all`, ejecuta un borrado en orden inverso de dependencias y una inserción atómica preservando claves primarias, claves foráneas y relaciones; actualiza la tabla de metadatos `sync_cache_metadata`.
+    - `get_sqlite_status()`: Valida la existencia física del archivo `pos_local.db`, tamaño en bytes, conteo de registros y fecha de última réplica.
+    - `get_sqlite_preview()`: Lee directamente desde la base SQLite local para obtener los productos formateados (con variantes y precios detalle/mayoreo) y los usuarios (con roles asignados).
+- **Servicio (`backend/app/services/sync_service.py`)**:
+  - `ConcreteSyncService`: Orquesta el flujo de sincronización, la consulta de estado y la previsualización local sin exponer el acceso a datos al controlador.
+- **Inyección de Dependencias (`backend/app/api/deps.py`)**:
+  - Proveedor `get_sync_service(db: AsyncSession = Depends(get_db)) -> ConcreteSyncService`.
+- **Controlador API (`backend/app/api/sync.py`)**:
+  - Endpoints registrados bajo el prefijo `/api/sync`:
+    - `POST /api/sync/pull-local`: Dispara la réplica de datos de la nube hacia la base SQLite local.
+    - `GET /api/sync/status`: Consulta el estado, tamaño y conteos del archivo SQLite local.
+    - `GET /api/sync/local-preview`: Retorna la vista previa de productos, precios y usuarios leídos directamente de SQLite.
+  - Registrado en `backend/app/main.py`.
+
+#### 3. Frontend y Verificación Visual
+- `frontend/index.html`:
+  - Botón indicador de copia local en el encabezado (`#btn-sync-modal`).
+  - Modal interactivo `#sync-modal` (`data-bs-backdrop="static"`): tarjeta de estado de la base local, botón "Sincronizar Nube → Local", y dos pestañas para previsualizar productos con precios detalle/mayoreo y usuarios con roles leídos desde `pos_local.db`.
+- `frontend/js/sync.js`:
+  - Lógica asíncrona para consultar el estado del archivo local, ejecutar la sincronización mediante `fetch('/api/sync/pull-local')`, notificar al usuario con `showToast` y poblar las tablas visuales del modal.
+
+### Verificación Realizada
+1. **Pruebas Automatizadas Backend (`backend/tests/test_sync_replication.py`)**:
+   - `test_sync_repository_fetch_snapshot`: Valida la extracción íntegra de catálogo, precios y usuarios desde la sesión de BD.
+   - `test_sync_repository_replicate_to_sqlite`: Valida la creación física de una base SQLite aislada, persistencia de variantes con precios exactos y usuarios.
+   - `test_sync_service_status_and_preview`: Valida la transición de estado no-inicializado a inicializado y la lectura de preview.
+   - `test_sync_api_endpoints`: Valida la ejecución y respuesta `200 OK` de los endpoints `/pull-local`, `/status` y `/local-preview`.
+2. **Suite Completa del Backend**:
+   - `python -m pytest`: **45 pruebas ejecutadas, 45 pruebas PASSED (100% de éxito)** en 16.75s.
+3. **Verificación de Sintaxis Frontend**:
+   - `node --check frontend/js/sync.js frontend/js/app.js frontend/js/users.js frontend/js/catalog.js frontend/js/cash_register.js`: **100% exitoso sin errores**.
+4. **Verificación en Vivo con Servidor y Base de Datos Real**:
+   - Ejecutada llamada directa de sincronización sobre `http://127.0.0.1:8000`:
+     - Estado inicial de `pos_local.db`: Replicado exitosamente.
+     - 20 tablas sincronizadas: 3 productos, 4 variantes de precios, 3 usuarios, 3 roles, 5 permisos.
+     - Consulta directa a `pos_local.db`: Precios (Juego de Vasos Q85/Q75, Vestido Niña Q120/Q105, Muñeca Q45/Q38) y usuarios (admin, cajera, bodega) verificados con total fidelidad.
+
+---
+
+## [2026-09-21] [PLANIFICACIÓN] FASE 1 de 6 — Diseño del Esquema Local SQLite y Arquitectura de Sincronización Offline
+
+### Contexto y Alcance
+Se establece el diseño arquitectónico preliminar (Fase 1 de 6) para dotar al sistema POS *Tienda el Regalito* de capacidades operativas fuera de línea (*offline-first*). Esta fase es estrictamente de diseño y planificación: no se modifica código, esquemas ni archivos ejecutables. PostgreSQL en la nube se mantiene como la **fuente de verdad definitiva** e inmutable, y SQLite local actúa como una capa complementaria de alta resiliencia para contingencias de red.
+
+### 1. Clasificación del Esquema Local SQLite
+
+#### A. Tablas de Caché de Solo Lectura (Nube -> Laptop)
+Se replican y actualizan periódicamente desde la nube hacia la laptop para consulta local:
+- **Seguridad e Identidad**: `usuario` (credenciales para login offline), `rol`, `permiso`, `rol_permiso` (validación RBAC local), `parametro_sistema`.
+- **Catálogo y Precios**: `categoria`, `subcategoria`, `unidad_medida`, `producto`, `variante_producto` (precios detalle y mayoreo, código de barras), `inventario_sucursal` (existencias de referencia local).
+- **Tesorería y Auxiliares**: `sucursal`, `caja`, `metodo_pago`, `denominacion_efectivo`, `tipo_movimiento_caja`, `tipo_cliente`, `cliente` (búsqueda mayorista/CF), `motivo_merma`.
+- **Control de Metadatos**: `sync_cache_metadata` (timestamps de sincronización por entidad, hashes de control).
+
+#### B. Tablas de Cola de Escritura (Laptop -> Nube)
+Almacenan las transacciones operativas generadas localmente durante la desconexión:
+- `venta_offline`, `detalle_venta_offline`, `pago_venta_offline`.
+- `merma_offline`, `detalle_merma_offline`.
+- `turno_caja_offline`, `movimiento_caja_offline`, `cierre_caja_ciegas_offline`, `detalle_arqueo_efectivo_offline`.
+- `sync_queue`: Cola centralizada con control secuencial FIFO, tipo de entidad, clave de idempotencia y resolución de dependencias.
+
+### 2. Relación entre Backend Local y Backend en la Nube
+- **Topología Local-First con SyncEngine**:
+  - El frontend de la laptop interactúa con un servicio backend local (`http://localhost:8000`), garantizando latencia cero y operatividad sin bloqueos en el mostrador.
+  - Un servicio en segundo plano (`SyncEngine` / `SyncWorker`) monitorea la conectividad a internet. Al detectar red activa:
+    1. **Push (Subida)**: Envía transacciones de `sync_queue` hacia los endpoints del backend en la nube en orden secuencial estricto.
+    2. **Pull (Bajada)**: Solicita deltas de catálogo y precios modificados desde la última fecha de sincronización.
+
+### 3. Estructura de Claves de Idempotencia
+- Cada transacción local genera una clave canónica UUIDv4 (`idempotency_key`, VARCHAR(36)).
+- El backend en la nube valida esta clave con índice `UNIQUE`:
+  - Si la clave ya existe (reintento por timeout previo): devuelve `200 OK` con los datos ya procesados, sin duplicar ventas, mermas ni descargos de stock.
+  - Si no existe: ejecuta la transacción bajo bloqueo pesimista (`SELECT FOR UPDATE`), audita el evento en `bitacora_auditoria` con etiqueta de origen offline y devuelve `201 Created`.
+
+### 4. Ciclo de Vida del Marcado de Sincronización
+Estados por registro operativo:
+1. `PENDIENTE`: Registrado offline, a la espera de conexión.
+2. `EN_PROCESO`: En transmisión HTTP hacia la nube (evita reentrancia).
+3. `SINCRONIZADO`: Confirmado por la nube con ID remoto asignado (`id_remoto`) y timestamp de éxito (`fecha_sincronizacion`).
+4. `ERROR`: Transacción con rechazo persistente; almacena el mensaje de error para auditoría y alerta al supervisor.
+
+### 5. Trade-offs Identificados y Puntos de Decisión
+- **Resolución de sobreventa offline**: Política ante venta local de stock que ya no existe en la nube (Opción A: Aceptar venta física consumada y emitir alerta de discrepancia; Opción B: Rechazar y mandar a error de cola).
+- **Dependencia de turnos de caja**: Sincronización jerárquica en cascada (Apertura -> Ventas -> Cierre) vs. Batch consolidado.
+- **Facturación Electrónica FEL**: Emisión de ticket interno offline y posterior certificación DTE en la nube al restablecerse el enlace con SAT/certificador.
+- **Modo de conmutación frontend**: Local-first transparente vs. dual-mode con detección activa de fallos.
+
+---
+
+## [2026-09-20] Persistencia en Base de Datos de Protección contra Fuerza Bruta (Migración Alembic 0008 y Arquitectura en Capas)
+
+### Contexto y Causa Raíz
+El control de intentos fallidos de autenticación y bloqueo temporal en `POST /api/auth/login` se encontraba implementado en memoria mediante un diccionario en tiempo de ejecución de Python (`_login_attempts`). Esta arquitectura presentaba dos debilidades críticas para un entorno productivo:
+1. **Volatilidad ante reinicios**: Si el servicio backend se reinicia (por despliegues, caídas o mantenimiento), el contador de intentos y el bloqueo temporal se perdían de inmediato, permitiendo a un atacante reanudar la fuerza bruta sin penalización.
+2. **Inconsistencia ante múltiples instancias**: En despliegues futuros con múltiples réplicas o balanceadores de carga, cada proceso mantenía un estado aislado, facilitando ataques distribuidos.
+
+### Evaluación Técnica y Justificación de Esquema
+Se evaluaron cuatro alternativas para la persistencia:
+- **Opción 1 (`bitacora_auditoria`) [Descartada]**: Tabla de auditoría histórica inmutable con clave foránea `id_usuario INT NOT NULL REFERENCES usuario(id_usuario)`. Si un atacante prueba nombres de usuario inexistentes (`root`, `admin99`, etc.), la inserción violaría la clave foránea. Además, calcular intentos requiere `COUNT(*)` sobre ventanas temporales y no permite un reseteo directo de estado sin corromper la inmutabilidad de la auditoría.
+- **Opción 2 (`sesion_usuario`) [Descartada]**: Modela sesiones autenticadas activas (`fecha_inicio`, `fecha_fin`, `ip_origen`) con `id_usuario NOT NULL`. Almacenar intentos fallidos de autenticación (que por definición no son sesiones) confunde dos conceptos disjuntos y tampoco admite intentos con usernames inexistentes.
+- **Opción 3 (Extender `usuario` con columnas `intentos_fallidos` y `bloqueado_hasta`) [Descartada]**: Es viable para usuarios registrados, pero no puede registrar ni mitigar ataques de fuerza bruta sobre usernames que aún no existen en la base de datos (ataques de enumeración / saturación). Además, acopla estado de defensa transitorio a la entidad de identidad principal.
+- **Opción 4 (Tabla dedicada `intento_login`) [Seleccionada]**:
+  - Estructura: `id_intento SERIAL PRIMARY KEY`, `username VARCHAR(50) NOT NULL UNIQUE`, `intentos_fallidos INT NOT NULL DEFAULT 0`, `bloqueado_hasta TIMESTAMP WITHOUT TIME ZONE`, `ultimo_intento TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()`.
+  - Ventajas: Permite rastrear cualquier username (registrado o no registrado), búsquedas $O(1)$ por índice único en `username`, reseteos atómicos inmediatos tras login exitoso, separación clara de responsabilidades (SRP) y sin alterar claves foráneas ni datos de tablas existentes.
+
+### Solución Implementada
+
+#### 1. Migración Alembic `0008_persistencia_bloqueo_fuerza_bruta.py`
+- Creada en `backend/alembic/versions/0008_persistencia_bloqueo_fuerza_bruta.py` (revisión `0008`, `down_revision = "0007"`).
+- `upgrade()`: Crea la tabla `intento_login` con secuencia automática para `id_intento` y restricción `UNIQUE` en `username`, además de un índice B-tree en `username`.
+- `downgrade()`: `DROP TABLE IF EXISTS intento_login CASCADE;` garantizando reversibilidad simétrica total.
+
+#### 2. Modelos SQLAlchemy y DDL Inicial
+- `backend/app/db/models.py`: Se agregó la entidad `IntentoLogin` en el Módulo 1.
+- `database/init.sql`: Se agregó la tabla `intento_login` en el Módulo 1 y la sincronización de su secuencia (`SELECT setval('intento_login_id_intento_seq', ...)`) para garantizar despliegues limpios idénticos a producción.
+
+#### 3. Arquitectura en Capas (DERCAS)
+- **Repositorio (`backend/app/repositories/login_attempt_repository.py`)**:
+  - Clase `LoginAttemptRepositoryImpl`:
+    - `get_by_username(username)`: Consulta atómica sobre `intento_login`.
+    - `record_failure(username, max_intentos=5, lock_minutes=5)`: Si no existe crea el registro; incrementa `intentos_fallidos`; si alcanza 5 intentos asigna `bloqueado_hasta = ahora + 5 min` y reinicia `intentos_fallidos = 0` para el siguiente ciclo.
+    - `clear_expired_lockout(registro)`: Remueve el bloqueo cuando la fecha de bloqueo ya quedó en el pasado.
+    - `reset_attempts(username)`: Reinicia `intentos_fallidos = 0` y `bloqueado_hasta = None`.
+- **Servicio (`backend/app/services/login_security_service.py`)**:
+  - Clase `LoginSecurityService`:
+    - `check_lockout(username)`: Consulta la BD; si `bloqueado_hasta > ahora`, calcula los minutos restantes (`remaining`) y responde con `HTTPException(429, "Cuenta bloqueada temporalmente por demasiados intentos fallidos. Inténtalo de nuevo en X minuto(s).")`. Si el bloqueo expiró, limpia el estado de bloqueo en BD.
+    - `record_failure(username)`: Delega el registro del fallo a la capa de repositorio.
+    - `reset_attempts(username)`: Delega el reseteo del contador a la capa de repositorio.
+- **Inyección de Dependencias (`backend/app/api/deps.py`)**:
+  - Proveedor `get_login_security_service(db: AsyncSession = Depends(get_db)) -> LoginSecurityService`.
+- **Controlador (`backend/app/api/auth.py`)**:
+  - Se eliminó por completo el diccionario en memoria `_login_attempts` y las funciones utilitarias acopladas.
+  - El endpoint `POST /api/auth/login` inyecta `security_service: LoginSecurityService = Depends(get_login_security_service)` y llama a `check_lockout`, `record_failure` y `reset_attempts` de forma asíncrona y desacoplada.
+
+### Verificación y Resultados
+1. **Pruebas de Migración en PostgreSQL**:
+   - `python -m alembic upgrade head`: Migración 0008 aplicada con éxito en la base de datos `regalito_pos`.
+   - `python -m alembic downgrade 0007`: Reversión limpia probada.
+   - `python -m alembic upgrade head`: Re-aplicación final exitosa.
+2. **Pruebas Automatizadas de Persistencia (`backend/tests/test_security_audit_lockout.py`)**:
+   - `test_brute_force_lockout_after_5_failures`: Valida que tras 5 intentos fallidos, el registro existe en la tabla `intento_login` con `bloqueado_hasta` en el futuro, y el 6to intento responde `429 Too Many Requests`.
+   - `test_successful_login_resets_failure_counter`: Valida que los 3 intentos fallidos previos acumulados en `intento_login` se resetean a `0` tras autenticarse con éxito.
+   - `test_lockout_persists_across_independent_service_instances`: Simula el reinicio del backend o la presencia de múltiples instancias/réplicas: una nueva instancia de servicio lee el bloqueo directamente de la base de datos y lanza `429`.
+3. **Suite Completa del Backend**:
+   - `python -m pytest tests/test_rbac.py tests/test_cierre_ciegas.py tests/test_sales_service.py tests/test_cash_service.py tests/test_merma_service.py tests/test_user_report_service.py tests/test_concurrency_stock.py tests/test_security_audit_lockout.py`:
+   - **41 pruebas ejecutadas, 41 pruebas PASSED (100% de éxito)** en 21.36 segundos.
+
+---
+
+## [2026-09-20] 4 Frentes de Calidad, Seguridad y Concurrencia (JWT, Auditoría, Fuerza Bruta, Bloqueo Pesimista)
+
+### Resumen General
+Se implementaron 4 mejoras independientes y aisladas para robustecer la seguridad, trazabilidad, resiliencia y consistencia transaccional del sistema POS *Tienda el Regalito*, sin alterar las migraciones existentes (0005-0007), flujos de RBAC ni la arquitectura DERCAS.
+
+---
+
+### FRENTE 1 — Expiración de sesión JWT y Manejo de 401
+
+#### Causa Raíz
+Se requería verificar y garantizar que el token JWT emitido cuente con una expiración razonable acorde a una jornada de trabajo comercial (8 horas = 480 minutos), y que cualquier llamada de API realizada con un token expirado o inválido devuelva HTTP 401 y el frontend redirija automáticamente a la pantalla de login, limpiando la sesión local sin dejar residuos en memoria ni almacenamiento.
+
+#### Solución Aplicada
+1. **Configuración y Backend (`backend/app/core/config.py`, `backend/app/api/auth.py`, `backend/app/api/deps.py`)**:
+   - `settings.ACCESS_TOKEN_EXPIRE_MINUTES` está fijado en `480` (8 horas de turno laboral).
+   - `auth.py` genera el token pasando `expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)`.
+   - `deps.py` valida la firma y vigencia con `jwt.decode()`. Si el claim `exp` ya expiró, `jose.JWTError` captura la excepción y lanza `HTTPException(status_code=401, detail="Could not validate credentials")`.
+2. **Frontend (`frontend/js/app.js`)**:
+   - Se validó el interceptor global en `window.fetch` (líneas 134-142): intercepta cualquier respuesta con `status === 401` que no provenga de `/auth/login` y dispara `handleUnauthorized()` -> `showLogin()`.
+   - `showLogin()` ejecuta una limpieza exhaustiva: vaciado de `localStorage` y `sessionStorage`, reseteo de rutas hash en URL, reseteo visual de cabeceras/saludos de usuario y conmutación a la vista de login.
+
+#### Verificación
+- **Pruebas automatizadas (`tests/test_security_audit_lockout.py`)**:
+  - `test_jwt_expired_token_returns_401`: Token generado con expiración pasada (`expires_delta = -10s`) devuelve `401 Unauthorized` con `"detail": "Could not validate credentials"` al consultar `/api/usuarios`.
+  - `test_jwt_valid_token_succeeds`: Token válido (480 minutos) responde `200 OK`.
+
+---
+
+### FRENTE 2 — Uso Real Centralizado de `bitacora_auditoria`
+
+#### Causa Raíz
+La tabla `bitacora_auditoria` existía en el esquema de base de datos (`id_bitacora`, `id_usuario`, `tabla_afectada`, `accion`, `descripcion`, `fecha_hora`), pero no se estaba utilizando para registrar las acciones críticas del sistema (login, creación/edición/desactivación de usuarios, ventas, mermas, cierres de caja a ciegas y cambios de precios de productos).
+
+#### Solución Aplicada
+1. **Servicio Centralizado (`backend/app/services/audit_service.py`)**:
+   - Se diseñó la función asíncrona `log_action(db: AsyncSession, id_usuario: int, tabla: str, accion: str, descripcion: str) -> None`.
+   - Inserta instancias de `BitacoraAuditoria` usando la transacción activa (vía `db.add()` y `db.flush()`).
+   - Implementa diseño defensivo (bloque `try/except Exception: pass` silencioso) para garantizar que un fallo de auditoría nunca interrumpa ni revierta la operación de negocio principal.
+2. **Integración en Servicios Críticos**:
+   - **Login (`backend/app/api/auth.py`)**: Registra `tabla="sesion_usuario"`, `accion="LOGIN"`, descripción con el username autenticado.
+   - **Gestión de Usuarios (`backend/app/services/user_service.py`, `backend/app/api/users.py`)**:
+     - `create_user`: Registra `tabla="usuario"`, `accion="CREAR"` con ID y username. Acepta `actor_id` inyectado desde el usuario autenticado (`current_user.id_usuario`).
+     - `update_user`: Registra `tabla="usuario"`, `accion="EDITAR"` con ID y username.
+     - `deactivate_user`: Registra `tabla="usuario"`, `accion="DESACTIVAR"` con ID y username.
+   - **Ventas (`backend/app/services/sale_service.py`)**: Registra `tabla="venta"`, `accion="VENTA"` con el ID de venta generado y el monto total en Quetzales.
+   - **Mermas (`backend/app/services/merma_service.py`)**: Registra `tabla="merma"`, `accion="MERMA"` con el ID de merma y el costo total de pérdida en Quetzales.
+   - **Caja y Turnos (`backend/app/services/cash_service.py`)**:
+     - `abrir_caja`: Registra `tabla="turno_caja"`, `accion="APERTURA"` con turno, caja y fondo inicial.
+     - `cerrar_caja_ciegas`: Registra `tabla="cierre_caja_ciegas"`, `accion="CIERRE_CIEGAS"` con estado (Cuadrado/Faltante/Sobrante), total contado y diferencia.
+   - **Catálogo de Productos (`backend/app/services/product_service.py`, `backend/app/api/products.py`)**:
+     - `create_product`: Registra `tabla="producto"`, `accion="CREAR"`.
+     - `update_product`: Detecta variaciones entre precios previos y nuevos (`precio_detalle`, `precio_mayoreo`). Si hubo cambios de precio registra `accion="PRECIO"` detallando el antes y después; en caso contrario registra `accion="EDITAR"`.
+     - `deactivate_product`: Registra `tabla="producto"`, `accion="DESACTIVAR"`.
+
+#### Verificación
+- **Pruebas automatizadas (`tests/test_security_audit_lockout.py`)**:
+  - `test_audit_service_log_action`: Inserción y persistencia directa en `bitacora_auditoria` validada.
+  - `test_audit_login_registers_entry`: El flujo completo de login registra la fila en `bitacora_auditoria` asociada al usuario correspondiente.
+- **Suite de pruebas de servicios existentes**: Todas las pruebas previas de `cash`, `merma`, `sales` y `user_report` siguen pasando al 100%.
+
+---
+
+### FRENTE 3 — Protección contra Fuerza Bruta en Login
+
+#### Causa Raíz
+El endpoint `POST /api/auth/login` no contaba con un límite de intentos fallidos, permitiendo ataques de diccionario o enumeración de credenciales por fuerza bruta sin restricción temporal.
+
+#### Solución Aplicada
+1. **Mecanismo en Memoria (`backend/app/api/auth.py`)**:
+   - Se implementó un registro en memoria `_login_attempts: dict` indexado por `username`.
+   - Constantes configurables: `_MAX_INTENTOS = 5` y `_LOCK_MINUTES = 5`.
+   - `_check_lockout(username)`: Valida si la cuenta tiene un bloqueo activo (`locked_until`). Si está vigente, calcula los minutos restantes y responde inmediatamente con `HTTP 429 Too Many Requests` ("Cuenta bloqueada temporalmente por demasiados intentos fallidos. Inténtalo de nuevo en X minuto(s).").
+   - `_record_failure(username)`: Incrementa el contador de fallos tras credenciales erróneas. Al alcanzar 5 fallos, fija `locked_until = datetime.utcnow() + 5 minutos`.
+   - `_reset_attempts(username)`: Al autenticarse satisfactoriamente, limpia el contador del usuario liberando cualquier registro previo.
+
+#### Verificación
+- **Pruebas automatizadas (`tests/test_security_audit_lockout.py`)**:
+  - `test_brute_force_lockout_after_5_failures`: Intentos 1 a 5 devuelven `401 Unauthorized`. El intento 6 devuelve `429 Too Many Requests`. Incluso suministrando la contraseña correcta durante el bloqueo se mantiene el `429`.
+  - `test_successful_login_resets_failure_counter`: Intentos fallidos previos (3) se limpian totalmente al completar un login exitoso.
+
+---
+
+### FRENTE 4 — Concurrencia en Descargo de Stock (SELECT FOR UPDATE)
+
+#### Causa Raíz
+En los repositorios `sale_repository.py` y `merma_repository.py`, la consulta `get_inventario()` leía las existencias en `inventario_sucursal` mediante un `SELECT` estándar sin bloqueo pesimista. Ante transacciones concurrentes simultáneas sobre un mismo producto con stock bajo, ambas transacciones leían el mismo stock disponible antes del descargo, derivando en sobreventa (stock negativo en base de datos o ventas por encima de las existencias físicas reales).
+
+#### Solución Aplicada
+1. **Bloqueo Pesimista en Repositorios (`backend/app/repositories/sale_repository.py`, `backend/app/repositories/merma_repository.py`)**:
+   - En `SaleRepositoryImpl.get_inventario`:
+     ```python
+     stmt = (
+         select(InventarioSucursal)
+         .where(
+             InventarioSucursal.id_variante == id_variante,
+             InventarioSucursal.id_sucursal == id_sucursal,
+         )
+         .with_for_update()  # Bloqueo pesimista: serializa la lectura y previene sobreventa
+     )
+     ```
+   - En `MermaRepositoryImpl.get_inventario`: Se agregó idénticamente `.with_for_update()`.
+   - Al ejecutarse dentro del contexto transaccional gobernado por el `UnitOfWork`, PostgreSQL bloquea la fila del registro de inventario con un lock exclusivo a nivel de fila (`FOR UPDATE`) hasta que la transacción se confirma (`commit()`) o revierte (`rollback()`).
+
+#### Verificación
+- **Pruebas automatizadas (`tests/test_concurrency_stock.py`)**:
+  - `test_sale_repository_get_inventario_uses_for_update`: Inspecciona la consulta construida y valida la cláusula de bloqueo pesimista.
+  - `test_merma_repository_get_inventario_uses_for_update`: Valida que la consulta de inventario en mermas utilice la cláusula de bloqueo pesimista.
+  - `test_concurrent_sales_no_oversell`: Simula escenario de inventario crítico (stock inicial = 1) con dos ventas consecutivas al mismo producto. La primera venta se procesa con éxito dejando stock = 0, y la segunda venta es rechazada de inmediato con `HTTP 400 Bad Request ("Stock insuficiente")`.
+
+---
+
+### Suite Completa de Verificación
+Ejecución integral de todas las suites de prueba del sistema:
+- `python -m pytest tests/test_rbac.py tests/test_cierre_ciegas.py tests/test_sales_service.py tests/test_cash_service.py tests/test_merma_service.py tests/test_user_report_service.py tests/test_concurrency_stock.py tests/test_security_audit_lockout.py`:
+  - **40 pruebas ejecutadas, 40 pruebas PASSED (100% de éxito)** en 13.50 segundos.
+
+---
+
+## [2026-09-20] Migración Alembic 0007: Secuencias Automáticas, Restricciones de Unicidad, Índices en Llaves Foráneas y No Negatividad en Stock
+
+### Contexto y Diagnóstico
+Se identificaron y corrigieron problemas estructurales en la base de datos de Tienda el Regalito POS que representaban riesgos reales de concurrencia, integridad referencial, rendimiento y corrupción de datos en un entorno de producción:
+
+1. **Auditoría Previa de Datos Existentes**:
+   - Antes de aplicar cualquier modificación DDL, se auditó la base de datos en vivo (`regalito_pos`):
+     - Candidatos a `UNIQUE` (`usuario.username`, `variante_producto.codigo_barras`, `factura_fel.numero_dte`, nombres de rol, categoría, etc.): **0 duplicados encontrados (100% limpios)**.
+     - Campos de stock y cantidad (`stock_actual`, `stock_minimo`, movimientos y detalles): **0 valores negativos encontrados (100% limpios)**.
+   - Conclusión: Base de datos limpia y apta para la aplicación aditiva de restricciones sin riesgo de fallos en producción.
+
+2. **Riesgo de Colisión de IDs en Inserciones Concurrentes (Punto 1)**:
+   - *Diagnóstico*: En el diseño inicial, 32 tablas con clave primaria `INT` carecían de secuencias automáticas asignadas en PostgreSQL (por ejemplo `usuario`, `producto`, `variante_producto`, `categoria`, `cliente`, `proveedor`, `orden_compra`, `compra`, etc.). A diferencia de las tablas operativas regularizadas en la migración `0005` (`caja`, `turno_caja`, `venta`, `merma`), las inserciones dependían de que la capa de aplicación gestionara el ID o de secuencias implícitas no vinculadas formalmente a la columna (`OWNED BY`), arriesgando colisiones bajo concurrencia.
+   - *Solución*: Creación de secuencias dedicadas para las 32 tablas, asignación de valor predeterminado `DEFAULT nextval('{tabla}_{col}_seq')`, propiedad de secuencia (`OWNED BY`) e inicialización segura del contador con `setval(..., MAX(...) + 1, false)`.
+
+3. **Falta de Protección de Unicidad a Nivel de Base de Datos (Punto 2)**:
+   - *Diagnóstico*: Múltiples campos clave que el backend valida en memoria o trata como únicos no tenían restricciones `UNIQUE` a nivel de motor relacional (`usuario.username`, `variante_producto.codigo_barras`, `factura_fel.numero_dte`, `rol.nombre`, `categoria.nombre`, `departamento_geografico.nombre`, `permiso.codigo`, `parametro_sistema.clave`, `unidad_medida.codigo`). Ante un fallo de validación, concurrencia de peticiones simultáneas o scripts manuales, la base de datos aceptaba registros duplicados.
+   - *Solución*: Se incorporaron 9 restricciones `UNIQUE` formales e idempotentes. En `variante_producto(codigo_barras)`, el estándar SQL de Postgres permite valores `NULL` sin colisionar pero bloquea duplicados en códigos asignados.
+
+4. **Ausencia de Índices en Columnas de Llave Foránea (Punto 3)**:
+   - *Diagnóstico*: PostgreSQL no crea índices automáticos para las restricciones `FOREIGN KEY`. Esto provocaba que todas las consultas de unión (`JOIN`), filtros por usuario, consultas de inventario por variante/sucursal y reportes requirieran escaneos secuenciales de tabla completa (*Sequential Scans*). Asimismo, operaciones de actualización o eliminación en tablas padre podían provocar bloqueos pesados sobre tablas hijas.
+   - *Solución*: Se crearon 48 índices B-tree sobre todas las columnas de llaves foráneas frecuentemente consultadas en filtros y reportes (agrupadas por `id_usuario`, `id_variante`, `id_sucursal`, `id_venta`, `id_turno`, etc.).
+
+5. **Riesgo de Valores Negativos en Inventario y Cantidades (Punto 4)**:
+   - *Diagnóstico*: Errores en la capa de aplicación, excepciones durante mermas o devoluciones podían derivar en stocks o cantidades negativas en la base de datos sin ningún freno del motor SQL.
+   - *Solución*: Se implementaron 8 restricciones `CHECK (columna >= 0)` sobre todos los campos numéricos de cantidad y stock del sistema.
+
+### Cambios Implementados
+
+1. **Migración Alembic `0007_secuencias_unicidad_indices_y_no_negatividad.py`**:
+   - Creada en `backend/alembic/versions/0007_secuencias_unicidad_indices_y_no_negatividad.py` (revisión `0007`, `down_revision = "0006"`).
+   - Bloque 1: 32 secuencias PostgreSQL automáticas idempotentes con `CREATE SEQUENCE IF NOT EXISTS`, `SET DEFAULT nextval(...)`, `OWNED BY` y sincronización con `setval(...)`.
+   - Bloque 2: 9 restricciones `UNIQUE` mediante bloques `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = ...) THEN ALTER TABLE ... ADD CONSTRAINT ... UNIQUE (...); END IF; END $$;`.
+   - Bloque 3: 48 índices B-tree creados mediante `CREATE INDEX IF NOT EXISTS {idx_name} ON {tabla} ({columna});`.
+   - Bloque 4: 8 restricciones `CHECK` de no negatividad (`>= 0`) mediante bloques `DO $$ ... IF NOT EXISTS ... END $$;`.
+   - Método `downgrade()` simétrico y totalmente reversible probado con `asyncpg`.
+
+2. **Modelos SQLAlchemy (`backend/app/db/models.py`)**:
+   - Se reflejaron `unique=True` en las 9 entidades correspondientes (`Rol.nombre`, `Usuario.username`, `Permiso.codigo`, `ParametroSistema.clave`, `DepartamentoGeografico.nombre`, `Categoria.nombre`, `UnidadMedida.codigo`, `VarianteProducto.codigo_barras`, `FacturaFel.numero_dte`).
+   - Se reflejaron `index=True` en las columnas de llaves foráneas para mantener paridad entre el ORM, PostgreSQL y los tests en memoria con SQLite.
+
+3. **Esquema Inicial (`database/init.sql`)**:
+   - Se migraron las definiciones de claves primarias a `SERIAL PRIMARY KEY` para las 42 tablas individuales (preservando clave compuesta en `rol_permiso`).
+   - Se incorporaron las restricciones `UNIQUE` y las restricciones `CHECK (columna >= 0)`.
+   - Se añadió el bloque formal de 48 índices `CREATE INDEX IF NOT EXISTS`.
+   - Se añadió el bloque de sincronización de secuencias tras la carga de datos semilla (`SELECT setval(...)`) para garantizar despliegues Docker limpios totalmente sincronizados con producción.
+
+### Verificación y Resultados
+1. **Reversibilidad y Ejecución de Migración**:
+   - `alembic upgrade head` (0006 -> 0007): **Exitoso**.
+   - `alembic downgrade 0006`: **Exitoso**, demostrando reversibilidad total sin pérdida de datos.
+   - `alembic upgrade head` (re-aplicación a 0007): **Exitoso**.
+2. **Pruebas de Restricciones e Integridad en PostgreSQL**:
+   - Auto-incremento sin ID: confirmado (`INSERT INTO categoria` asigna automáticamente el siguiente ID secuencial sin colisión).
+   - Rechazo de duplicados: confirmado (inserción de `username = 'admin'` rechazada con `IntegrityError / UniqueViolation`).
+   - Rechazo de stock negativo: confirmado (inserción de `stock_actual = -5` rechazada con `IntegrityError / CheckViolation`).
+3. **Validación de `init.sql`**:
+   - Ejecución completa y dry-run de `database/init.sql` en base de datos limpia de PostgreSQL sin errores sintácticos.
+4. **Suite Completa Pytest del Backend**:
+   - `python -m pytest tests/test_rbac.py tests/test_cierre_ciegas.py tests/test_sales_service.py tests/test_cash_service.py tests/test_merma_service.py tests/test_user_report_service.py`: **31/31 pruebas PASSED (100% de éxito)**.
+5. **Suites de Regresión Frontend**:
+   - `test_form_validations.js`: **8/8 pruebas PASSED (100%)**.
+   - `test_4_fixes.js`: **4/4 pruebas PASSED (100%)**.
+   - `test_logout_flow.js`: **4/4 pruebas PASSED (100%)**.
+
+---
+
+## [2026-09-20] Migración Alembic 0006: Restricciones de Dominio para Estados, Ampliación de Campos de Texto y Evaluación de Zonas Horarias
+
+### Contexto y Diagnóstico
+Se solicitó la aplicación de tres mejoras de calidad no urgentes en la base de datos de Tienda el Regalito POS, bajo la premisa estricta de no representar riesgo de romper datos o funcionalidad existente:
+
+1. **Restricciones en columnas de tipo `estado` (Punto 1)**:
+   - *Diagnóstico*: En el esquema original, diez tablas poseían columnas `estado VARCHAR(20)` como texto libre sin validación a nivel de motor SQL. Existía el riesgo latente de registrar estados inconsistentes, erróneos o con errores tipográficos (ej. "activo", "inactiva", "Pendinte").
+   - *Directriz*: Limitar los valores permitidos únicamente a los que el sistema realmente utiliza hoy, **sin cambiar el tipo de dato de la columna** (manteniendo `VARCHAR(20)` y evitando `ENUM` de Postgres, que requeriría `ALTER TYPE`, bloquearía transacciones DDL y dificultaría migraciones futuras).
+   - *Revisión de valores en uso*: Se identificaron los dominios reales actuales:
+     - `rol`: `'Activo'`, `'Inactivo'`
+     - `usuario`: `'Activo'`, `'Inactivo'`
+     - `sucursal`: `'Activo'`, `'Inactivo'`
+     - `categoria`: `'Activo'`, `'Inactivo'`
+     - `producto`: `'Activo'`, `'Inactivo'`
+     - `caja`: `'Activa'`, `'Inactiva'`, `'Activo'`, `'Inactivo'` (variantes por compatibilidad con seeds y repositorios legacy)
+     - `turno_caja`: `'Abierto'`, `'Cerrado'`, `'Abierta'`, `'Cerrada'` (variantes de género admitidas)
+     - `venta`: `'Completada'`, `'Anulada'`
+     - `orden_compra`: `'Emitida'`, `'Recibida'`, `'Cancelada'`
+     - `alerta_stock`: `'Pendiente'`, `'Atendida'`, `'Descartada'`
+
+2. **Ampliación de campos de texto libre para observaciones y descripciones (Punto 2)**:
+   - *Diagnóstico*: Múltiples columnas críticas de texto libre estaban restringidas a `VARCHAR(255)`. Se detectó un riesgo real de desbordamiento en tiempo de ejecución en `cash_service.py` (L200), donde el sistema antepone automáticamente metadatos en notas de turno de caja (`f"Cierre a ciegas: {estado_cierre} (Dif: Q{diferencia:.2f}). {obs_limpia or ''}"`). Si el usuario ingresaba observaciones detalladas, la concatenación excedía fácilmente los 255 caracteres, disparando una excepción `DataError: value too long for type character varying(255)` de PostgreSQL y bloqueando el cierre de caja.
+   - *Solución*: Ampliar las 5 columnas de texto libre a tipo `TEXT`, sin límite artificial de 255 caracteres y sin sobrecosto de almacenamiento en PostgreSQL.
+
+3. **Evaluación de Fechas, Horas y Zona Horaria (Punto 3)**:
+   - *Diagnóstico técnico*: El driver asíncrono `asyncpg` utilizado por SQLAlchemy en el backend (`postgresql+asyncpg://...`) impone una regla estricta: si una columna es de tipo `TIMESTAMP WITH TIME ZONE` (`TIMESTAMPTZ`), rechaza de inmediato cualquier objeto Python naive (`TypeError: a datetime.datetime object with a tzinfo is required`).
+   - *Evaluación de impacto*: Actualmente todos los servicios y modelos del sistema generan marcas de tiempo con `datetime.now()` (naive) y el esquema utiliza `TIMESTAMP WITHOUT TIME ZONE`. Cambiar a `TIMESTAMPTZ` rompería instantáneamente todas las operaciones de escritura en producción salvo que se refactorizara el 100% de los servicios, modelos y esquemas Pydantic.
+   - *Contexto operacional*: Tienda el Regalito opera actualmente dentro de Guatemala (`America/Guatemala`, UTC-6 fijo sin horario de verano), por lo que las marcas de tiempo locales son perfectamente deterministas y unívocas.
+   - *Decisión*: Preservar `TIMESTAMP WITHOUT TIME ZONE` para cumplir rigurosamente con la instrucción de "no implementar cambios que rompan compatibilidad o representen riesgo".
+
+### Cambios Implementados
+
+1. **Migración Alembic `0006_restricciones_estado_y_ampliacion_textos.py`**:
+   - Creada en `backend/alembic/versions/0006_restricciones_estado_y_ampliacion_textos.py` (revisión `0006`, `down_revision = "0005"`).
+   - Incorpora 10 restricciones `CHECK` idempotentes mediante bloques `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = ...) THEN ALTER TABLE ... ADD CONSTRAINT ... CHECK (...); END IF; END $$;`.
+   - Modifica a tipo `TEXT` las siguientes 5 columnas:
+     - `producto.descripcion`
+     - `cierre_caja_ciegas.observaciones`
+     - `turno_caja.notas`
+     - `merma.observaciones`
+     - `bitacora_auditoria.descripcion`
+   - Función `downgrade()` completa y simétrica que revierte las columnas a `VARCHAR(255)` y elimina las 10 restricciones `CHECK` con `DROP CONSTRAINT IF EXISTS`.
+
+2. **Modelos SQLAlchemy (`backend/app/db/models.py`)**:
+   - Se importó el tipo `Text` desde `sqlalchemy`.
+   - Se actualizaron las definiciones de los modelos a `Column(Text, ...)` en `Producto.descripcion`, `CierreCajaCiegas.observaciones`, `TurnoCaja.notas`, `Merma.observaciones` y `BitacoraAuditoria.descripcion`.
+
+3. **Esquema Inicial (`database/init.sql`)**:
+   - Sincronización íntegra de las 10 restricciones `CHECK` en las sentencias `CREATE TABLE` correspondientes.
+   - Actualización de las 5 columnas a `TEXT` para garantizar coherencia en despliegues desde cero (Database-First con Docker Compose).
+
+### Verificación y Resultados
+1. **Verificación de Modelos y Migración Alembic**:
+   - La migración es sintáctica y conceptualmente limpia, y se integra de forma continua a la cadena `0001 -> 0002 -> 0003 -> 0004 -> 0005 -> 0006`.
+2. **Suite Completa de Pruebas Pytest del Backend**:
+   - `python -m pytest tests/test_rbac.py tests/test_cierre_ciegas.py tests/test_sales_service.py tests/test_cash_service.py tests/test_merma_service.py`: **26/26 pruebas PASSED (100%)**.
+   - `python -m pytest tests/test_user_report_service.py`: **5/5 pruebas PASSED (100%)**.
+   - Total backend: **31/31 pruebas exitosas sin ninguna regresión**.
+3. **Suites de Pruebas Frontend**:
+   - `scratch/test_form_validations.js`: **8/8 pruebas PASSED (100%)**.
+   - `scratch/test_4_fixes.js`: **4/4 pruebas PASSED (100%)**.
+   - `scratch/test_logout_flow.js`: **4/4 pruebas PASSED (100%)**.
+
+---
 
 ## [2026-09-18] Corrección Definitiva del Bug de Validación en Cascada por Desplazamiento de Layout (DOM Layout Shift) en Navegador
 
@@ -1248,3 +2808,27 @@ Se desarrolló el módulo de **Productos** y el mantenimiento de **Categorías**
 - Recrear el volumen de Postgres (`docker-compose down -v && docker-compose up -d db`) para aplicar `init.sql` actualizado.
 - Considerar migraciones versionadas con Alembic para entornos con datos existentes.
 - El frontend (`frontend/js/app.js`) aún usa el formato previo de producto; debe actualizarse para enviar `category_id`/`sku`.
+
+### Módulo de Reportes y Estadísticas (Completado)
+- Aplicado SDD y TDD de manera estricta para el filtrado de reportes por fecha.
+- Creada capa DERCAS (Schema, Repository, Service, Controller) para exportar reportes a Excel y CSV utilizando `openpyxl` y `csv`.
+- Validado el RBAC usando `require_admin` en el controlador y verificaciones profundas en el servicio, bloqueando con HTTP 403 a roles no autorizados.
+- Todas las pruebas de `test_reportes_service.py` pasan al 100% resolviendo el esquema completo de dependencias en base de datos.
+
+## Corrección: Módulo de Inventario en blanco (2026-10-05)
+
+### Problema
+- Al seleccionar "Inventario / Bodega" en la barra lateral, la zona del sistema aparecía en blanco.
+
+### Causa raíz
+- En `frontend/index.html` faltaba el `</div>` de cierre del contenedor `reportes-view` (abierto en la línea ~712). Esto hacía que `inventory-view` y `configuracion-view` quedaran **anidados dentro** de `reportes-view`.
+- Al navegar, `renderView()` oculta todos los `[data-main-view]` con `d-none`; como el padre `reportes-view` seguía con `d-none`, el inventario (hijo) permanecía oculto aunque se le quitara `d-none` a su propio contenedor.
+- Se agregó el `</div>` faltante tras el cierre de la tarjeta de Reportes, dejando a `reportes-view`, `inventory-view` y `configuracion-view` como hermanos directos.
+
+### Archivos modificados
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/index.html` | Se agregó el `</div>` de cierre que faltaba para el contenedor `reportes-view`; balance de `<div>` restaurado (359 abren / 359 cierran). |
+
+### Nota
+- `reportes-view`, `inventory-view` y `configuracion-view` ya no quedan anidados entre sí; el enrutamiento SPA de `app.js` funciona sin cambios adicionales.

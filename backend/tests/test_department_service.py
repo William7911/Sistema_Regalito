@@ -8,44 +8,52 @@ def service(uow):
     return ConcreteDepartmentService(uow)
 
 
-async def test_create_and_get_department(uow):
-    created = await service(uow).create_department(schemas.DepartmentCreate(name="Ventas"))
-    assert created.id is not None
-    assert created.is_active is True
+@pytest.mark.asyncio
+async def test_crear_y_obtener_departamento(uow):
+    creado = await service(uow).create_department(schemas.DepartmentCreate(nombre="Guatemala"))
+    assert creado.id_departamento is not None
+    assert creado.nombre == "Guatemala"
 
-    fetched = await service(uow).get_department(created.id)
-    assert fetched.id == created.id
+    obtenido = await service(uow).get_department(creado.id_departamento)
+    assert obtenido.id_departamento == creado.id_departamento
+    assert obtenido.nombre == "Guatemala"
 
 
-async def test_duplicate_department_name_rejected(uow):
+@pytest.mark.asyncio
+async def test_departamento_duplicado_rechazado(uow):
     svc = service(uow)
-    await svc.create_department(schemas.DepartmentCreate(name="Bodega"))
+    await svc.create_department(schemas.DepartmentCreate(nombre="Sololá"))
     with pytest.raises(HTTPException) as exc:
-        await svc.create_department(schemas.DepartmentCreate(name="Bodega"))
+        await svc.create_department(schemas.DepartmentCreate(nombre="Sololá"))
     assert exc.value.status_code == 400
+    assert "Ya existe" in exc.value.detail
 
 
-async def test_get_nonexistent_department_404(uow):
+@pytest.mark.asyncio
+async def test_obtener_departamento_inexistente_404(uow):
     with pytest.raises(HTTPException) as exc:
-        await service(uow).get_department(999)
+        await service(uow).get_department(9999)
     assert exc.value.status_code == 404
 
 
-async def test_update_department(uow):
-    created = await service(uow).create_department(schemas.DepartmentCreate(name="Ventas"))
-    updated = await service(uow).update_department(
-        created.id, schemas.DepartmentUpdate(name="Ventas Norte", description="Sucursal")
-    )
-    assert updated.name == "Ventas Norte"
-
-
-async def test_soft_delete_department(uow):
+@pytest.mark.asyncio
+async def test_actualizar_departamento(uow):
     svc = service(uow)
-    a = await svc.create_department(schemas.DepartmentCreate(name="A"))
-    await svc.create_department(schemas.DepartmentCreate(name="B"))
+    creado = await svc.create_department(schemas.DepartmentCreate(nombre="Peten"))
+    actualizado = await svc.update_department(
+        creado.id_departamento, schemas.DepartmentUpdate(nombre="Petén")
+    )
+    assert actualizado.nombre == "Petén"
 
-    await svc.deactivate_department(a.id)
 
-    active = await svc.list_departments()
-    assert {d.name for d in active} == {"B"}
-    assert len(await svc.list_departments(include_inactive=True)) == 2
+@pytest.mark.asyncio
+async def test_listar_departamentos(uow):
+    svc = service(uow)
+    await svc.create_department(schemas.DepartmentCreate(nombre="Zacapa"))
+    await svc.create_department(schemas.DepartmentCreate(nombre="Izabal"))
+
+    departamentos = await svc.list_departments()
+    nombres = [d.nombre for d in departamentos]
+    assert "Zacapa" in nombres
+    assert "Izabal" in nombres
+

@@ -4,7 +4,9 @@ from datetime import datetime
 from fastapi import HTTPException
 from app.db.models import Venta, DetalleVenta, PagoVenta, TurnoCaja, Usuario
 from app.schemas import sale_schema
+from app.core.config import settings
 from app.core.permissions import check_user_permission
+from app.services.audit_service import log_action
 
 
 class ConcreteSaleService:
@@ -13,10 +15,16 @@ class ConcreteSaleService:
       - Validación de turno abierto (RF01)
       - Regla de mayoreo automática (RF05: cantidad >= 6 o tipo mayorista)
       - Descargo atómico de inventario
-      - Validación y cuadre de pagos con cálculo de vuelto"""
+      - Validación y cuadre de pagos con cálculo de vuelto
+      - Emisión de Factura Electrónica FEL (contingencia si el certificador cae)"""
 
     def __init__(self, uow):
         self.uow = uow
+
+    def _debe_emitir_fel(self, data: sale_schema.SaleCreate) -> bool:
+        return settings.FEL_ENABLED and (
+            data.nit_receptor is not None or data.nombre_receptor is not None
+        )
 
     async def registrar_venta(
         self,
@@ -32,12 +40,20 @@ class ConcreteSaleService:
                 detail="Debe registrar el fondo inicial antes de vender",
             )
 
-        # 2. Verificar si el cliente es mayorista
+        # 2. Verificar estado del cliente y si aplica mayoreo
         is_client_wholesale = False
         if data.id_cliente:
             cliente = await self.uow.sales.get_cliente(data.id_cliente)
-            if cliente and cliente.id_tipo_cliente == 2:  # 2: Mayorista según catálogo
-                is_client_wholesale = True
+            if cliente:
+                if cliente.estado == "Inactivo":
+                    raise HTTPException(
+                        status_code=400,
+                        detail="El cliente seleccionado está inactivo y no puede realizar compras",
+                    )
+                if cliente.tipo_cliente and "MAYORISTA" in cliente.tipo_cliente.nombre.upper():
+                    is_client_wholesale = True
+                elif cliente.id_tipo_cliente in (2, 3):
+                    is_client_wholesale = True
 
         detalles_model: List[DetalleVenta] = []
         subtotal_bruto = Decimal("0.00")
@@ -152,12 +168,39 @@ class ConcreteSaleService:
 
         try:
             created = await self.uow.sales.create_sale(venta, detalles_model, pagos_model)
+            if self._debe_emitir_fel(data):
+                from app.services.fel_service import ConcreteFelService
+
+                items_payload = [
+                    {
+                        "id_variante": d.id_variante,
+                        "cantidad": d.cantidad,
+                        "precio_unitario": d.precio_unitario,
+                        "subtotal": d.subtotal,
+                    }
+                    for d in detalles_model
+                ]
+                await ConcreteFelService(self.uow).emitir_factura(
+                    id_venta=created.id_venta,
+                    total=total_venta,
+                    nit_receptor=data.nit_receptor,
+                    nombre_receptor=data.nombre_receptor,
+                    items=items_payload,
+                )
             await self.uow.commit()
         except Exception:
             await self.uow.rollback()
             raise
 
         fresh = await self.uow.sales.get_sale_by_id(created.id_venta)
+        await log_action(
+            self.uow.db,
+            id_usuario=user_id,
+            tabla="venta",
+            accion="VENTA",
+            descripcion=f"Registró venta ID {fresh.id_venta} por Q{total_venta:.2f}.",
+        )
+        await self.uow.commit()
         response = sale_schema.SaleResponse.model_validate(fresh)
         response.cambio = cambio_total
         return response

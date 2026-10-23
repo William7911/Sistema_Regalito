@@ -32,7 +32,7 @@ async def create_category(
     service: ConcreteCategoryService = Depends(get_category_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    return await service.create_category(payload)
+    return await service.create_category(payload, actor_id=current_user.id_usuario)
 
 
 @router.put("/{category_id}", response_model=schemas.CategoriaOut)
@@ -42,7 +42,7 @@ async def update_category(
     service: ConcreteCategoryService = Depends(get_category_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    return await service.update_category(category_id, payload)
+    return await service.update_category(category_id, payload, actor_id=current_user.id_usuario)
 
 
 @router.delete("/{category_id}", response_model=schemas.CategoriaOut)
@@ -52,4 +52,4 @@ async def deactivate_category(
     current_user: Usuario = Depends(get_current_user),
 ):
     """Eliminación lógica (soft delete): marca la categoría como inactiva."""
-    return await service.deactivate_category(category_id)
+    return await service.deactivate_category(category_id, actor_id=current_user.id_usuario)

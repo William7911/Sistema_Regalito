@@ -9,6 +9,7 @@ from app.repositories.user_repository import UserRepositoryImpl
 from app.repositories.cash_repository import CajaRepositoryImpl, TurnoCajaRepositoryImpl
 from app.repositories.merma_repository import MermaRepositoryImpl
 from app.repositories.sale_repository import SaleRepositoryImpl
+from app.repositories.fel_repository import FelRepositoryImpl
 
 
 class TestUnitOfWork:
@@ -23,6 +24,48 @@ class TestUnitOfWork:
         self.turnos = TurnoCajaRepositoryImpl(db)
         self.mermas = MermaRepositoryImpl(db)
         self.sales = SaleRepositoryImpl(db)
+        self.fel = FelRepositoryImpl(db)
+        
+        from app.repositories.compra_repository import CompraRepositoryImpl
+        self.compras = CompraRepositoryImpl(db)
+
+        from app.repositories.traslado_repository import TrasladoRepositoryImpl
+        self.traslados = TrasladoRepositoryImpl(db)
+
+        from app.repositories.visita_repository import VisitaRepositoryImpl
+        self.visitas = VisitaRepositoryImpl(db)
+        
+        from app.repositories.reporte_repository import ReporteRepositoryImpl
+        self.reportes = ReporteRepositoryImpl(db)
+
+        from app.repositories.cliente_repository import ClienteRepositoryImpl, TipoClienteRepositoryImpl
+        self.clientes = ClienteRepositoryImpl(db)
+        self.tipos_cliente = TipoClienteRepositoryImpl(db)
+
+        from app.repositories.catalogo_repository import (
+            SucursalRepository, AreaBodegaRepository, SubcategoriaRepository, UnidadMedidaRepository,
+            MotivoMermaRepository, MetodoPagoRepository, ProveedorRepository,
+            DepartamentoRepository, MunicipioRepository,
+        )
+        self.sucursales = SucursalRepository(db)
+        self.areas = AreaBodegaRepository(db)
+        self.subcategorias = SubcategoriaRepository(db)
+        self.unidades = UnidadMedidaRepository(db)
+        self.motivos_merma = MotivoMermaRepository(db)
+        self.metodos_pago = MetodoPagoRepository(db)
+        self.proveedores = ProveedorRepository(db)
+        self.departamentos_geo = DepartamentoRepository(db)
+        self.municipios = MunicipioRepository(db)
+
+        from app.repositories.catalogo_repository import (
+            PermisoRepository, BitacoraRepository, HistorialPrecioRepository,
+        )
+        self.permisos = PermisoRepository(db)
+        self.bitacora = BitacoraRepository(db)
+        self.historial_precios = HistorialPrecioRepository(db)
+
+        from app.repositories.configuracion_repository import ConfiguracionRepositoryImpl
+        self.configuracion = ConfiguracionRepositoryImpl(db)
 
     async def commit(self):
         await self.db.commit()

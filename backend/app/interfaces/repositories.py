@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import Optional, List, Tuple, Any
+from decimal import Decimal
 from app.db.models import (
     Categoria, Subcategoria, UnidadMedida, Sucursal, AreaBodega,
     Producto, VarianteProducto, InventarioSucursal,
     Rol, DepartamentoGeografico, Usuario,
-    Caja, TurnoCaja,
+    Caja, TurnoCaja, Venta, Compra, FacturaFel,
 )
 
 
@@ -54,6 +55,11 @@ class DepartmentRepository(ABC):
     @abstractmethod
     async def update(self, department: DepartamentoGeografico) -> DepartamentoGeografico:
         ...
+
+    @abstractmethod
+    async def list_municipios(self, department_id: Optional[int] = None) -> List[Any]:
+        ...
+
 
 
 class UserRepository(ABC):
@@ -297,4 +303,80 @@ class TurnoCajaRepository(ABC):
 
     @abstractmethod
     async def update(self, turno: TurnoCaja) -> TurnoCaja:
+        ...
+
+
+class SyncRepository(ABC):
+    """Contrato de acceso a datos para sincronización y réplica de datos maestros a SQLite local."""
+
+    @abstractmethod
+    async def fetch_cloud_snapshot(self) -> dict:
+        ...
+
+    @abstractmethod
+    async def replicate_to_sqlite(self, snapshot: dict) -> dict:
+        ...
+
+    @abstractmethod
+    async def get_sqlite_status(self) -> dict:
+        ...
+
+    @abstractmethod
+    async def get_sqlite_preview(self) -> dict:
+        ...
+
+
+class HealthRepository(ABC):
+    """Contrato de acceso a datos para Health Check."""
+
+    @abstractmethod
+    async def ping(self) -> bool:
+        ...
+
+
+class DashboardRepository(ABC):
+    """Contrato de acceso a datos para las métricas del Panel Principal."""
+
+    @abstractmethod
+    async def get_ventas_hoy(self) -> Tuple[Decimal, int]:
+        ...
+
+    @abstractmethod
+    async def count_stock_critico(self) -> int:
+        ...
+
+    @abstractmethod
+    async def get_compras_mes(self) -> Tuple[Decimal, int]:
+        ...
+
+    @abstractmethod
+    async def count_turnos_activos(self) -> int:
+        ...
+
+
+class FelRepository(ABC):
+    """Contrato de acceso a datos para la tabla factura_fel (FEL)."""
+
+    @abstractmethod
+    async def create(self, factura: FacturaFel) -> FacturaFel:
+        ...
+
+    @abstractmethod
+    async def get_by_id(self, id_factura: int) -> Optional[FacturaFel]:
+        ...
+
+    @abstractmethod
+    async def get_by_venta(self, id_venta: int) -> Optional[FacturaFel]:
+        ...
+
+    @abstractmethod
+    async def get_by_numero_dte(self, numero_dte: str) -> Optional[FacturaFel]:
+        ...
+
+    @abstractmethod
+    async def list_pendientes(self, limit: int = 100) -> List[FacturaFel]:
+        ...
+
+    @abstractmethod
+    async def update(self, factura: FacturaFel) -> FacturaFel:
         ...

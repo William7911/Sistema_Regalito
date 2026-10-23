@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,9 +29,13 @@ class MermaRepositoryImpl:
         return result.scalar_one_or_none()
 
     async def get_inventario(self, id_variante: int, id_sucursal: int) -> Optional[InventarioSucursal]:
-        stmt = select(InventarioSucursal).where(
-            InventarioSucursal.id_variante == id_variante,
-            InventarioSucursal.id_sucursal == id_sucursal,
+        stmt = (
+            select(InventarioSucursal)
+            .where(
+                InventarioSucursal.id_variante == id_variante,
+                InventarioSucursal.id_sucursal == id_sucursal,
+            )
+            .with_for_update()  # Bloqueo pesimista: evita descargo concurrente inconsistente
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -53,7 +57,7 @@ class MermaRepositoryImpl:
             select(Merma)
             .options(
                 selectinload(Merma.detalles).selectinload(DetalleMerma.motivo),
-                selectinload(Merma.detalles).selectinload(DetalleMerma.variante),
+                selectinload(Merma.detalles).selectinload(DetalleMerma.variante).selectinload(VarianteProducto.producto),
                 selectinload(Merma.sucursal),
                 selectinload(Merma.usuario),
             )
@@ -65,32 +69,40 @@ class MermaRepositoryImpl:
     def _build_filters(
         self,
         id_sucursal: Optional[int] = None,
-        fecha_desde: Optional[datetime] = None,
-        fecha_hasta: Optional[datetime] = None,
+        id_motivo: Optional[int] = None,
+        fecha_desde: Optional[Any] = None,
+        fecha_hasta: Optional[Any] = None,
     ):
         conditions = []
         if id_sucursal is not None:
             conditions.append(Merma.id_sucursal == id_sucursal)
-        if fecha_desde is not None:
-            conditions.append(Merma.fecha_merma >= fecha_desde)
-        if fecha_hasta is not None:
-            conditions.append(Merma.fecha_merma <= fecha_hasta)
+        if id_motivo is not None:
+            conditions.append(Merma.detalles.any(DetalleMerma.id_motivo == id_motivo))
+        if fecha_desde is not None and str(fecha_desde).strip():
+            val = fecha_desde.date() if hasattr(fecha_desde, "date") else str(fecha_desde).split("T")[0]
+            conditions.append(func.date(Merma.fecha_merma) >= val)
+        if fecha_hasta is not None and str(fecha_hasta).strip():
+            val = fecha_hasta.date() if hasattr(fecha_hasta, "date") else str(fecha_hasta).split("T")[0]
+            conditions.append(func.date(Merma.fecha_merma) <= val)
         return conditions
 
     async def search(
         self,
         id_sucursal: Optional[int] = None,
-        fecha_desde: Optional[datetime] = None,
-        fecha_hasta: Optional[datetime] = None,
+        id_motivo: Optional[int] = None,
+        fecha_desde: Optional[Any] = None,
+        fecha_hasta: Optional[Any] = None,
         limit: int = 50,
         offset: int = 0,
     ) -> List[Merma]:
-        conditions = self._build_filters(id_sucursal, fecha_desde, fecha_hasta)
+        conditions = self._build_filters(id_sucursal, id_motivo, fecha_desde, fecha_hasta)
         stmt = (
             select(Merma)
             .options(
                 selectinload(Merma.detalles).selectinload(DetalleMerma.motivo),
-                selectinload(Merma.detalles).selectinload(DetalleMerma.variante),
+                selectinload(Merma.detalles).selectinload(DetalleMerma.variante).selectinload(VarianteProducto.producto),
+                selectinload(Merma.sucursal),
+                selectinload(Merma.usuario),
             )
             .order_by(Merma.fecha_merma.desc())
         )
@@ -103,10 +115,11 @@ class MermaRepositoryImpl:
     async def count_search(
         self,
         id_sucursal: Optional[int] = None,
-        fecha_desde: Optional[datetime] = None,
-        fecha_hasta: Optional[datetime] = None,
+        id_motivo: Optional[int] = None,
+        fecha_desde: Optional[Any] = None,
+        fecha_hasta: Optional[Any] = None,
     ) -> int:
-        conditions = self._build_filters(id_sucursal, fecha_desde, fecha_hasta)
+        conditions = self._build_filters(id_sucursal, id_motivo, fecha_desde, fecha_hasta)
         stmt = select(func.count()).select_from(Merma)
         if conditions:
             stmt = stmt.where(*conditions)

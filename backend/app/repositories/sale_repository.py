@@ -23,15 +23,23 @@ class SaleRepositoryImpl:
         return result.scalar_one_or_none()
 
     async def get_inventario(self, id_variante: int, id_sucursal: int) -> Optional[InventarioSucursal]:
-        stmt = select(InventarioSucursal).where(
-            InventarioSucursal.id_variante == id_variante,
-            InventarioSucursal.id_sucursal == id_sucursal,
+        stmt = (
+            select(InventarioSucursal)
+            .where(
+                InventarioSucursal.id_variante == id_variante,
+                InventarioSucursal.id_sucursal == id_sucursal,
+            )
+            .with_for_update()  # Bloqueo pesimista: evita sobreventa concurrente
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
     async def get_cliente(self, id_cliente: int) -> Optional[Cliente]:
-        stmt = select(Cliente).where(Cliente.id_cliente == id_cliente)
+        stmt = (
+            select(Cliente)
+            .options(selectinload(Cliente.tipo_cliente))
+            .where(Cliente.id_cliente == id_cliente)
+        )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 

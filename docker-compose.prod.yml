@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: regalito_db_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-regalito_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-Regalito_2026}
+      POSTGRES_DB: ${DB_NAME:-regalito_pos}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+      # Si tienes un script de inicialización, puedes montarlo aquí:
+      # - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - regalito_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: regalito_backend_prod
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-regalito_admin}:${DB_PASSWORD:-Regalito_2026}@db:5432/${DB_NAME:-regalito_pos}
+      - ENVIRONMENT=production
+    depends_on:
+      - db
+    networks:
+      - regalito_net
+
+  frontend_nginx:
+    image: nginx:alpine
+    container_name: regalito_frontend_prod
+    restart: always
+    ports:
+      - "9090:80"
+      # Si se añade SSL en el futuro, exponer el 443
+      # - "443:443"
+    volumes:
+      # Montar la carpeta del frontend
+      - ./frontend:/usr/share/nginx/html:ro
+      # Montar la configuración de Nginx
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - regalito_net
+
+volumes:
+  pgdata_prod:
+    name: regalito_pgdata_prod
+
+networks:
+  regalito_net:
+    name: regalito_network
+    driver: bridge
