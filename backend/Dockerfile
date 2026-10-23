@@ -24,5 +24,5 @@ COPY . .
 # Exponer el puerto donde corre la API
 EXPOSE 8000
 
-# Comando para iniciar la aplicación en modo producción (con 4 workers y sin reload)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Comando para iniciar la aplicación en producción (garantiza alembic_version en head antes de levantar uvicorn)
+CMD ["sh", "-c", "python -m app.db.auto_migrate && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4"]

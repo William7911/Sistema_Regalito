@@ -1,31 +1,51 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
-echo =========================================
-echo    Iniciando Sistema Regalito (Produccion)
-echo =========================================
+echo ======================================================================
+echo           TIENDA EL REGALITO POS - INICIO DE PRODUCCION
+echo ======================================================================
 echo.
 
-echo [1/5] Entrando a la carpeta...
-cd /d "C:\Users\abima\OneDrive\Desktop\Sistema_Regalito\Sistema_Regalito"
+cd /d "%~dp0"
 
-echo [2/5] Levantando la base de datos...
-docker compose -f docker-compose.prod.yml up -d db
-timeout /t 10 /nobreak > NUL
+REM Verificar Docker
+docker --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Docker no esta instalado o no se encuentra en el PATH.
+    echo Por favor instala o inicia Docker Desktop y vuelve a intentar.
+    pause
+    exit /b 1
+)
 
-echo [3/5] Respaldo de la base de datos...
-if not exist respaldos mkdir respaldos
-for /f %%d in ('powershell -command "Get-Date -Format yyyyMMdd_HHmm"') do set FECHA=%%d
-docker exec regalito_db_prod pg_dump -U regalito_admin regalito_pos > respaldos\respaldo_%FECHA%.sql
+REM Crear .env a partir de .env.example si no existe
+if not exist ".env" (
+    echo [INFO] Archivo .env no encontrado. Creando a partir de .env.example...
+    copy ".env.example" ".env" >nul
+    echo [INFO] Archivo .env creado con exito.
+)
 
-echo [4/5] Reconstruyendo y levantando todo...
+echo [INFO] Levantando contenedores en segundo plano...
+echo (Este comando conserva los volumenes y datos de la base de datos)
 docker compose -f docker-compose.prod.yml up -d --build
-timeout /t 10 /nobreak > NUL
 
-echo [5/5] Aplicando migraciones...
-docker exec regalito_backend_prod alembic upgrade head
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Ocurrio un error al levantar los servicios.
+    pause
+    exit /b 1
+)
 
-start "" "http://localhost:9090"
 echo.
-echo Listo. Usuario: admin
+echo ======================================================================
+echo  Sistema levantado con exito.
+echo  Frontend disponible en: http://localhost:9090
+echo.
+echo  Usuarios semilla:
+echo   - Administradora: admin / admin123
+echo   - Bodeguero:     bodega / bodega123
+echo   - Cajera:        caja / caja123
+echo.
+echo  ADVERTENCIA: Por seguridad, cambie las contrasenas por defecto
+echo  al iniciar sesion en produccion.
+echo ======================================================================
 pause
