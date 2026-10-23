@@ -161,7 +161,7 @@ class ConcreteCatalogoGeneralService:
         obj = MotivoMerma(descripcion=descripcion, estado="Activo")
         created = await self.uow.motivos_merma.create(obj)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="CREATE", tabla="MotivoMerma",
+            self.uow.db, id_usuario=actor_id, accion="CREAR", tabla="MotivoMerma",
             descripcion=f"Creó motivo de merma '{created.descripcion}' (ID: {created.id_motivo})",
         )
         await self.uow.commit()
@@ -190,7 +190,7 @@ class ConcreteCatalogoGeneralService:
             m.estado = payload.estado
         updated = await self.uow.motivos_merma.update(m)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="UPDATE", tabla="MotivoMerma",
+            self.uow.db, id_usuario=actor_id, accion="EDITAR", tabla="MotivoMerma",
             descripcion=f"Actualizó motivo de merma '{updated.descripcion}' (ID: {updated.id_motivo})",
         )
         await self.uow.commit()
@@ -209,7 +209,7 @@ class ConcreteCatalogoGeneralService:
         m.estado = "Inactivo"
         updated = await self.uow.motivos_merma.update(m)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="DEACTIVATE", tabla="MotivoMerma",
+            self.uow.db, id_usuario=actor_id, accion="DESACTIVAR", tabla="MotivoMerma",
             descripcion=f"Desactivó motivo de merma '{updated.descripcion}' (ID: {updated.id_motivo})",
         )
         await self.uow.commit()
@@ -222,7 +222,7 @@ class ConcreteCatalogoGeneralService:
         m.estado = "Activo"
         updated = await self.uow.motivos_merma.update(m)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="ACTIVATE", tabla="MotivoMerma",
+            self.uow.db, id_usuario=actor_id, accion="REACTIVAR", tabla="MotivoMerma",
             descripcion=f"Reactivó motivo de merma '{updated.descripcion}' (ID: {updated.id_motivo})",
         )
         await self.uow.commit()
@@ -271,7 +271,7 @@ class ConcreteCatalogoGeneralService:
         obj = MetodoPago(nombre=nombre, estado="Activo")
         created = await self.uow.metodos_pago.create(obj)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="CREATE", tabla="MetodoPago",
+            self.uow.db, id_usuario=actor_id, accion="CREAR", tabla="MetodoPago",
             descripcion=f"Creó método de pago '{created.nombre}' (ID: {created.id_metodo_pago})",
         )
         await self.uow.commit()
@@ -300,7 +300,7 @@ class ConcreteCatalogoGeneralService:
             m.estado = payload.estado
         updated = await self.uow.metodos_pago.update(m)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="UPDATE", tabla="MetodoPago",
+            self.uow.db, id_usuario=actor_id, accion="EDITAR", tabla="MetodoPago",
             descripcion=f"Actualizó método de pago '{updated.nombre}' (ID: {updated.id_metodo_pago})",
         )
         await self.uow.commit()
@@ -319,7 +319,7 @@ class ConcreteCatalogoGeneralService:
         m.estado = "Inactivo"
         updated = await self.uow.metodos_pago.update(m)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="DEACTIVATE", tabla="MetodoPago",
+            self.uow.db, id_usuario=actor_id, accion="DESACTIVAR", tabla="MetodoPago",
             descripcion=f"Desactivó método de pago '{updated.nombre}' (ID: {updated.id_metodo_pago})",
         )
         await self.uow.commit()
@@ -332,7 +332,7 @@ class ConcreteCatalogoGeneralService:
         m.estado = "Activo"
         updated = await self.uow.metodos_pago.update(m)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="ACTIVATE", tabla="MetodoPago",
+            self.uow.db, id_usuario=actor_id, accion="REACTIVAR", tabla="MetodoPago",
             descripcion=f"Reactivó método de pago '{updated.nombre}' (ID: {updated.id_metodo_pago})",
         )
         await self.uow.commit()
@@ -401,7 +401,7 @@ class ConcreteCatalogoGeneralService:
         )
         created = await self.uow.proveedores.create(obj)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="CREATE", tabla="Proveedor",
+            self.uow.db, id_usuario=actor_id, accion="CREAR", tabla="Proveedor",
             descripcion=f"Creó proveedor '{created.distribuidora}' (ID: {created.id_proveedor})",
         )
         await self.uow.commit()
@@ -441,7 +441,7 @@ class ConcreteCatalogoGeneralService:
             p.estado = payload.estado
         updated = await self.uow.proveedores.update(p)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="UPDATE", tabla="Proveedor",
+            self.uow.db, id_usuario=actor_id, accion="EDITAR", tabla="Proveedor",
             descripcion=f"Actualizó proveedor '{updated.distribuidora}' (ID: {updated.id_proveedor})",
         )
         await self.uow.commit()
@@ -460,7 +460,7 @@ class ConcreteCatalogoGeneralService:
         p.estado = "Inactivo"
         updated = await self.uow.proveedores.update(p)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="DEACTIVATE", tabla="Proveedor",
+            self.uow.db, id_usuario=actor_id, accion="DESACTIVAR", tabla="Proveedor",
             descripcion=f"Desactivó proveedor '{updated.distribuidora}' (ID: {updated.id_proveedor})",
         )
         await self.uow.commit()
@@ -473,7 +473,7 @@ class ConcreteCatalogoGeneralService:
         p.estado = "Activo"
         updated = await self.uow.proveedores.update(p)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="ACTIVATE", tabla="Proveedor",
+            self.uow.db, id_usuario=actor_id, accion="REACTIVAR", tabla="Proveedor",
             descripcion=f"Reactivó proveedor '{updated.distribuidora}' (ID: {updated.id_proveedor})",
         )
         await self.uow.commit()
@@ -537,7 +537,7 @@ class ConcreteCatalogoGeneralService:
         obj = DepartamentoGeografico(nombre=nombre, estado="Activo")
         created = await self.uow.departamentos_geo.create(obj)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="CREATE", tabla="DepartamentoGeografico",
+            self.uow.db, id_usuario=actor_id, accion="CREAR", tabla="DepartamentoGeografico",
             descripcion=f"Creó departamento '{created.nombre}' (ID: {created.id_departamento})",
         )
         await self.uow.commit()
@@ -567,7 +567,7 @@ class ConcreteCatalogoGeneralService:
             dep.estado = payload.estado
         updated = await self.uow.departamentos_geo.update(dep)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="UPDATE", tabla="DepartamentoGeografico",
+            self.uow.db, id_usuario=actor_id, accion="EDITAR", tabla="DepartamentoGeografico",
             descripcion=f"Actualizó departamento '{updated.nombre}' (ID: {updated.id_departamento})",
         )
         await self.uow.commit()
@@ -586,7 +586,7 @@ class ConcreteCatalogoGeneralService:
         dep.estado = "Inactivo"
         updated = await self.uow.departamentos_geo.update(dep)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="DEACTIVATE", tabla="DepartamentoGeografico",
+            self.uow.db, id_usuario=actor_id, accion="DESACTIVAR", tabla="DepartamentoGeografico",
             descripcion=f"Desactivó departamento '{updated.nombre}' (ID: {updated.id_departamento})",
         )
         await self.uow.commit()
@@ -599,7 +599,7 @@ class ConcreteCatalogoGeneralService:
         dep.estado = "Activo"
         updated = await self.uow.departamentos_geo.update(dep)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="ACTIVATE", tabla="DepartamentoGeografico",
+            self.uow.db, id_usuario=actor_id, accion="REACTIVAR", tabla="DepartamentoGeografico",
             descripcion=f"Reactivó departamento '{updated.nombre}' (ID: {updated.id_departamento})",
         )
         await self.uow.commit()
@@ -654,7 +654,7 @@ class ConcreteCatalogoGeneralService:
         obj = Municipio(id_departamento=payload.id_departamento, nombre=nombre, estado="Activo")
         created = await self.uow.municipios.create(obj)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="CREATE", tabla="Municipio",
+            self.uow.db, id_usuario=actor_id, accion="CREAR", tabla="Municipio",
             descripcion=f"Creó municipio '{created.nombre}' en departamento {payload.id_departamento}",
         )
         await self.uow.commit()
@@ -684,7 +684,7 @@ class ConcreteCatalogoGeneralService:
             m.estado = payload.estado
         updated = await self.uow.municipios.update(m)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="UPDATE", tabla="Municipio",
+            self.uow.db, id_usuario=actor_id, accion="EDITAR", tabla="Municipio",
             descripcion=f"Actualizó municipio '{updated.nombre}' (ID: {updated.id_municipio})",
         )
         await self.uow.commit()
@@ -703,7 +703,7 @@ class ConcreteCatalogoGeneralService:
         m.estado = "Inactivo"
         updated = await self.uow.municipios.update(m)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="DEACTIVATE", tabla="Municipio",
+            self.uow.db, id_usuario=actor_id, accion="DESACTIVAR", tabla="Municipio",
             descripcion=f"Desactivó municipio '{updated.nombre}' (ID: {updated.id_municipio})",
         )
         await self.uow.commit()
@@ -716,7 +716,7 @@ class ConcreteCatalogoGeneralService:
         m.estado = "Activo"
         updated = await self.uow.municipios.update(m)
         await log_action(
-            self.uow.db, id_usuario=actor_id, accion="ACTIVATE", tabla="Municipio",
+            self.uow.db, id_usuario=actor_id, accion="REACTIVAR", tabla="Municipio",
             descripcion=f"Reactivó municipio '{updated.nombre}' (ID: {updated.id_municipio})",
         )
         await self.uow.commit()

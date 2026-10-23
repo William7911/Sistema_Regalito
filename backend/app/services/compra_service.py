@@ -68,7 +68,7 @@ class ConcreteComprasService:
 
         orden_creada = await self.uow.compras.create_orden(orden, detalles_model)
         await log_action(
-            self.uow.db, id_usuario=user_id, accion="CREATE", tabla="orden_compra",
+            self.uow.db, id_usuario=user_id, accion="CREAR", tabla="orden_compra",
             descripcion=f"Emisión de orden de compra (ID: {orden_creada.id_orden}) al proveedor {data.id_proveedor} por Q{total_estimado}",
         )
         await self.uow.commit()
@@ -137,7 +137,7 @@ class ConcreteComprasService:
         auditoria = BitacoraAuditoria(
             fecha_hora=datetime.now(),
             id_usuario=user_id,
-            accion="INGRESO_COMPRA",
+            accion="RECIBIR_COMPRA",
             tabla_afectada="orden_compra",
             descripcion=f"Ingreso de orden {orden.id_orden} con total {total_compra}"
         )

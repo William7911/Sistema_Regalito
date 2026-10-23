@@ -31,7 +31,7 @@ class ConcreteCategoryService(CategoryService):
         await self.repository.create(categoria)
         if actor_id:
             await log_action(
-                self.repository.db, id_usuario=actor_id, accion="CREATE", tabla="categoria",
+                self.repository.db, id_usuario=actor_id, accion="CREAR", tabla="categoria",
                 descripcion=f"Creó categoría '{categoria.nombre}' (ID: {categoria.id_categoria})",
             )
         await self.repository.commit()
@@ -56,7 +56,7 @@ class ConcreteCategoryService(CategoryService):
         await self.repository.update(categoria)
         if actor_id:
             await log_action(
-                self.repository.db, id_usuario=actor_id, accion="UPDATE", tabla="categoria",
+                self.repository.db, id_usuario=actor_id, accion="EDITAR", tabla="categoria",
                 descripcion=f"Actualizó categoría '{categoria.nombre}' (ID: {category_id})",
             )
         await self.repository.commit()
@@ -71,7 +71,7 @@ class ConcreteCategoryService(CategoryService):
         await self.repository.update(categoria)
         if actor_id:
             await log_action(
-                self.repository.db, id_usuario=actor_id, accion="DEACTIVATE", tabla="categoria",
+                self.repository.db, id_usuario=actor_id, accion="DESACTIVAR", tabla="categoria",
                 descripcion=f"Desactivó categoría '{categoria.nombre}' (ID: {category_id})",
             )
         await self.repository.commit()

@@ -34,7 +34,7 @@ class ConcreteRoleService(RoleService):
         created = await self.uow.roles.create(rol)
         if actor_id:
             await log_action(
-                self.uow.db, id_usuario=actor_id, accion="CREATE", tabla="rol",
+                self.uow.db, id_usuario=actor_id, accion="CREAR", tabla="rol",
                 descripcion=f"Creó rol '{created.nombre}' (ID: {created.id_rol})",
             )
         await self.uow.commit()
@@ -59,7 +59,7 @@ class ConcreteRoleService(RoleService):
         updated = await self.uow.roles.update(role)
         if actor_id:
             await log_action(
-                self.uow.db, id_usuario=actor_id, accion="UPDATE", tabla="rol",
+                self.uow.db, id_usuario=actor_id, accion="EDITAR", tabla="rol",
                 descripcion=f"Actualizó rol '{updated.nombre}' (ID: {updated.id_rol})",
             )
         await self.uow.commit()
@@ -80,7 +80,7 @@ class ConcreteRoleService(RoleService):
         updated = await self.uow.roles.update(role)
         if actor_id:
             await log_action(
-                self.uow.db, id_usuario=actor_id, accion="DEACTIVATE", tabla="rol",
+                self.uow.db, id_usuario=actor_id, accion="DESACTIVAR", tabla="rol",
                 descripcion=f"Desactivó rol '{updated.nombre}' (ID: {updated.id_rol})",
             )
         await self.uow.commit()
@@ -158,7 +158,7 @@ class ConcreteRoleService(RoleService):
         if actor_id:
             detalle = ", ".join(sorted(codigos_set)) or "sin permisos"
             await log_action(
-                self.uow.db, id_usuario=actor_id, accion="UPDATE", tabla="rol_permiso",
+                self.uow.db, id_usuario=actor_id, accion="EDITAR", tabla="rol_permiso",
                 descripcion=f"Actualizó permisos del rol '{role.nombre}' (ID: {role_id}): {detalle}",
             )
         await self.uow.commit()

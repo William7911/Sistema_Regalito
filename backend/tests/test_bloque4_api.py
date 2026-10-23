@@ -223,9 +223,9 @@ async def test_bitacora_api_lee_registros_con_filtros(client, db_session):
 
     user = await get_user_by_username(db_session, "admin_b4")
     db_session.add_all([
-        BitacoraAuditoria(id_usuario=user.id_usuario, tabla_afectada="usuario", accion="CREATE",
+        BitacoraAuditoria(id_usuario=user.id_usuario, tabla_afectada="usuario", accion="CREAR",
                           descripcion="Creó usuario 'a'", fecha_hora=datetime(2026, 10, 1, 10, 0, 0)),
-        BitacoraAuditoria(id_usuario=user.id_usuario, tabla_afectada="categoria", accion="UPDATE",
+        BitacoraAuditoria(id_usuario=user.id_usuario, tabla_afectada="categoria", accion="EDITAR",
                           descripcion="Editó categoría X", fecha_hora=datetime(2026, 10, 2, 11, 0, 0)),
         BitacoraAuditoria(id_usuario=user.id_usuario, tabla_afectada="producto", accion="PRECIO",
                           descripcion="Cambió precio", fecha_hora=datetime(2026, 10, 3, 9, 0, 0)),

@@ -62,7 +62,7 @@ async def test_categoria_create_registra_bitacora(db_session):
 
     await svc.create_category(schemas.CategoriaCreate(nombre="Categoria Auditada"), actor_id=user.id_usuario)
 
-    assert await _contar_bitacora(db_session, "categoria", "CREATE") == 1
+    assert await _contar_bitacora(db_session, "categoria", "CREAR") == 1
 
 
 @pytest.mark.asyncio
@@ -74,7 +74,7 @@ async def test_categoria_update_registra_bitacora(db_session):
     cat = await svc.create_category(schemas.CategoriaCreate(nombre="Cat Original"), actor_id=user.id_usuario)
     await svc.update_category(cat.id_categoria, schemas.CategoriaUpdate(nombre="Cat Editada"), actor_id=user.id_usuario)
 
-    assert await _contar_bitacora(db_session, "categoria", "UPDATE") == 1
+    assert await _contar_bitacora(db_session, "categoria", "EDITAR") == 1
 
 
 @pytest.mark.asyncio
@@ -86,7 +86,7 @@ async def test_categoria_deactivate_registra_bitacora(db_session):
     cat = await svc.create_category(schemas.CategoriaCreate(nombre="Cat Desactivar"), actor_id=user.id_usuario)
     await svc.deactivate_category(cat.id_categoria, actor_id=user.id_usuario)
 
-    assert await _contar_bitacora(db_session, "categoria", "DEACTIVATE") == 1
+    assert await _contar_bitacora(db_session, "categoria", "DESACTIVAR") == 1
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ async def test_departamento_create_registra_bitacora(uow, db_session):
 
     await svc.create_department(schemas.DepartmentCreate(nombre="Depto Auditado"), actor_id=user.id_usuario)
 
-    assert await _contar_bitacora(db_session, "departamento_geografico", "CREATE") == 1
+    assert await _contar_bitacora(db_session, "departamento_geografico", "CREAR") == 1
 
 
 @pytest.mark.asyncio
@@ -111,7 +111,7 @@ async def test_departamento_update_registra_bitacora(uow, db_session):
     dep = await svc.create_department(schemas.DepartmentCreate(nombre="Depto A"), actor_id=user.id_usuario)
     await svc.update_department(dep.id_departamento, schemas.DepartmentUpdate(nombre="Depto B"), actor_id=user.id_usuario)
 
-    assert await _contar_bitacora(db_session, "departamento_geografico", "UPDATE") == 1
+    assert await _contar_bitacora(db_session, "departamento_geografico", "EDITAR") == 1
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ async def test_rol_permisos_update_registra_bitacora(uow, db_session):
 
     await svc.update_rol_permisos(rol.id_rol, ["VENTA_COBRAR"], actor_id=user.id_usuario)
 
-    assert await _contar_bitacora(db_session, "rol_permiso", "UPDATE") == 1
+    assert await _contar_bitacora(db_session, "rol_permiso", "EDITAR") == 1
 
 
 # ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ async def test_compras_crear_orden_registra_bitacora(uow, db_session):
         user_id=usuario.id_usuario,
     )
 
-    assert await _contar_bitacora(db_session, "orden_compra", "CREATE") == 1
+    assert await _contar_bitacora(db_session, "orden_compra", "CREAR") == 1
 
 
 # ---------------------------------------------------------------------------
@@ -194,4 +194,4 @@ async def test_configuracion_actualizar_registra_bitacora(uow, db_session):
     svc = ConfiguracionService(uow)
     await svc.actualizar_configuracion({"IVA_PORCENTAJE": "12", "NIT_EMPRESA": "12345678-9"}, usuario_actual=usuario)
 
-    assert await _contar_bitacora(db_session, "parametro_sistema", "UPDATE") == 1
+    assert await _contar_bitacora(db_session, "parametro_sistema", "EDITAR") == 1

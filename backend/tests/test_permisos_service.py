@@ -107,7 +107,7 @@ async def test_create_rol_registra_bitacora(uow):
 
     conteo = (await uow.db.execute(
         select(func.count()).select_from(BitacoraAuditoria)
-        .where(BitacoraAuditoria.accion == "CREATE", BitacoraAuditoria.tabla_afectada == "rol")
+        .where(BitacoraAuditoria.accion == "CREAR", BitacoraAuditoria.tabla_afectada == "rol")
     )).scalar_one()
     assert conteo == 1
 

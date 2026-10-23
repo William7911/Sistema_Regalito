@@ -122,7 +122,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="CREATE",
+            accion="CREAR",
             tabla="Sucursal",
             descripcion=f"Creó sucursal '{created.nombre}' (ID: {created.id_sucursal})",
         )
@@ -177,7 +177,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="UPDATE",
+            accion="EDITAR",
             tabla="Sucursal",
             descripcion=f"Actualizó sucursal '{updated.nombre}' (ID: {updated.id_sucursal})",
         )
@@ -194,7 +194,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="DEACTIVATE",
+            accion="DESACTIVAR",
             tabla="Sucursal",
             descripcion=f"Desactivó sucursal '{updated.nombre}' (ID: {updated.id_sucursal})",
         )
@@ -210,7 +210,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="ACTIVATE",
+            accion="REACTIVAR",
             tabla="Sucursal",
             descripcion=f"Reactivó sucursal '{updated.nombre}' (ID: {updated.id_sucursal})",
         )
@@ -317,7 +317,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="CREATE",
+            accion="CREAR",
             tabla="AreaBodega",
             descripcion=f"Creó área de bodega '{created.nombre_area}' en sucursal {payload.id_sucursal}",
         )
@@ -359,7 +359,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="UPDATE",
+            accion="EDITAR",
             tabla="AreaBodega",
             descripcion=f"Actualizó área de bodega '{updated.nombre_area}' (ID: {updated.id_area})",
         )
@@ -381,7 +381,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="DEACTIVATE",
+            accion="DESACTIVAR",
             tabla="AreaBodega",
             descripcion=f"Desactivó área de bodega '{updated.nombre_area}' (ID: {updated.id_area})",
         )
@@ -397,7 +397,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="ACTIVATE",
+            accion="REACTIVAR",
             tabla="AreaBodega",
             descripcion=f"Reactivó área de bodega '{updated.nombre_area}' (ID: {updated.id_area})",
         )
@@ -489,7 +489,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="CREATE",
+            accion="CREAR",
             tabla="Subcategoria",
             descripcion=f"Creó subcategoría '{created.nombre}' en categoría {payload.id_categoria}",
         )
@@ -531,7 +531,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="UPDATE",
+            accion="EDITAR",
             tabla="Subcategoria",
             descripcion=f"Actualizó subcategoría '{updated.nombre}' (ID: {updated.id_subcategoria})",
         )
@@ -553,7 +553,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="DEACTIVATE",
+            accion="DESACTIVAR",
             tabla="Subcategoria",
             descripcion=f"Desactivó subcategoría '{updated.nombre}' (ID: {updated.id_subcategoria})",
         )
@@ -569,7 +569,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="ACTIVATE",
+            accion="REACTIVAR",
             tabla="Subcategoria",
             descripcion=f"Reactivó subcategoría '{updated.nombre}' (ID: {updated.id_subcategoria})",
         )
@@ -656,7 +656,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="CREATE",
+            accion="CREAR",
             tabla="UnidadMedida",
             descripcion=f"Creó unidad de medida '{created.descripcion}' ({created.codigo})",
         )
@@ -700,7 +700,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="UPDATE",
+            accion="EDITAR",
             tabla="UnidadMedida",
             descripcion=f"Actualizó unidad de medida '{updated.descripcion}' (ID: {updated.id_unidad})",
         )
@@ -722,7 +722,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="DEACTIVATE",
+            accion="DESACTIVAR",
             tabla="UnidadMedida",
             descripcion=f"Desactivó unidad de medida '{updated.descripcion}' (ID: {updated.id_unidad})",
         )
@@ -738,7 +738,7 @@ class ConcreteCatalogoService(CatalogoService):
         await log_action(
             self.uow.db,
             id_usuario=actor_id,
-            accion="ACTIVATE",
+            accion="REACTIVAR",
             tabla="UnidadMedida",
             descripcion=f"Reactivó unidad de medida '{updated.descripcion}' (ID: {updated.id_unidad})",
         )

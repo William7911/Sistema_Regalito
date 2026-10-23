@@ -37,7 +37,7 @@ class ConcreteInventoryService:
         auditoria = BitacoraAuditoria(
             id_usuario=current_user.id_usuario,
             tabla_afectada="inventario_sucursal",
-            accion="UPDATE",
+            accion="EDITAR",
             descripcion=f"Actualización de inventario {id_inventario}",
             fecha_hora=datetime.utcnow()
         )

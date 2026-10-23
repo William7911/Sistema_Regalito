@@ -69,7 +69,7 @@ async def test_update_inventory_stock_minimo(db_session: AsyncSession):
     # Verificar Auditoría
     auditoria = (await db_session.execute(select(BitacoraAuditoria))).scalars().all()
     assert len(auditoria) == 1
-    assert auditoria[0].accion == "UPDATE"
+    assert auditoria[0].accion == "EDITAR"
 
 async def test_adjust_stock_success_with_alert(db_session: AsyncSession):
     await _seed_inventory_data(db_session)

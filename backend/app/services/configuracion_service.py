@@ -33,7 +33,7 @@ class ConfiguracionService:
             await self.uow.configuracion.actualizar_valor(clave, valor)
 
         await log_action(
-            self.uow.db, id_usuario=usuario_actual.id_usuario, accion="UPDATE",
+            self.uow.db, id_usuario=usuario_actual.id_usuario, accion="EDITAR",
             tabla="parametro_sistema",
             descripcion="Actualizó configuración: " + ", ".join(sorted(parametros.keys())),
         )

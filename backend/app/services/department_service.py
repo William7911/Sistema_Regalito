@@ -40,7 +40,7 @@ class ConcreteDepartmentService(DepartmentService):
         created = await self.uow.departments.create(department)
         if actor_id:
             await log_action(
-                self.uow.db, id_usuario=actor_id, accion="CREATE", tabla="departamento_geografico",
+                self.uow.db, id_usuario=actor_id, accion="CREAR", tabla="departamento_geografico",
                 descripcion=f"Creó departamento '{created.nombre}' (ID: {created.id_departamento})",
             )
         await self.uow.commit()
@@ -65,7 +65,7 @@ class ConcreteDepartmentService(DepartmentService):
         updated = await self.uow.departments.update(department)
         if actor_id:
             await log_action(
-                self.uow.db, id_usuario=actor_id, accion="UPDATE", tabla="departamento_geografico",
+                self.uow.db, id_usuario=actor_id, accion="EDITAR", tabla="departamento_geografico",
                 descripcion=f"Actualizó departamento '{updated.nombre}' (ID: {updated.id_departamento})",
             )
         await self.uow.commit()

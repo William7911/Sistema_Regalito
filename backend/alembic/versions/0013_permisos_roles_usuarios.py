@@ -42,3 +42,4 @@ def downgrade() -> None:
         DELETE FROM permiso
         WHERE codigo IN ('ROL_ADMIN', 'USUARIO_ADMIN');
     """)
+
