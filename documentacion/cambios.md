@@ -3,6 +3,43 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Fase 2 — Bloque 3: Saneamiento de Datos Geográficos (338 Municipios), Paridad init.sql, Estados de Orden de Compra y Verificación de Secretos
+
+### Causa Raíz / Requerimiento
+1. **Aclaración de Conteos Geográficos**: Explicar la discrepancia del SELECT que mostró 2 departamentos y 3 municipios en el reporte anterior. Ejecutar la verificación en la base real PostgreSQL (`regalito_db`, puerto 5433, base `regalito_pos`) confirmando los 22 departamentos y los 338 municipios oficiales.
+2. **Paridad de `database/init.sql`**: Asegurar y verificar que la inicialización desde cero en volumen vacío (`init.sql`) genere exactamente los 22 departamentos y 338 municipios oficiales con secuencias íntegras.
+3. **Cobertura de Órdenes de Compra Abiertas para Proveedor**: Garantizar que la regla de bloqueo de desactivación de proveedores cubra todos los estados no finalizados (`Emitida`, `Recibida Parcialmente`, `Pendiente`, `En Proceso`, etc., excluyendo únicamente los terminales `Recibida`, `Cancelada` y `Anulada`), devuelva HTTP 400 con el conteo respectivo, y agregar prueba de API específica.
+4. **Auditoría de Secretos en Git**: Confirmar mediante `git ls-files | grep -i -E "\.env|credenc|secret"` que no existan credenciales ni variables de entorno sensibles versionadas en el repositorio.
+
+### Solución Implementada
+1. **Identificación y Aclaración de Base de Datos**:
+   - El SELECT previo de 2 departamentos y 3 municipios fue ejecutado por error de contexto contra el archivo SQLite temporal `scratch/b3_e2e.db` (fixture local utilizado para aislar las pruebas de interfaz Playwright).
+   - En la base PostgreSQL de desarrollo (`regalito_db`, puerto 5433, base `regalito_pos`), se aplicó la migración Alembic [`0012_carga_municipios_338.py`](../backend/alembic/versions/0012_carga_municipios_338.py) agregando los 2 municipios restantes para alcanzar los 338 oficiales certificados: *El Chal* (Petén, Decreto 5-2014) y *Petatán* (Huehuetenango, Decreto 6-2015).
+   - Conteos en PostgreSQL real: 22 departamentos y 338 municipios, 0 huérfanos.
+2. **Actualización y Verificación de `database/init.sql`**:
+   - Se actualizó [`database/init.sql`](../database/init.sql) con la carga íntegra de los 22 departamentos y 338 municipios.
+   - Verificado levantando una base limpia aislada `test_init_db` a partir de `init.sql`: conteo confirmado de 22 departamentos y 338 municipios.
+3. **Regla de Estados No Finalizados para Proveedores y Prueba API**:
+   - En [`backend/app/repositories/catalogo_repository.py`](../backend/app/repositories/catalogo_repository.py): se ajustó `count_ordenes_activas` para filtrar `OrdenCompra.estado.notin_(["Recibida", "Cancelada", "Anulada"])`, cubriendo de manera exhaustiva cualquier orden en estado abierto (`Emitida`, `Recibida Parcialmente`, `Pendiente`, `En Proceso`).
+   - En [`backend/app/services/catalogo_general_service.py`](../backend/app/services/catalogo_general_service.py): mensaje de error 400 estandarizado a `"No se puede desactivar el proveedor: hay {dependencias} orden(es) de compra abierta(s)"`.
+   - En [`backend/tests/test_catalogo_bloque3_api.py`](../backend/tests/test_catalogo_bloque3_api.py): se agregó la prueba `test_desactivar_proveedor_con_orden_abierta_retorna_400`, validando rechazo 400 ante órdenes en `Emitida` y `Recibida Parcialmente`, y éxito 200 tras pasar a estado finalizado `Recibida`.
+   - En [`backend/tests/test_catalogo_bloque3_service.py`](../backend/tests/test_catalogo_bloque3_service.py): se expandió la prueba unitaria para validar estados abiertos vs terminales.
+4. **Verificación de Seguridad en Git**:
+   - Ejecutado `git ls-files | grep -i -E '\.env|credenc|secret'` en el repositorio, arrojando únicamente `.env.example`. Cero credenciales ni archivos `.env` versionados.
+
+### Verificación
+- PostgreSQL real (`regalito_pos` en puerto 5433):
+  - `SELECT COUNT(*) FROM departamento_geografico;` -> **22**.
+  - `SELECT COUNT(*) FROM municipio;` -> **338**.
+- Base limpia desde `init.sql`:
+  - `SELECT COUNT(*) FROM departamento_geografico;` -> **22**.
+  - `SELECT COUNT(*) FROM municipio;` -> **338**.
+- Pytest suite completa: **195 passed, 0 failed** (incluyendo nueva prueba de API y servicio para proveedor).
+- Git ls-files grep: únicamente `.env.example`.
+
+
+---
+
 
 
 ## [2026-10-22] Fase 2 — Bloque 3: Resolución de Pendientes (Git por Bloque, Desglose 194 Tests, Desactivación Segura y Limpieza E2E)

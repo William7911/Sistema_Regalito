@@ -246,6 +246,20 @@ async def test_desactivar_proveedor_con_orden_emitida_rechazado(uow):
     assert "orden" in exc_info.value.detail.lower()
     assert "hay 1 orden(es)" in exc_info.value.detail
 
+    # Cubre estado no finalizado 'Recibida Parcialmente'
+    orden.estado = "Recibida Parcialmente"
+    await uow.db.commit()
+    with pytest.raises(HTTPException) as exc_info2:
+        await svc.deactivate_proveedor(prov.id_proveedor, actor_id=1)
+    assert exc_info2.value.status_code == 400
+    assert "hay 1 orden(es)" in exc_info2.value.detail
+
+    # Estado finalizado 'Recibida' permite desactivar
+    orden.estado = "Recibida"
+    await uow.db.commit()
+    deact = await svc.deactivate_proveedor(prov.id_proveedor, actor_id=1)
+    assert deact.estado == "Inactivo"
+
 
 @pytest.mark.asyncio
 async def test_desactivar_y_reactivar_proveedor(uow):

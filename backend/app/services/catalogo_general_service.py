@@ -455,7 +455,7 @@ class ConcreteCatalogoGeneralService:
         if dependencias:
             raise HTTPException(
                 status_code=400,
-                detail=f"No se puede desactivar el proveedor: hay {dependencias} orden(es) de compra emitida(s) activa(s)",
+                detail=f"No se puede desactivar el proveedor: hay {dependencias} orden(es) de compra abierta(s)",
             )
         p.estado = "Inactivo"
         updated = await self.uow.proveedores.update(p)

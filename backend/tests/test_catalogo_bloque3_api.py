@@ -1,9 +1,11 @@
+from datetime import date
+from decimal import Decimal
 import pytest
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.db.database import get_db
 from app.core import security
-from app.db.models import Rol, Usuario, Permiso, RolPermiso, Municipio
+from app.db.models import Rol, Usuario, Permiso, RolPermiso, Municipio, Proveedor, OrdenCompra
 
 
 @pytest.fixture
@@ -195,6 +197,52 @@ async def test_crud_proveedor_api(client, db_session):
     res_xlsx = await client.get("/api/catalogos/proveedores/export?format=excel", headers=headers)
     assert res_xlsx.status_code == 200
     assert "spreadsheetml" in res_xlsx.headers["content-type"]
+
+
+@pytest.mark.asyncio
+async def test_desactivar_proveedor_con_orden_abierta_retorna_400(client, db_session):
+    headers = await seed_catalogo_admin_auth(db_session)
+
+    # 1. Crear proveedor
+    res = await client.post("/api/catalogos/proveedores", headers=headers, json={
+        "nombre_contacto": "Carlos",
+        "distribuidora": "Distribuidora Central GT",
+    })
+    assert res.status_code == 201
+    id_prov = res.json()["id_proveedor"]
+
+    # 2. Asignar orden de compra abierta ("Emitida")
+    orden = OrdenCompra(
+        id_proveedor=id_prov,
+        id_usuario=1,
+        fecha_emision=date.today(),
+        total_estimado=Decimal("500.00"),
+        estado="Emitida",
+    )
+    db_session.add(orden)
+    await db_session.commit()
+
+    # 3. Intentar desactivar vía DELETE -> debe retornar 400
+    res_del = await client.delete(f"/api/catalogos/proveedores/{id_prov}", headers=headers)
+    assert res_del.status_code == 400
+    assert "orden(es) de compra abierta(s)" in res_del.json()["detail"]
+    assert "1" in res_del.json()["detail"]
+
+    # 4. Probar con otro estado no finalizado ("Recibida Parcialmente")
+    orden.estado = "Recibida Parcialmente"
+    await db_session.commit()
+
+    res_del_parcial = await client.delete(f"/api/catalogos/proveedores/{id_prov}", headers=headers)
+    assert res_del_parcial.status_code == 400
+    assert "orden(es) de compra abierta(s)" in res_del_parcial.json()["detail"]
+
+    # 5. Si la orden pasa a un estado finalizado ("Recibida"), sí permite desactivar
+    orden.estado = "Recibida"
+    await db_session.commit()
+
+    res_del_ok = await client.delete(f"/api/catalogos/proveedores/{id_prov}", headers=headers)
+    assert res_del_ok.status_code == 200
+    assert res_del_ok.json()["estado"] == "Inactivo"
 
 
 # ---------------------------------------------------------------------------

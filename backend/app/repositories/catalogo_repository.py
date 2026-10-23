@@ -886,10 +886,10 @@ class ProveedorRepository:
         return res.scalar_one()
 
     async def count_ordenes_activas(self, id_proveedor: int) -> int:
-        """Cuenta órdenes de compra en estado Emitida (activas) que dependen del proveedor."""
+        """Cuenta órdenes de compra abiertas / no finalizadas (Emitida, Recibida Parcialmente, Pendiente, En Proceso, etc.) que dependen del proveedor."""
         stmt = select(func.count()).select_from(OrdenCompra).where(
             OrdenCompra.id_proveedor == id_proveedor,
-            OrdenCompra.estado == "Emitida",
+            OrdenCompra.estado.notin_(["Recibida", "Cancelada", "Anulada"]),
         )
         res = await self.db.execute(stmt)
         return res.scalar_one()
