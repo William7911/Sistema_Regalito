@@ -3,6 +3,42 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Proceso 2: Alertas de Stock Crítico (Acción Atender, Registro en Bitácora y Modal Operativo)
+
+### Causa Raíz / Requerimiento
+1. **Acción Operativa para Alertas de Stock**: Proporcionar a los usuarios autorizados la capacidad de atender/descartar alertas de stock crítico tanto desde la campanita de notificaciones del encabezado como desde un modal dedicado de alertas en la vista de inventario.
+2. **Auditoría en Bitácora**: Registrar formalmente la acción en `bitacora_auditoria` con verbo estandarizado `EDITAR` sobre la tabla `alerta_stock`, capturando el identificador del usuario responsable y el cambio de estado a `"Atendida"`.
+3. **Seguridad y Control de Acceso (RBAC)**: Restringir la atención de alertas únicamente a roles con permiso `INV_INGRESAR_MERCADERIA` (Administradora, Bodega), bloqueando con HTTP 403 a roles sin autorización (como Cajera).
+
+### Solución Implementada
+1. **Backend — Repositorio y Servicio de Inventario** ([`backend/app/repositories/inventory_repository.py`](../backend/app/repositories/inventory_repository.py), [`backend/app/services/inventory_service.py`](../backend/app/services/inventory_service.py)):
+   - Se implementó `get_alert_by_id(id_alerta)` con eager-loading de relaciones (`variante.producto`).
+   - Se optimizó `get_for_update(id_inventario)` para cargar `InventarioSucursal.variante` y `VarianteProducto.producto`, evitando errores de greenlet asíncrono en triggers de stock bajo.
+   - Se creó `atender_alerta(id_alerta, current_user)` en `InventoryService`:
+     - Valida existencia de la alerta (HTTP 404 si no existe).
+     - Actualiza el estado a `"Atendida"`.
+     - Registra auditoría con `accion="EDITAR"`, `tabla="alerta_stock"`, `registro_id=id_alerta` y detalle JSON (`{"estado_anterior": ..., "nuevo_estado": "Atendida"}`).
+2. **Backend — Endpoints API** ([`backend/app/api/inventory.py`](../backend/app/api/inventory.py)):
+   - Se añadió `PUT /api/inventario/alertas/{id_alerta}/atender` (y su alias en inglés `/api/inventory/alerts/{id_alerta}/atender`).
+   - Protegidos con `require_permission("INV_INGRESAR_MERCADERIA")`.
+3. **Frontend — Campanita y Modal de Alertas** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/notificaciones.js`](../frontend/js/notificaciones.js), [`frontend/js/inventory.js`](../frontend/js/inventory.js)):
+   - En `notificaciones.js`: el dropdown de la campanita muestra botón interactivo `[Atender]` por cada alerta activa para usuarios con permiso; al hacer clic invoca `window.atenderAlertaStock(id)` con feedback vía toast y actualización reactiva del badge.
+   - En `index.html`: se añadió el modal estático `#modal-inventario-alertas` (`data-bs-backdrop="static"`).
+   - En `inventory.js`: el botón `#btn-inventory-alerts` abre dicho modal y ejecuta `window.cargarAlertasInventarioModal()`, permitiendo visualizar detalles y atender alertas pendientes directamente desde la tabla de inventario.
+4. **Pruebas Automatizadas (TDD)**:
+   - En [`backend/tests/test_inventario_alertas.py`](../backend/tests/test_inventario_alertas.py):
+     - `test_atender_alerta_stock_success`: verifica transición a `"Atendida"`.
+     - `test_atender_alerta_stock_registra_bitacora`: comprueba entrada en `bitacora_auditoria` con acción `EDITAR` y detalle correcto.
+     - `test_atender_alerta_stock_403_cajera`: confirma rechazo HTTP 403 Forbidden para rol Cajera.
+     - `test_atender_alerta_stock_404_no_existe`: valida respuesta HTTP 404 para alertas inexistentes.
+   - En [`scratch/verify_alertas_browser.py`](../scratch/verify_alertas_browser.py): verificación E2E con Playwright (9/9 pasos aprobados, admin atiende alerta, badge se descuenta a 0, Cajera recibe 403).
+
+### Verificación
+- **Pytest**: **237 pruebas aprobadas, 0 fallidas**.
+- **Playwright**: **9/9 checks exitosos** en navegador Chromium.
+
+---
+
 ## [2026-10-23] Proceso 1: Módulo de Mermas de Inventario (Pantalla, Filtros y Control RBAC) y Unificación de Bitácora
 
 ### Causa Raíz / Requerimiento

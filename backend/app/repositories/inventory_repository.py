@@ -33,9 +33,14 @@ class InventoryRepositoryImpl:
 
     async def get_for_update(self, id_inventario: int) -> Optional[InventarioSucursal]:
         # Bloqueo pesimista: with_for_update evita condiciones de carrera
-        stmt = select(InventarioSucursal).where(
-            InventarioSucursal.id_inventario == id_inventario
-        ).with_for_update()
+        stmt = (
+            select(InventarioSucursal)
+            .options(
+                selectinload(InventarioSucursal.variante).selectinload(VarianteProducto.producto)
+            )
+            .where(InventarioSucursal.id_inventario == id_inventario)
+            .with_for_update()
+        )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -61,3 +66,16 @@ class InventoryRepositoryImpl:
             
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_alert_by_id(self, id_alerta: int) -> Optional[AlertaStock]:
+        stmt = (
+            select(AlertaStock)
+            .options(
+                selectinload(AlertaStock.inventario)
+                .selectinload(InventarioSucursal.variante)
+                .selectinload(VarianteProducto.producto)
+            )
+            .where(AlertaStock.id_alerta == id_alerta)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()

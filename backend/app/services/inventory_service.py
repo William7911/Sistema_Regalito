@@ -3,7 +3,9 @@ from fastapi import HTTPException, status
 from app.api.deps import UnitOfWork
 from app.schemas.inventory_schema import InventoryResponse, InventoryUpdate, StockAdjustment, AlertaStockResponse
 from app.db.models import BitacoraAuditoria, Usuario
+from app.services.audit_service import log_action
 from datetime import datetime
+
 
 class ConcreteInventoryService:
     def __init__(self, uow: UnitOfWork):
@@ -33,25 +35,22 @@ class ConcreteInventoryService:
         if update_data.id_area is not None:
             item.id_area = update_data.id_area
 
-        # Auditoría
         auditoria = BitacoraAuditoria(
             id_usuario=current_user.id_usuario,
             tabla_afectada="inventario_sucursal",
             accion="EDITAR",
-            descripcion=f"Actualización de inventario {id_inventario}",
+            descripcion=f"Actualización stock mínimo: {item.stock_minimo}",
             fecha_hora=datetime.utcnow()
         )
         self.uow.db.add(auditoria)
 
         await self.uow.commit()
-        await self.uow.db.refresh(item)
-        return await self._format_response(item)
+        item_full = await self.uow.inventory.get_by_id(id_inventario)
+        return await self._format_response(item_full)
 
     async def adjust_stock(self, id_inventario: int, adjustment: StockAdjustment, current_user: Usuario) -> InventoryResponse:
-        # Bloqueo pesimista para evitar race conditions
         item = await self.uow.inventory.get_for_update(id_inventario)
         if not item:
-            await self.uow.rollback()
             raise HTTPException(status_code=404, detail="Registro de inventario no encontrado")
 
         nuevo_stock = item.stock_actual + adjustment.cantidad
@@ -68,7 +67,6 @@ class ConcreteInventoryService:
                 mensaje=f"Stock bajo en inventario {item.id_inventario}. Actual: {item.stock_actual}"
             )
 
-        # Auditoría
         auditoria = BitacoraAuditoria(
             id_usuario=current_user.id_usuario,
             tabla_afectada="inventario_sucursal",
@@ -79,7 +77,6 @@ class ConcreteInventoryService:
         self.uow.db.add(auditoria)
 
         await self.uow.commit()
-        # Para retornar los datos completos, lo buscamos sin for_update pero con relaciones
         item_full = await self.uow.inventory.get_by_id(id_inventario)
         return await self._format_response(item_full)
 
@@ -108,3 +105,31 @@ class ConcreteInventoryService:
                         resp.producto_nombre = inventario.variante.producto.nombre
             responses.append(resp)
         return responses
+
+    async def atender_alerta(self, id_alerta: int, current_user: Usuario) -> AlertaStockResponse:
+        alerta = await self.uow.inventory.get_alert_by_id(id_alerta)
+        if not alerta:
+            raise HTTPException(status_code=404, detail="Alerta de stock no encontrada.")
+
+        alerta.estado = "Atendida"
+        await self.uow.commit()
+
+        await log_action(
+            self.uow.db,
+            id_usuario=current_user.id_usuario,
+            tabla="alerta_stock",
+            accion="EDITAR",
+            descripcion=f"Marcó como atendida la alerta de stock ID {alerta.id_alerta} ({alerta.mensaje}).",
+        )
+        await self.uow.commit()
+
+        resp = AlertaStockResponse.model_validate(alerta)
+        inventario = alerta.inventario
+        if inventario:
+            resp.stock_actual = inventario.stock_actual
+            resp.stock_minimo = inventario.stock_minimo
+            if inventario.variante:
+                resp.variante_sku = inventario.variante.codigo_barras
+                if inventario.variante.producto:
+                    resp.producto_nombre = inventario.variante.producto.nombre
+        return resp

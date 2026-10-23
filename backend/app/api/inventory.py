@@ -59,3 +59,23 @@ async def list_alertas_pendientes(
     el nombre del producto y el código de barras (JOIN vía inventario_sucursal
     → variante_producto → producto). Se usa para el badge de notificaciones."""
     return await service.get_alerts()
+
+
+@inventario_router.put("/alertas/{id_alerta}/atender", response_model=AlertaStockResponse)
+async def atender_alerta_inventario(
+    id_alerta: int,
+    current_user: Usuario = Depends(require_permission("INV_INGRESAR_MERCADERIA")),
+    service: ConcreteInventoryService = Depends(get_inventory_service),
+):
+    """Marca una alerta de stock como 'Atendida' registrando el evento en bitácora (INV_INGRESAR_MERCADERIA)."""
+    return await service.atender_alerta(id_alerta, current_user)
+
+
+@router.put("/alerts/{id_alerta}/atender", response_model=AlertaStockResponse)
+async def atender_alerta_inventory(
+    id_alerta: int,
+    current_user: Usuario = Depends(require_permission("INV_INGRESAR_MERCADERIA")),
+    service: ConcreteInventoryService = Depends(get_inventory_service),
+):
+    """Alias para marcar una alerta como 'Atendida'."""
+    return await service.atender_alerta(id_alerta, current_user)

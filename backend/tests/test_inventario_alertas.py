@@ -14,6 +14,9 @@ from app.db.database import get_db
 from app.api.deps import get_current_user
 from app.db.models import (
     Usuario,
+    Rol,
+    Permiso,
+    RolPermiso,
     Categoria,
     Subcategoria,
     UnidadMedida,
@@ -21,7 +24,10 @@ from app.db.models import (
     VarianteProducto,
     InventarioSucursal,
     AlertaStock,
+    BitacoraAuditoria,
 )
+from sqlalchemy import select
+
 
 pytestmark = pytest.mark.asyncio
 
@@ -91,3 +97,96 @@ async def test_inventario_alertas_devuelve_solo_pendientes(client, db_session):
     assert data[0]["variante_sku"] == "123"
     assert data[0]["stock_actual"] == 4
     assert data[0]["stock_minimo"] == 5
+
+
+async def test_atender_alerta_exitosa_y_registra_bitacora(client, db_session):
+    await _seed_alertas(db_session)
+    # Rol y permiso para bodeguero
+    perm = Permiso(id_permiso=3, modulo="Inventario", codigo="INV_INGRESAR_MERCADERIA", descripcion="Ingreso")
+    rol_bodega = Rol(id_rol=3, nombre="Bodeguero", estado="Activo")
+    db_session.add_all([perm, rol_bodega])
+    await db_session.flush()
+
+    db_session.add(RolPermiso(id_rol=3, id_permiso=3))
+    user_bodega = Usuario(
+        id_usuario=10, id_rol=3, nombre_completo="Bodeguero 10",
+        username="bodega10", password_hash="x", estado="Activo"
+    )
+    db_session.add(user_bodega)
+    await db_session.commit()
+
+    from app.core import security
+    token = security.create_access_token(
+        data={"sub": user_bodega.username, "role": "Bodeguero", "permissions": ["INV_INGRESAR_MERCADERIA"]}
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Atender alerta con ID 1
+    res = await client.put("/api/inventario/alertas/1/atender", headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["id_alerta"] == 1
+    assert data["estado"] == "Atendida"
+
+    # Verificar que ya no aparece como pendiente
+    app.dependency_overrides[get_current_user] = lambda: user_bodega
+    res_pendientes = await client.get("/api/inventario/alertas", headers=headers)
+    assert res_pendientes.status_code == 200
+    assert len(res_pendientes.json()) == 0
+
+    # Verificar bitácora
+    audit = await db_session.execute(
+        select(BitacoraAuditoria).where(BitacoraAuditoria.tabla_afectada == "alerta_stock")
+    )
+    logs = audit.scalars().all()
+    assert len(logs) == 1
+    assert logs[0].accion == "EDITAR"
+    assert "Marcó como atendida" in logs[0].descripcion
+
+
+async def test_atender_alerta_403_cajera(client, db_session):
+    await _seed_alertas(db_session)
+    rol_cajera = Rol(id_rol=2, nombre="Cajera", estado="Activo")
+    db_session.add(rol_cajera)
+    await db_session.flush()
+
+    user_cajera = Usuario(
+        id_usuario=20, id_rol=2, nombre_completo="Cajera 20",
+        username="cajera20", password_hash="x", estado="Activo"
+    )
+    db_session.add(user_cajera)
+    await db_session.commit()
+
+    from app.core import security
+    token = security.create_access_token(
+        data={"sub": user_cajera.username, "role": "Cajera", "permissions": ["VENTA_COBRAR"]}
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    res = await client.put("/api/inventario/alertas/1/atender", headers=headers)
+    assert res.status_code == 403
+    assert "INV_INGRESAR_MERCADERIA" in res.json()["detail"]
+
+
+async def test_atender_alerta_404_no_existe(client, db_session):
+    rol_admin = Rol(id_rol=1, nombre="Administradora", estado="Activo")
+    perm = Permiso(id_permiso=3, modulo="Inventario", codigo="INV_INGRESAR_MERCADERIA", descripcion="Ingreso")
+    db_session.add_all([rol_admin, perm])
+    await db_session.flush()
+    db_session.add(RolPermiso(id_rol=1, id_permiso=3))
+
+    user_admin = Usuario(
+        id_usuario=1, id_rol=1, nombre_completo="Admin",
+        username="admin_test", password_hash="x", estado="Activo"
+    )
+    db_session.add(user_admin)
+    await db_session.commit()
+
+    from app.core import security
+    token = security.create_access_token(
+        data={"sub": user_admin.username, "role": "Administradora", "permissions": ["INV_INGRESAR_MERCADERIA"]}
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    res = await client.put("/api/inventario/alertas/9999/atender", headers=headers)
+    assert res.status_code == 404

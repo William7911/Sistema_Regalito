@@ -49,6 +49,18 @@
             currentPage = 1;
             applyFilters();
         });
+
+        const btnAlertas = document.getElementById('btn-inventory-alerts');
+        if (btnAlertas) {
+            btnAlertas.addEventListener('click', async () => {
+                const modalEl = document.getElementById('modal-inventario-alertas');
+                if (modalEl) {
+                    const bsAlertsModal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
+                    bsAlertsModal.show();
+                    await window.cargarAlertasInventarioModal();
+                }
+            });
+        }
         
         if (DOM.pageSize) DOM.pageSize.addEventListener('change', (e) => {
             pageSize = parseInt(e.target.value);
@@ -375,5 +387,45 @@
             DOM.btnSave.innerHTML = 'Guardar Ajuste';
         }
     }
+
+    window.cargarAlertasInventarioModal = async function() {
+        const container = document.getElementById('inventario-alertas-lista');
+        if (!container) return;
+
+        container.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Cargando alertas...</div>';
+
+        const token = localStorage.getItem('jwt_token');
+        try {
+            const res = await fetch('/api/inventario/alertas', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Error al consultar alertas');
+            const alertas = await res.json();
+
+            if (!alertas || alertas.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-success"><i class="bi bi-check-circle fs-3 d-block mb-2"></i>No hay alertas de stock pendientes.</div>';
+                return;
+            }
+
+            let html = '';
+            alertas.forEach(a => {
+                const nombre = a.producto_nombre || a.mensaje;
+                const sku = a.variante_sku ? `<span class="badge bg-light text-dark border ms-1">SKU: ${a.variante_sku}</span>` : '';
+                html += `
+                <div class="list-group-item d-flex justify-content-between align-items-center py-3">
+                    <div>
+                        <h6 class="mb-1 text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i>${nombre}${sku}</h6>
+                        <small class="text-muted">Stock actual: <strong class="text-danger">${a.stock_actual}</strong> | Mínimo requerido: <strong>${a.stock_minimo}</strong></small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-success btn-atender-alerta" onclick="window.atenderAlertaStock(${a.id_alerta}, this)">
+                        <i class="bi bi-check-lg me-1"></i>Marcar Atendida
+                    </button>
+                </div>`;
+            });
+            container.innerHTML = html;
+        } catch (err) {
+            container.innerHTML = `<div class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${err.message || 'Error al cargar alertas'}</div>`;
+        }
+    };
 
 })();
