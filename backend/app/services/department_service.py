@@ -2,7 +2,7 @@ from typing import Optional, List
 from fastapi import HTTPException
 from app.db.models import DepartamentoGeografico
 from app.interfaces.services import DepartmentService
-from app.schemas import schemas
+from app.schemas import schemas, cliente_schema
 
 
 class ConcreteDepartmentService(DepartmentService):
@@ -21,6 +21,15 @@ class ConcreteDepartmentService(DepartmentService):
         if not department:
             raise HTTPException(status_code=404, detail="Departamento no encontrado")
         return schemas.Department.model_validate(department)
+
+    async def list_municipios(
+        self, department_id: Optional[int] = None
+    ) -> List[cliente_schema.MunicipioOut]:
+        munis = await self.uow.departments.list_municipios(department_id=department_id)
+        return [cliente_schema.MunicipioOut.model_validate(m) for m in munis]
+
+
+
 
     async def create_department(self, data: schemas.DepartmentCreate) -> schemas.Department:
         existing = await self.uow.departments.get_by_name(data.nombre.strip())
@@ -61,3 +70,11 @@ class ConcreteDepartmentService(DepartmentService):
         if not department:
             raise HTTPException(status_code=404, detail="Departamento no encontrado")
         return schemas.Department.model_validate(department)
+
+    async def list_municipios(
+        self, department_id: Optional[int] = None
+    ) -> List[cliente_schema.MunicipioOut]:
+        munis = await self.uow.departments.list_municipios(department_id=department_id)
+        return [cliente_schema.MunicipioOut.model_validate(m) for m in munis]
+
+

@@ -218,3 +218,74 @@ async def test_venta_falla_por_variante_inexistente(sale_service, db_session, uo
     assert exc_info.value.status_code == 404
     assert "variante" in exc_info.value.detail.lower() and "no existe" in exc_info.value.detail.lower()
 
+
+@pytest.mark.asyncio
+async def test_venta_cliente_inactivo_rechazada(sale_service, db_session, uow):
+    """Punto 3: Un cliente inactivo no puede asignarse a una venta (HTTP 400)."""
+    turno = await _seed_sale_data(db_session)
+
+    # Crear cliente inactivo
+    cliente_inactivo = Cliente(
+        id_cliente=10,
+        id_tipo_cliente=1,
+        nit="123456-7",
+        nombre_comercial="Cliente Desactivado",
+        estado="Inactivo",
+    )
+    db_session.add(cliente_inactivo)
+    await db_session.commit()
+
+    payload = sale_schema.SaleCreate(
+        id_sucursal=1,
+        id_cliente=10,
+        items=[sale_schema.SaleItemCreate(id_variante=1, cantidad=1)],
+        pagos=[sale_schema.PaymentCreate(id_metodo_pago=1, monto_recibido=Decimal("10.00"))],
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await sale_service.registrar_venta(payload, user_id=1, active_shift=turno)
+
+    assert exc_info.value.status_code == 400
+    assert "inactivo" in exc_info.value.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_venta_cliente_mayorista_aplica_precio_mayoreo(sale_service, db_session, uow):
+    """Punto 4: Un cliente de tipo Mayorista recibe precio de mayoreo y descuento automático incluso con cantidad < 6."""
+    turno = await _seed_sale_data(db_session)
+
+    # Crear tipo Mayorista y cliente asociado
+    tipo_mayoreo = TipoCliente(id_tipo_cliente=3, nombre="Mayorista", estado="Activo")
+    db_session.add(tipo_mayoreo)
+    await db_session.flush()
+
+    cliente_mayorista = Cliente(
+        id_cliente=20,
+        id_tipo_cliente=3,
+        nit="998877-6",
+        nombre_comercial="Distribuidora El Éxito",
+        estado="Activo",
+    )
+    db_session.add(cliente_mayorista)
+    await db_session.commit()
+
+    # Venta de solo 2 unidades (menor a 6, precio detalle = Q10.00, precio mayoreo = Q8.00)
+    payload = sale_schema.SaleCreate(
+        id_sucursal=1,
+        id_cliente=20,
+        items=[sale_schema.SaleItemCreate(id_variante=1, cantidad=2)],
+        pagos=[sale_schema.PaymentCreate(id_metodo_pago=1, monto_recibido=Decimal("20.00"))],
+    )
+
+    sale = await sale_service.registrar_venta(payload, user_id=1, active_shift=turno)
+
+    # Subtotal bruto = 2 * 10 = 20.00
+    assert sale.subtotal == Decimal("20.00")
+    # Descuento = 2 * (10 - 8) = 4.00
+    assert sale.descuento_total == Decimal("4.00")
+    # Total a pagar = 2 * 8 = 16.00
+    assert sale.total_venta == Decimal("16.00")
+    # Cambio = 20 - 16 = 4.00
+    assert sale.cambio == Decimal("4.00")
+
+

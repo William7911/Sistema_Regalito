@@ -35,7 +35,11 @@ class SaleRepositoryImpl:
         return result.scalar_one_or_none()
 
     async def get_cliente(self, id_cliente: int) -> Optional[Cliente]:
-        stmt = select(Cliente).where(Cliente.id_cliente == id_cliente)
+        stmt = (
+            select(Cliente)
+            .options(selectinload(Cliente.tipo_cliente))
+            .where(Cliente.id_cliente == id_cliente)
+        )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 

@@ -5,6 +5,9 @@
         sucursalId: null,
         catalog: [],
         cart: [],
+        clienteId: null,
+        nitReceptor: 'CF',
+        nombreReceptor: 'Consumidor Final',
     };
     let page = 1;
     const PAGE_SIZE = 8;
@@ -37,6 +40,10 @@
         change: document.getElementById('pos-change'),
         btnCharge: document.getElementById('btn-pos-charge'),
         btnClear: document.getElementById('btn-pos-clear'),
+        clientNit: document.getElementById('pos-client-nit'),
+        clientBadge: document.getElementById('pos-client-badge'),
+        clientName: document.getElementById('pos-client-name'),
+        btnSearchClient: document.getElementById('btn-pos-search-client'),
         historyBody: document.getElementById('pos-history-body'),
         historyEmpty: document.getElementById('pos-history-empty'),
         btnReloadHistory: document.getElementById('btn-pos-reload-history'),
@@ -88,6 +95,16 @@
         });
         if (DOM.btnClear) DOM.btnClear.addEventListener('click', clearCart);
         if (DOM.btnCharge) DOM.btnCharge.addEventListener('click', cobrar);
+        if (DOM.btnSearchClient) DOM.btnSearchClient.addEventListener('click', searchClientByNit);
+        if (DOM.clientNit) {
+            DOM.clientNit.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchClientByNit();
+                }
+            });
+            DOM.clientNit.addEventListener('change', searchClientByNit);
+        }
         if (DOM.cashReceived) DOM.cashReceived.addEventListener('input', renderTotals);
         if (DOM.transferAmount) DOM.transferAmount.addEventListener('input', renderTotals);
         if (DOM.btnReloadHistory) DOM.btnReloadHistory.addEventListener('click', loadHistory);
@@ -447,6 +464,67 @@
         renderTotals();
     }
 
+
+    async function searchClientByNit() {
+        const rawNit = (DOM.clientNit ? DOM.clientNit.value : 'CF').trim().toUpperCase();
+        if (!rawNit || rawNit === 'CF') {
+            state.clienteId = 1;
+            state.nitReceptor = 'CF';
+            state.nombreReceptor = 'Consumidor Final';
+            if (DOM.clientBadge) {
+                DOM.clientBadge.textContent = 'CF';
+                DOM.clientBadge.className = 'badge bg-secondary-subtle text-secondary small';
+            }
+            if (DOM.clientName) DOM.clientName.textContent = 'Consumidor Final';
+            renderTotals();
+            return;
+        }
+
+        try {
+            const cliente = await apiGet(`/api/clientes/nit/${encodeURIComponent(rawNit)}`);
+            if (cliente.estado === 'Inactivo') {
+                if (typeof window.showToast === 'function') {
+                    window.showToast(`El cliente '${cliente.nombre_comercial}' está inactivo y no puede realizar compras.`, 'danger');
+                }
+                state.clienteId = 1;
+                state.nitReceptor = 'CF';
+                state.nombreReceptor = 'Consumidor Final';
+                if (DOM.clientBadge) {
+                    DOM.clientBadge.textContent = 'CF';
+                    DOM.clientBadge.className = 'badge bg-secondary-subtle text-secondary small';
+                }
+                if (DOM.clientName) DOM.clientName.textContent = 'Consumidor Final (Cliente Inactivo no permitido)';
+                if (DOM.clientNit) DOM.clientNit.value = '';
+                renderTotals();
+                return;
+            }
+            state.clienteId = cliente.id_cliente;
+            state.nitReceptor = cliente.nit;
+            state.nombreReceptor = cliente.nombre_comercial;
+
+            if (DOM.clientBadge) {
+                DOM.clientBadge.textContent = cliente.tipo_cliente ? cliente.tipo_cliente.nombre : 'Cliente';
+                DOM.clientBadge.className = 'badge bg-teal-subtle text-teal small';
+            }
+            if (DOM.clientName) DOM.clientName.textContent = cliente.nombre_comercial;
+
+            if (typeof window.showToast === 'function') {
+                window.showToast(`Cliente '${cliente.nombre_comercial}' seleccionado.`, 'info');
+            }
+            renderTotals();
+        } catch (err) {
+            state.clienteId = null;
+            state.nitReceptor = rawNit;
+            state.nombreReceptor = `Cliente NIT ${rawNit}`;
+
+            if (DOM.clientBadge) {
+                DOM.clientBadge.textContent = 'NIT No Reg.';
+                DOM.clientBadge.className = 'badge bg-warning-subtle text-warning small';
+            }
+            if (DOM.clientName) DOM.clientName.textContent = `Emisión FEL a NIT ${rawNit}`;
+        }
+    }
+
     async function cobrar() {
         if (state.cart.length === 0) return;
         const payment = renderTotals();
@@ -467,7 +545,9 @@
 
         const payload = {
             id_sucursal: state.sucursalId,
-            id_cliente: null,
+            id_cliente: state.clienteId,
+            nit_receptor: state.nitReceptor,
+            nombre_receptor: state.nombreReceptor,
             items: state.cart.map(i => ({ id_variante: i.id_variante, cantidad: i.cantidad })),
             pagos: pagos,
         };

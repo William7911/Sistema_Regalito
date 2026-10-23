@@ -40,12 +40,20 @@ class ConcreteSaleService:
                 detail="Debe registrar el fondo inicial antes de vender",
             )
 
-        # 2. Verificar si el cliente es mayorista
+        # 2. Verificar estado del cliente y si aplica mayoreo
         is_client_wholesale = False
         if data.id_cliente:
             cliente = await self.uow.sales.get_cliente(data.id_cliente)
-            if cliente and cliente.id_tipo_cliente == 2:  # 2: Mayorista según catálogo
-                is_client_wholesale = True
+            if cliente:
+                if cliente.estado == "Inactivo":
+                    raise HTTPException(
+                        status_code=400,
+                        detail="El cliente seleccionado está inactivo y no puede realizar compras",
+                    )
+                if cliente.tipo_cliente and "MAYORISTA" in cliente.tipo_cliente.nombre.upper():
+                    is_client_wholesale = True
+                elif cliente.id_tipo_cliente in (2, 3):
+                    is_client_wholesale = True
 
         detalles_model: List[DetalleVenta] = []
         subtotal_bruto = Decimal("0.00")
