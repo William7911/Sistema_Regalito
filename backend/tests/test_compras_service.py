@@ -229,3 +229,110 @@ async def test_emitir_orden_cantidad_negativa_falla(compras_service, db_session,
     await db_session.rollback()
     ordenes = (await db_session.execute(select(func.count(OrdenCompra.id_orden)))).scalar()
     assert ordenes == 0
+
+
+@pytest.mark.asyncio
+async def test_cancelar_orden_compra_exito(compras_service, db_session, uow):
+    """Escenario: Cancelación exitosa de una orden Emitida por usuario autorizado."""
+    ctx = await _seed_compras_data(db_session)
+    orden_pre = OrdenCompra(
+        id_orden=1, id_proveedor=ctx["proveedor"], id_usuario=ctx["admin"],
+        fecha_emision=date.today(), total_estimado=Decimal("250.00"), estado="Emitida"
+    )
+    detalle_pre = DetalleOrdenCompra(
+        id_detalle_orden=1, id_orden=1, id_variante=ctx["variante"],
+        cantidad_pedida=50, costo_pactado=Decimal("5.00")
+    )
+    db_session.add_all([orden_pre, detalle_pre])
+    await db_session.commit()
+
+    orden_cancelada = await compras_service.cancelar_orden(1, user_id=ctx["admin"], motivo="Proveedor sin stock")
+    assert orden_cancelada.estado == "Cancelada"
+
+    orden_db = await db_session.get(OrdenCompra, 1)
+    assert orden_db.estado == "Cancelada"
+
+    # Verificar registro en bitácora con acción EDITAR
+    stmt = select(BitacoraAuditoria).where(BitacoraAuditoria.tabla_afectada == "orden_compra", BitacoraAuditoria.accion == "EDITAR")
+    res = await db_session.execute(stmt)
+    logs = res.scalars().all()
+    assert any("Cancelación" in l.descripcion for l in logs)
+
+
+@pytest.mark.asyncio
+async def test_cancelar_orden_ya_recibida_falla(compras_service, db_session, uow):
+    """Escenario: Intento de cancelar una orden ya Recibida debe fallar con HTTP 400."""
+    ctx = await _seed_compras_data(db_session)
+    orden_pre = OrdenCompra(
+        id_orden=1, id_proveedor=ctx["proveedor"], id_usuario=ctx["admin"],
+        fecha_emision=date.today(), total_estimado=Decimal("250.00"), estado="Recibida"
+    )
+    db_session.add(orden_pre)
+    await db_session.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await compras_service.cancelar_orden(1, user_id=ctx["admin"])
+    assert exc_info.value.status_code == 400
+    assert "No se puede cancelar" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_cancelar_orden_sin_permiso_falla(compras_service, db_session, uow):
+    """Escenario: Usuario sin COMPRA_EMITIR_ORDEN no puede cancelar (HTTP 403)."""
+    ctx = await _seed_compras_data(db_session)
+    orden_pre = OrdenCompra(
+        id_orden=1, id_proveedor=ctx["proveedor"], id_usuario=ctx["admin"],
+        fecha_emision=date.today(), total_estimado=Decimal("250.00"), estado="Emitida"
+    )
+    db_session.add(orden_pre)
+    await db_session.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await compras_service.cancelar_orden(1, user_id=ctx["bodega"])
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_recibir_orden_cancelada_falla(compras_service, db_session, uow):
+    """Escenario: No se puede recibir mercadería de una orden Cancelada (HTTP 400)."""
+    ctx = await _seed_compras_data(db_session)
+    orden_pre = OrdenCompra(
+        id_orden=1, id_proveedor=ctx["proveedor"], id_usuario=ctx["admin"],
+        fecha_emision=date.today(), total_estimado=Decimal("250.00"), estado="Cancelada"
+    )
+    db_session.add(orden_pre)
+    await db_session.commit()
+
+    payload = IngresoMercaderiaCreate(
+        id_orden=1,
+        id_proveedor=ctx["proveedor"],
+        numero_factura_proveedor="INV-999",
+        detalles=[DetalleIngresoCreate(id_variante=ctx["variante"], cantidad_recibida=50, costo_unitario=Decimal("5.00"))]
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await compras_service.ingresar_mercaderia(payload, user_id=ctx["bodega"])
+    assert exc_info.value.status_code == 400
+    assert "No se puede ingresar sobre una orden en estado Cancelada" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_listar_ordenes_filtro_estado(compras_service, db_session, uow):
+    """Escenario: Listado de órdenes con filtros por estado."""
+    ctx = await _seed_compras_data(db_session)
+    o1 = OrdenCompra(id_orden=1, id_proveedor=ctx["proveedor"], id_usuario=ctx["admin"], fecha_emision=date.today(), total_estimado=Decimal("100"), estado="Emitida")
+    o2 = OrdenCompra(id_orden=2, id_proveedor=ctx["proveedor"], id_usuario=ctx["admin"], fecha_emision=date.today(), total_estimado=Decimal("200"), estado="Recibida")
+    o3 = OrdenCompra(id_orden=3, id_proveedor=ctx["proveedor"], id_usuario=ctx["admin"], fecha_emision=date.today(), total_estimado=Decimal("300"), estado="Cancelada")
+    db_session.add_all([o1, o2, o3])
+    await db_session.commit()
+
+    emitidas = await compras_service.listar_ordenes(user_id=ctx["admin"], estado="Emitida")
+    assert len(emitidas) == 1
+    assert emitidas[0].id_orden == 1
+
+    canceladas = await compras_service.listar_ordenes(user_id=ctx["admin"], estado="Cancelada")
+    assert len(canceladas) == 1
+    assert canceladas[0].id_orden == 3
+
+    todas = await compras_service.listar_ordenes(user_id=ctx["admin"])
+    assert len(todas) == 3

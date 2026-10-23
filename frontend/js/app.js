@@ -250,7 +250,7 @@ function applyRoleRestrictions() {
     const moduleAllowed = {
         pos: isUserAdmin || window.hasPermission('VENTA_COBRAR'),
         inventory: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
-        compras: isUserAdmin || window.hasPermission('COMPRA_EMITIR_ORDEN'),
+        compras: isUserAdmin || window.hasPermission('COMPRA_EMITIR_ORDEN') || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         mermas: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         cash: isUserAdmin || role === 'Cajero',
         caja: isUserAdmin || role === 'Cajero',
@@ -311,7 +311,7 @@ function canAccessView(viewKey) {
     const role = window.getUserRole();
     if (viewKey === 'pos') return window.hasPermission('VENTA_COBRAR');
     if (viewKey === 'inventory') return window.hasPermission('INV_INGRESAR_MERCADERIA');
-    if (viewKey === 'compras') return window.hasPermission('COMPRA_EMITIR_ORDEN');
+    if (viewKey === 'compras') return window.hasPermission('COMPRA_EMITIR_ORDEN') || window.hasPermission('INV_INGRESAR_MERCADERIA');
     if (viewKey === 'mermas') return window.hasPermission('INV_INGRESAR_MERCADERIA');
     if (viewKey === 'cash' || viewKey === 'caja') return role === 'Cajero';
     if (viewKey === 'catalog') return role === 'Bodeguero';

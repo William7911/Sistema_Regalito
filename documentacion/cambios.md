@@ -3,6 +3,61 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-23] Proceso 3: Flujo Completo de Compras y Órdenes (Emisión, Recepción en Bodega, Cancelación y Seguimiento de Estados)
+
+### Causa Raíz / Requerimiento
+1. **Flujo Integral de Compras en Pantalla**: Completar en la interfaz de usuario el ciclo de vida operativo de las compras de mercadería:
+   - **Emisión de órdenes de compra**: Confección con catálogo de productos/variantes, proveedor y costo pactado, registrando la orden en estado `Emitida`.
+   - **Recepción física de mercadería**: Formulario modal para ingresar el número de factura del proveedor, flete y cargadores, confirmar o ajustar las cantidades recibidas y costos unitarios, e incrementar el stock en inventario de forma atómica pasando la orden a `Recibida`.
+   - **Cancelación de órdenes**: Acción controlada para anular órdenes pendientes en estado `Emitida` con justificación opcional, pasando a estado `Cancelada` y bloqueando ingresos posteriores.
+2. **Listado Reactivo y Visibilidad de Estados**:
+   - Tabla operativa con visualización clara de número de orden, fecha de emisión, proveedor, usuario responsable, total estimado y badges de estado (`Emitida` [amarillo], `Recibida` [verde], `Cancelada` [gris]).
+   - Filtros dinámicos por estado de orden y rango de fechas (desde/hasta).
+   - Acciones contextuales por fila según el estado y los permisos del usuario activo.
+3. **Seguridad y Control de Acceso (RBAC)**:
+   - `COMPRA_EMITIR_ORDEN`: emite y cancela órdenes (Administradora).
+   - `INV_INGRESAR_MERCADERIA`: recibe mercadería e incrementa inventario (Administradora, Bodeguero).
+   - Usuarios no autorizados (Cajera): enlace en menú lateral oculto, protección SPA activa y rechazo con HTTP 403 Forbidden.
+4. **Auditoría en Bitácora**:
+   - Registro con `CREAR` en `orden_compra` y `compra`.
+   - Registro con `EDITAR` en `orden_compra` para recepciones y cancelaciones.
+
+### Solución Implementada
+1. **Backend — Repositorio y Servicio de Compras** ([`backend/app/repositories/compra_repository.py`](../backend/app/repositories/compra_repository.py), [`backend/app/services/compra_service.py`](../backend/app/services/compra_service.py), [`backend/app/schemas/compras_schema.py`](../backend/app/schemas/compras_schema.py)):
+   - Se añadió `list_ordenes` en `CompraRepositoryImpl` con soporte de filtros por `estado`, `fecha_desde`, `fecha_hasta` e `id_proveedor`, y eager-loading de relaciones (`detalles.variante.producto`, `proveedor`, `usuario`).
+   - Se ampliaron schemas `DetalleOrdenCompraOut`, `OrdenCompraOut` (enriquecidos con nombres legibles) y `OrdenCompraCancelar`.
+   - En `ConcreteComprasService`:
+     - `listar_ordenes`: valida permisos (`COMPRA_EMITIR_ORDEN` o `INV_INGRESAR_MERCADERIA`), consulta el repositorio y retorna órdenes enriquecidas.
+     - `obtener_orden`: consulta y enriquece orden individual por ID.
+     - `cancelar_orden`: valida `COMPRA_EMITIR_ORDEN`, verifica que el estado sea estrictamente `Emitida` (rechaza con HTTP 400 si ya fue `Recibida` o `Cancelada`), actualiza a `Cancelada` y registra en bitácora (`accion="EDITAR"`).
+     - `ingresar_mercaderia`: valida `INV_INGRESAR_MERCADERIA`, rechaza con HTTP 400 órdenes que no estén `Emitida`, actualiza inventario con bloqueo pesimista, registra factura en `compra` (`accion="CREAR"`), actualiza estado a `Recibida` y audita en bitácora (`accion="EDITAR"`).
+2. **Backend — Endpoints API** ([`backend/app/api/compras.py`](../backend/app/api/compras.py)):
+   - `GET /api/compras/ordenes`: listado con filtros de estado y fechas.
+   - `GET /api/compras/ordenes/{id_orden}`: consulta detallada de orden.
+   - `POST /api/compras/ordenes`: emisión de orden (`COMPRA_EMITIR_ORDEN`).
+   - `POST /api/compras/ordenes/{id_orden}/cancelar`: cancelación controlada (`COMPRA_EMITIR_ORDEN`).
+   - `POST /api/compras/ingreso`: recepción y actualización de inventario (`INV_INGRESAR_MERCADERIA`).
+3. **Frontend — Pantalla, Pestañas y Modales de Compras** ([`frontend/index.html`](../frontend/index.html), [`frontend/js/app.js`](../frontend/js/app.js), [`frontend/js/compras.js`](../frontend/js/compras.js)):
+   - En `index.html`:
+     - Sistema de navegación por pestañas (`#pills-ordenes-tab` y `#pills-nueva-orden-tab`).
+     - Barra de filtros en tiempo real por estado (`Emitida`, `Recibida`, `Cancelada`) y rango de fechas.
+     - Tabla con badges visuales de estado y botones de acción (`[Recibir]`, `[Cancelar]`, `[Detalle]`).
+     - Modal `#modal-recibir-compra`: captura factura del proveedor, flete, cargadores y confirmación de cantidades/costos con recálculo dinámico de totales.
+     - Modal `#modal-cancelar-compra`: diálogo de advertencia con motivo opcional de anulación.
+     - Modal `#modal-ver-orden`: ficha de consulta de ítems pedidos y costos pactados.
+   - En `app.js`: se sincronizó el control de acceso visual (`applyRoleRestrictions` y `navigateTo`) para permitir el acceso a compras tanto a roles con `COMPRA_EMITIR_ORDEN` (Admin) como con `INV_INGRESAR_MERCADERIA` (Bodeguero), bloqueando a Cajera.
+   - En `compras.js`: arquitectura reactiva con inicialización dinámica de selectores DOM (`initDOM()`), delegación de eventos y feedback mediante `showToast()`.
+4. **Pruebas Automatizadas (TDD)**:
+   - En [`backend/tests/test_compras_service.py`](../backend/tests/test_compras_service.py): 10 pruebas unitarias de servicio (emisión, recepción, cancelación exitosa, rechazo al cancelar orden recibida, rechazo al recibir orden cancelada, permisos 403 y filtros por estado).
+   - En [`backend/tests/test_compras_api.py`](../backend/tests/test_compras_api.py): 7 pruebas de integración API con endpoints HTTP y tokens JWT (emisión, cancelación, recepción, filtros y rechazos 403 para Cajera y Bodega).
+   - En [`scratch/verify_compras_browser.py`](../scratch/verify_compras_browser.py): 18/18 pruebas E2E aprobadas en Playwright Chromium (flujo completo de emisión, recepción con factura, cancelación de segunda orden, filtros y rechazo para rol Cajera).
+
+### Verificación
+- **Pytest**: Todas las pruebas aprobadas sin regresiones.
+- **Playwright**: **18/18 checks exitosos** en navegador Chromium.
+
+---
+
 ## [2026-10-23] Proceso 2: Alertas de Stock Crítico (Acción Atender, Registro en Bitácora y Modal Operativo)
 
 ### Causa Raíz / Requerimiento

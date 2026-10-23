@@ -21,6 +21,10 @@ class DetalleOrdenCompraOut(BaseModel):
     id_variante: int
     cantidad_pedida: int
     costo_pactado: Decimal
+    nombre_producto: Optional[str] = None
+    talla: Optional[str] = None
+    color: Optional[str] = None
+    codigo_barras: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -32,9 +36,15 @@ class OrdenCompraOut(BaseModel):
     fecha_emision: date
     total_estimado: Decimal
     estado: str
+    nombre_proveedor: Optional[str] = None
+    nombre_usuario: Optional[str] = None
     detalles: List[DetalleOrdenCompraOut] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class OrdenCompraCancelar(BaseModel):
+    motivo: Optional[str] = None
 
 
 class DetalleIngresoCreate(BaseModel):

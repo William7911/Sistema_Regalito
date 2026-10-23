@@ -1,4 +1,5 @@
 from typing import Optional, List
+from datetime import date
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -48,7 +49,13 @@ class CompraRepositoryImpl:
 
         stmt = (
             select(OrdenCompra)
-            .options(selectinload(OrdenCompra.detalles))
+            .options(
+                selectinload(OrdenCompra.detalles)
+                .selectinload(DetalleOrdenCompra.variante)
+                .selectinload(VarianteProducto.producto),
+                selectinload(OrdenCompra.proveedor),
+                selectinload(OrdenCompra.usuario),
+            )
             .where(OrdenCompra.id_orden == orden.id_orden)
         )
         res = await self.db.execute(stmt)
@@ -57,11 +64,47 @@ class CompraRepositoryImpl:
     async def get_orden_by_id(self, id_orden: int) -> Optional[OrdenCompra]:
         stmt = (
             select(OrdenCompra)
-            .options(selectinload(OrdenCompra.detalles))
+            .options(
+                selectinload(OrdenCompra.detalles)
+                .selectinload(DetalleOrdenCompra.variante)
+                .selectinload(VarianteProducto.producto),
+                selectinload(OrdenCompra.proveedor),
+                selectinload(OrdenCompra.usuario),
+            )
             .where(OrdenCompra.id_orden == id_orden)
         )
         res = await self.db.execute(stmt)
         return res.scalar_one_or_none()
+
+    async def list_ordenes(
+        self,
+        estado: Optional[str] = None,
+        fecha_desde: Optional[date] = None,
+        fecha_hasta: Optional[date] = None,
+        id_proveedor: Optional[int] = None,
+    ) -> List[OrdenCompra]:
+        stmt = (
+            select(OrdenCompra)
+            .options(
+                selectinload(OrdenCompra.detalles)
+                .selectinload(DetalleOrdenCompra.variante)
+                .selectinload(VarianteProducto.producto),
+                selectinload(OrdenCompra.proveedor),
+                selectinload(OrdenCompra.usuario),
+            )
+            .order_by(OrdenCompra.id_orden.desc())
+        )
+        if estado:
+            stmt = stmt.where(OrdenCompra.estado == estado)
+        if fecha_desde:
+            stmt = stmt.where(OrdenCompra.fecha_emision >= fecha_desde)
+        if fecha_hasta:
+            stmt = stmt.where(OrdenCompra.fecha_emision <= fecha_hasta)
+        if id_proveedor:
+            stmt = stmt.where(OrdenCompra.id_proveedor == id_proveedor)
+
+        res = await self.db.execute(stmt)
+        return list(res.scalars().all())
 
     async def add_compra(self, compra: Compra, detalles: List[DetalleCompra]) -> Compra:
         self.db.add(compra)

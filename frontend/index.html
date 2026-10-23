@@ -2022,110 +2022,164 @@
             </div>
 
             <!-- Compras Module View -->
+            <!-- Compras Module View -->
             <div id="compras-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="compras">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h4 class="fw-bold mb-1">Compras / Ingreso de Mercadería</h4>
-                        <p class="text-muted small mb-0">Registra la recepción de mercadería y actualiza el stock automáticamente</p>
+                        <p class="text-muted small mb-0">Gestión de órdenes de compra, recepción en bodega y control de costos</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
-                        <button id="btn-compras-refresh" class="btn btn-outline-secondary" title="Recargar catálogo"><i class="bi bi-arrow-clockwise"></i></button>
+                        <button id="btn-compras-refresh" class="btn btn-outline-secondary" title="Recargar"><i class="bi bi-arrow-clockwise"></i></button>
                     </div>
                 </div>
 
-                <div class="row g-3">
-                    <!-- Columna izquierda: buscador de productos -->
-                    <div class="col-12 col-xl-7">
-                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                <!-- Tabs de Navegación -->
+                <ul class="nav nav-pills mb-4" id="pills-compras-tab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active rounded-pill px-4 fw-semibold" id="pills-ordenes-tab" data-bs-toggle="pill" data-bs-target="#pills-ordenes-pane" type="button" role="tab" aria-selected="true">
+                            <i class="bi bi-card-checklist me-2"></i>Órdenes de Compra
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link rounded-pill px-4 fw-semibold" id="pills-nueva-orden-tab" data-bs-toggle="pill" data-bs-target="#pills-nueva-orden-pane" type="button" role="tab" aria-selected="false">
+                            <i class="bi bi-plus-circle me-2"></i>Nueva Orden
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="pills-compras-tabContent">
+                    <!-- Tab 1: Listado de Órdenes y Seguimiento de Estados -->
+                    <div class="tab-pane fade show active" id="pills-ordenes-pane" role="tabpanel" tabindex="0">
+                        <div class="card border-0 shadow-sm rounded-4 mb-4">
                             <div class="card-body p-3">
-                                <div class="d-flex gap-2 align-items-center mb-3">
-                                    <div class="position-relative flex-grow-1">
-                                        <span class="position-absolute start-0 top-0 h-100 d-flex align-items-center px-2 text-muted"><i class="bi bi-search"></i></span>
-                                        <input type="text" id="compras-search" class="form-control ps-4" placeholder="Buscar producto por nombre, talla, color o código..." autocomplete="off">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label small text-muted mb-1">Estado de Orden</label>
+                                        <select id="filtro-compras-estado" class="form-select form-select-sm">
+                                            <option value="">Todos los estados</option>
+                                            <option value="Emitida">Emitida (Pendiente)</option>
+                                            <option value="Recibida">Recibida</option>
+                                            <option value="Cancelada">Cancelada</option>
+                                        </select>
                                     </div>
-                                    <button id="btn-compras-filter" class="btn btn-teal"><i class="bi bi-funnel"></i> Filtrar</button>
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label small text-muted mb-1">Fecha Desde</label>
+                                        <input type="date" id="filtro-compras-desde" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label small text-muted mb-1">Fecha Hasta</label>
+                                        <input type="date" id="filtro-compras-hasta" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-12 col-md-3 d-flex gap-2 align-items-end">
+                                        <button id="btn-filtro-compras" class="btn btn-sm btn-teal flex-grow-1"><i class="bi bi-funnel"></i> Filtrar</button>
+                                        <button id="btn-limpiar-compras" class="btn btn-sm btn-outline-secondary" title="Limpiar filtros"><i class="bi bi-x-circle"></i></button>
+                                        <button id="btn-goto-nueva-orden" class="btn btn-sm btn-outline-teal text-nowrap"><i class="bi bi-plus-lg"></i> Nueva Orden</button>
+                                    </div>
                                 </div>
+                            </div>
+                        </div>
 
-                                <div id="compras-products-list" class="d-flex flex-column gap-2 mb-2" style="max-height: 400px; overflow-y: auto;"></div>
-
-                                <div id="compras-products-empty" class="text-center text-muted py-4 d-none">
-                                    <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
-                                    <span>No hay productos que coincidan con la búsqueda</span>
+                        <div class="card border-0 shadow-sm rounded-4">
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0" id="tabla-compras-ordenes">
+                                        <thead class="table-light small text-muted">
+                                            <tr>
+                                                <th class="ps-3"># Orden</th>
+                                                <th>Fecha Emisión</th>
+                                                <th>Proveedor</th>
+                                                <th>Responsable</th>
+                                                <th class="text-end">Total Estimado</th>
+                                                <th class="text-center">Estado</th>
+                                                <th class="text-end pe-3">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tbody-compras-ordenes"></tbody>
+                                    </table>
                                 </div>
-
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span id="compras-products-info" class="text-muted small">0 productos</span>
+                                <div id="compras-ordenes-empty" class="text-center text-muted py-5 d-none">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+                                    <span>No hay órdenes de compra registradas con los filtros actuales</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Columna derecha: compra en curso -->
-                    <div class="col-12 col-xl-5">
-                        <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body p-3">
-                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-bag-check me-2 text-teal"></i>Compra en curso</h6>
+                    <!-- Tab 2: Confección y Emisión de Nueva Orden -->
+                    <div class="tab-pane fade" id="pills-nueva-orden-pane" role="tabpanel" tabindex="0">
+                        <div class="row g-3">
+                            <!-- Columna izquierda: catálogo -->
+                            <div class="col-12 col-xl-7">
+                                <div class="card border-0 shadow-sm rounded-4 h-100">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex gap-2 align-items-center mb-3">
+                                            <div class="position-relative flex-grow-1">
+                                                <span class="position-absolute start-0 top-0 h-100 d-flex align-items-center px-2 text-muted"><i class="bi bi-search"></i></span>
+                                                <input type="text" id="compras-search" class="form-control ps-4" placeholder="Buscar producto por nombre, talla, color o código..." autocomplete="off">
+                                            </div>
+                                            <button id="btn-compras-filter" class="btn btn-teal"><i class="bi bi-funnel"></i> Filtrar</button>
+                                        </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label small text-muted">Proveedor <span class="text-danger">*</span></label>
-                                    <select id="compras-proveedor" class="form-select">
-                                        <option value="">Cargando proveedores...</option>
-                                    </select>
-                                </div>
+                                        <div id="compras-products-list" class="d-flex flex-column gap-2 mb-2" style="max-height: 400px; overflow-y: auto;"></div>
 
-                                <div id="compras-cart-empty" class="text-center text-muted py-4">
-                                    <i class="bi bi-cart3 fs-1 d-block mb-2 opacity-50"></i>
-                                    <span class="small">Agrega productos de la izquierda para iniciar la compra</span>
-                                </div>
+                                        <div id="compras-products-empty" class="text-center text-muted py-4 d-none">
+                                            <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
+                                            <span>No hay productos que coincidan con la búsqueda</span>
+                                        </div>
 
-                                <table class="table table-sm table-hover align-middle mb-2 d-none" id="compras-cart-table">
-                                    <thead class="table-light small">
-                                        <tr>
-                                            <th>Producto</th>
-                                            <th class="text-center" style="width: 92px;">Costo (Q)</th>
-                                            <th class="text-center" style="width: 76px;">Cant.</th>
-                                            <th class="text-end" style="width: 80px;">Subtotal</th>
-                                            <th style="width: 30px;"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="compras-cart-body"></tbody>
-                                </table>
-
-                                <div class="row g-2 mb-3">
-                                    <div class="col-12 col-sm-6">
-                                        <label class="form-label small text-muted">N° Factura proveedor <span class="text-danger">*</span></label>
-                                        <input type="text" id="compras-factura" class="form-control form-control-sm" placeholder="Ej. F-00123" autocomplete="off">
-                                    </div>
-                                    <div class="col-12 col-sm-6">
-                                        <label class="form-label small text-muted">Gasto de flete (Q)</label>
-                                        <input type="number" id="compras-flete" class="form-control form-control-sm" min="0" step="0.01" value="0.00">
-                                    </div>
-                                    <div class="col-12 col-sm-6">
-                                        <label class="form-label small text-muted">Gasto de cargadores (Q)</label>
-                                        <input type="number" id="compras-cargadores" class="form-control form-control-sm" min="0" step="0.01" value="0.00">
-                                    </div>
-                                    <div class="col-12 col-sm-6 d-flex align-items-end">
-                                        <button id="btn-compras-clear" class="btn btn-outline-secondary btn-sm w-100">Vaciar carrito</button>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span id="compras-products-info" class="text-muted small">0 productos</span>
+                                        </div>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div class="d-flex justify-content-between py-2 px-3 mb-1">
-                                    <span class="text-muted small">Subtotal mercadería</span>
-                                    <strong class="text-dark small" id="compras-subtotal">Q 0.00</strong>
-                                </div>
-                                <div class="d-flex justify-content-between py-2 px-3 mb-1">
-                                    <span class="text-muted small">Flete + Cargadores</span>
-                                    <strong class="text-dark small" id="compras-gastos">Q 0.00</strong>
-                                </div>
-                                <div class="d-flex justify-content-between py-2 px-3 mb-3 border-top">
-                                    <span class="fw-bold">COSTO TOTAL</span>
-                                    <span class="fw-bold fs-4 text-teal" id="compras-total">Q 0.00</span>
-                                </div>
+                            <!-- Columna derecha: orden en confección -->
+                            <div class="col-12 col-xl-5">
+                                <div class="card border-0 shadow-sm rounded-4 h-100">
+                                    <div class="card-body p-3">
+                                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-bag-check me-2 text-teal"></i>Orden en Confección</h6>
 
-                                <button id="btn-compras-process" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm" disabled>
-                                    <i class="bi bi-box-arrow-in-down me-1"></i> Procesar Ingreso
-                                </button>
+                                        <div class="mb-3">
+                                            <label class="form-label small text-muted">Proveedor <span class="text-danger">*</span></label>
+                                            <select id="compras-proveedor" class="form-select">
+                                                <option value="">Cargando proveedores...</option>
+                                            </select>
+                                        </div>
+
+                                        <div id="compras-cart-empty" class="text-center text-muted py-4">
+                                            <i class="bi bi-cart3 fs-1 d-block mb-2 opacity-50"></i>
+                                            <span class="small">Agrega productos de la izquierda para confeccionar la orden</span>
+                                        </div>
+
+                                        <table class="table table-sm table-hover align-middle mb-2 d-none" id="compras-cart-table">
+                                            <thead class="table-light small">
+                                                <tr>
+                                                    <th>Producto</th>
+                                                    <th class="text-center" style="width: 92px;">Costo (Q)</th>
+                                                    <th class="text-center" style="width: 76px;">Cant.</th>
+                                                    <th class="text-end" style="width: 80px;">Subtotal</th>
+                                                    <th style="width: 30px;"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="compras-cart-body"></tbody>
+                                        </table>
+
+                                        <div class="d-flex justify-content-between py-2 px-3 mb-3 border-top border-bottom">
+                                            <span class="fw-bold">TOTAL ESTIMADO</span>
+                                            <span class="fw-bold fs-4 text-teal" id="compras-total">Q 0.00</span>
+                                        </div>
+
+                                        <div class="d-flex gap-2">
+                                            <button id="btn-compras-clear" class="btn btn-outline-secondary btn-sm flex-grow-1">Vaciar</button>
+                                            <button id="btn-compras-emitir" class="btn btn-teal flex-grow-1 py-2 fw-semibold shadow-sm" disabled>
+                                                <i class="bi bi-send me-1"></i> Emitir Orden
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -3719,6 +3773,145 @@
                 </div>
                 <div class="modal-footer border-top-0 pt-0">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Recibir Compra / Mercadería -->
+    <div class="modal fade" id="modal-recibir-compra" tabindex="-1" aria-labelledby="modalRecibirCompraLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-light rounded-top-4 px-4 py-3">
+                    <h5 class="modal-title fw-bold" id="modalRecibirCompraLabel">
+                        <i class="bi bi-box-arrow-in-down text-success me-2"></i>Recibir Mercadería — Orden #<span id="recibir-orden-id"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <div class="alert alert-info py-2 px-3 mb-3 small d-flex justify-content-between align-items-center">
+                        <div><strong>Proveedor:</strong> <span id="recibir-proveedor-nombre">—</span></div>
+                        <div><strong>Fecha Emisión:</strong> <span id="recibir-fecha-emision">—</span></div>
+                    </div>
+                    <form id="form-recibir-compra">
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small fw-semibold">N° Factura del Proveedor <span class="text-danger">*</span></label>
+                                <input type="text" id="recibir-factura" class="form-control form-control-sm" placeholder="Ej. FAC-00981" required autocomplete="off">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-semibold">Gasto Flete (Q)</label>
+                                <input type="number" id="recibir-flete" class="form-control form-control-sm" min="0" step="0.01" value="0.00">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label small fw-semibold">Gasto Cargadores (Q)</label>
+                                <input type="number" id="recibir-cargadores" class="form-control form-control-sm" min="0" step="0.01" value="0.00">
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold small text-muted mb-2">Detalle de Productos a Ingresar</h6>
+                        <div class="table-responsive border rounded-3 mb-3" style="max-height: 220px; overflow-y: auto;">
+                            <table class="table table-sm table-hover align-middle mb-0" id="tabla-recibir-detalles">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th>Producto / Variante</th>
+                                        <th class="text-center" style="width: 100px;">Pedida</th>
+                                        <th class="text-center" style="width: 110px;">Recibida</th>
+                                        <th class="text-center" style="width: 110px;">Costo Unit. (Q)</th>
+                                        <th class="text-end pe-3" style="width: 110px;">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-recibir-detalles"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center py-2 px-3 bg-light rounded-3">
+                            <div>
+                                <span class="small text-muted d-block">Subtotal mercadería: <strong id="recibir-subtotal-txt">Q 0.00</strong></span>
+                                <span class="small text-muted d-block">Gastos adicionales: <strong id="recibir-gastos-txt">Q 0.00</strong></span>
+                            </div>
+                            <div class="text-end">
+                                <span class="small text-muted d-block fw-semibold">TOTAL COMPRA</span>
+                                <span class="fs-4 fw-bold text-teal" id="recibir-total-txt">Q 0.00</span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer border-0 px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success fw-semibold" id="btn-confirmar-recibir">
+                        <i class="bi bi-box-arrow-in-down me-1"></i> Confirmar Ingreso a Inventario
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cancelar Orden de Compra -->
+    <div class="modal fade" id="modal-cancelar-compra" tabindex="-1" aria-labelledby="modalCancelarCompraLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-danger-subtle rounded-top-4 px-4 py-3">
+                    <h5 class="modal-title fw-bold text-danger" id="modalCancelarCompraLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Cancelar Orden de Compra #<span id="cancelar-orden-id"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <p class="text-muted mb-3">¿Estás seguro de que deseas cancelar esta orden de compra? La orden cambiará a estado <strong>Cancelada</strong> y no podrá ser recibida en bodega.</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted">Motivo de Cancelación (opcional)</label>
+                        <textarea id="cancelar-orden-motivo" class="form-control" rows="2" placeholder="Ej. Proveedor sin existencias, precio no acordado..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Volver</button>
+                    <button type="button" class="btn btn-danger fw-semibold" id="btn-confirmar-cancelar">
+                        <i class="bi bi-x-circle me-1"></i> Sí, Cancelar Orden
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ver Detalle de Orden -->
+    <div class="modal fade" id="modal-ver-orden" tabindex="-1" aria-labelledby="modalVerOrdenLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-light rounded-top-4 px-4 py-3">
+                    <h5 class="modal-title fw-bold" id="modalVerOrdenLabel">
+                        <i class="bi bi-file-earmark-text text-teal me-2"></i>Detalle de Orden #<span id="ver-orden-id"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body px-4 py-3">
+                    <div class="row g-2 mb-3 small">
+                        <div class="col-6 col-md-3"><strong>Fecha Emisión:</strong> <span id="ver-fecha" class="d-block text-muted">—</span></div>
+                        <div class="col-6 col-md-3"><strong>Proveedor:</strong> <span id="ver-proveedor" class="d-block text-muted">—</span></div>
+                        <div class="col-6 col-md-3"><strong>Emisor:</strong> <span id="ver-emisor" class="d-block text-muted">—</span></div>
+                        <div class="col-6 col-md-3"><strong>Estado:</strong> <span id="ver-estado" class="d-block">—</span></div>
+                    </div>
+                    <div class="table-responsive border rounded-3 mb-3">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light small">
+                                <tr>
+                                    <th>Producto / Variante</th>
+                                    <th>Código</th>
+                                    <th class="text-center">Cant. Pedida</th>
+                                    <th class="text-end">Costo Pactado</th>
+                                    <th class="text-end pe-3">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-ver-detalles"></tbody>
+                        </table>
+                    </div>
+                    <div class="text-end pe-2">
+                        <span class="small text-muted me-2">Total Estimado:</span>
+                        <strong class="fs-5 text-teal" id="ver-total-estimado">Q 0.00</strong>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 py-3">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                 </div>
             </div>
         </div>

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from decimal import Decimal
 from datetime import date, datetime
 from fastapi import HTTPException
@@ -26,6 +26,58 @@ class ConcreteComprasService:
         allowed = await check_user_permission(self.uow.db, user, permiso)
         if not allowed:
             raise HTTPException(status_code=403, detail=f"No tiene permisos para realizar esta acción ({permiso})")
+
+    async def _validar_algun_permiso(self, user_id: int, permisos: List[str]):
+        user = await self.uow.users.get_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=401, detail="Usuario no encontrado")
+        for p in permisos:
+            if await check_user_permission(self.uow.db, user, p):
+                return
+        raise HTTPException(
+            status_code=403,
+            detail=f"No tiene permisos para realizar esta acción ({', '.join(permisos)})"
+        )
+
+    def _enrich_orden(self, orden: OrdenCompra) -> OrdenCompra:
+        if getattr(orden, "proveedor", None):
+            orden.nombre_proveedor = orden.proveedor.distribuidora or orden.proveedor.nombre_contacto
+        if getattr(orden, "usuario", None):
+            orden.nombre_usuario = orden.usuario.nombre_completo
+
+        for d in getattr(orden, "detalles", []):
+            if getattr(d, "variante", None):
+                v = d.variante
+                d.talla = v.talla
+                d.color = v.color
+                d.codigo_barras = v.codigo_barras
+                if getattr(v, "producto", None):
+                    d.nombre_producto = v.producto.nombre
+        return orden
+
+    async def listar_ordenes(
+        self,
+        user_id: int,
+        estado: Optional[str] = None,
+        fecha_desde: Optional[date] = None,
+        fecha_hasta: Optional[date] = None,
+        id_proveedor: Optional[int] = None,
+    ) -> List[OrdenCompra]:
+        await self._validar_algun_permiso(user_id, ["COMPRA_EMITIR_ORDEN", "INV_INGRESAR_MERCADERIA"])
+        ordenes = await self.uow.compras.list_ordenes(
+            estado=estado,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+            id_proveedor=id_proveedor,
+        )
+        return [self._enrich_orden(o) for o in ordenes]
+
+    async def obtener_orden(self, id_orden: int, user_id: int) -> OrdenCompra:
+        await self._validar_algun_permiso(user_id, ["COMPRA_EMITIR_ORDEN", "INV_INGRESAR_MERCADERIA"])
+        orden = await self.uow.compras.get_orden_by_id(id_orden)
+        if not orden:
+            raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+        return self._enrich_orden(orden)
 
     async def crear_orden(self, data: OrdenCompraCreate, user_id: int) -> OrdenCompra:
         await self._validar_permiso(user_id, "COMPRA_EMITIR_ORDEN")
@@ -72,7 +124,36 @@ class ConcreteComprasService:
             descripcion=f"Emisión de orden de compra (ID: {orden_creada.id_orden}) al proveedor {data.id_proveedor} por Q{total_estimado}",
         )
         await self.uow.commit()
-        return orden_creada
+        return self._enrich_orden(orden_creada)
+
+    async def cancelar_orden(self, id_orden: int, user_id: int, motivo: Optional[str] = None) -> OrdenCompra:
+        await self._validar_permiso(user_id, "COMPRA_EMITIR_ORDEN")
+
+        orden = await self.uow.compras.get_orden_by_id(id_orden)
+        if not orden:
+            raise HTTPException(status_code=404, detail="Orden de compra no encontrada")
+
+        if orden.estado != "Emitida":
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se puede cancelar una orden en estado {orden.estado}"
+            )
+
+        orden.estado = "Cancelada"
+
+        desc = f"Cancelación de orden de compra (ID: {orden.id_orden})"
+        if motivo:
+            desc += f" - Motivo: {motivo}"
+
+        await log_action(
+            self.uow.db,
+            id_usuario=user_id,
+            accion="EDITAR",
+            tabla="orden_compra",
+            descripcion=desc,
+        )
+        await self.uow.commit()
+        return self._enrich_orden(orden)
 
     async def ingresar_mercaderia(self, data: IngresoMercaderiaCreate, user_id: int) -> OrdenCompra:
         await self._validar_permiso(user_id, "INV_INGRESAR_MERCADERIA")
@@ -134,14 +215,20 @@ class ConcreteComprasService:
         
         orden.estado = "Recibida"
 
-        auditoria = BitacoraAuditoria(
-            fecha_hora=datetime.now(),
+        await log_action(
+            self.uow.db,
             id_usuario=user_id,
-            accion="RECIBIR_COMPRA",
-            tabla_afectada="orden_compra",
-            descripcion=f"Ingreso de orden {orden.id_orden} con total {total_compra}"
+            accion="CREAR",
+            tabla="compra",
+            descripcion=f"Ingreso de mercadería factura {data.numero_factura_proveedor} por Q{total_compra}",
         )
-        await self.uow.compras.add_auditoria(auditoria)
+        await log_action(
+            self.uow.db,
+            id_usuario=user_id,
+            accion="EDITAR",
+            tabla="orden_compra",
+            descripcion=f"Recepción de orden {orden.id_orden} con total {total_compra}",
+        )
 
         await self.uow.commit()
-        return orden
+        return self._enrich_orden(orden)
