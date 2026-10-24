@@ -8,11 +8,11 @@ echo.
 
 cd /d "%~dp0"
 
-REM Verificar Docker
-docker --version >nul 2>&1
+REM Verificar que Docker este instalado y en ejecucion
+docker info >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Docker no esta instalado o no se encuentra en el PATH.
-    echo Por favor instala o inicia Docker Desktop y vuelve a intentar.
+    echo [ERROR] Docker no esta instalado o Docker Desktop no esta abierto.
+    echo Abre Docker Desktop, espera a que diga "Running" y vuelve a intentar.
     pause
     exit /b 1
 )
@@ -24,9 +24,14 @@ if not exist ".env" (
     echo [INFO] Archivo .env creado con exito.
 )
 
+REM Uso normal: iniciar.bat        (rapido, no reconstruye)
+REM Tras cambiar codigo: iniciar.bat build   (reconstruye el backend)
+set BUILD=
+if /i "%1"=="build" set BUILD=--build
+
 echo [INFO] Levantando contenedores en segundo plano...
-echo (Este comando conserva los volumenes y datos de la base de datos)
-docker compose -f docker-compose.prod.yml up -d --build
+echo (Conserva los volumenes y datos de la base de datos)
+docker compose -f docker-compose.prod.yml up -d %BUILD%
 
 if %errorlevel% neq 0 (
     echo.
@@ -34,6 +39,15 @@ if %errorlevel% neq 0 (
     pause
     exit /b 1
 )
+
+echo [INFO] Esperando a que el sistema arranque...
+timeout /t 15 /nobreak >nul
+
+REM Reiniciar nginx para que reconozca el backend actual (evita el error 502)
+docker compose -f docker-compose.prod.yml restart frontend_nginx >nul 2>&1
+timeout /t 3 /nobreak >nul
+
+start "" "http://localhost:9090"
 
 echo.
 echo ======================================================================

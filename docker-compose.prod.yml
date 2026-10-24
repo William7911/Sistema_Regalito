@@ -30,7 +30,7 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-regalito_admin}:${DB_PASSWORD:-Regalito_2026}@db:5432/${DB_NAME:-regalito_pos}
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-regalito_admin}:${DB_PASSWORD:-Regalito_2026}@db:5432/${DB_NAME:-regalito_pos}
       - ENVIRONMENT=production
     depends_on:
       db:
