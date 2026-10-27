@@ -107,6 +107,7 @@ class ConcreteProductService(ProductService):
             id_unidad=data.id_unidad,
             nombre=data.nombre.strip(),
             descripcion=data.descripcion.strip() if data.descripcion else None,
+            imagen_url=data.imagen_url.strip() if data.imagen_url else None,
             estado="Activo",
         )
         producto = await self.products.add_producto(producto)
@@ -167,6 +168,8 @@ class ConcreteProductService(ProductService):
             producto.nombre = data.nombre.strip()
         if data.descripcion is not None:
             producto.descripcion = data.descripcion.strip() if data.descripcion else None
+        if data.imagen_url is not None:
+            producto.imagen_url = data.imagen_url.strip() if data.imagen_url else None
         if data.estado is not None:
             producto.estado = data.estado.strip()
 

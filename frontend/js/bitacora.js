@@ -80,6 +80,10 @@ async function loadBitacora() {
     params.append('limit', bitacoraState.pageSize);
     params.append('offset', (bitacoraState.page - 1) * bitacoraState.pageSize);
 
+    if (tbody && typeof window.renderSkeletonTable === 'function') {
+        tbody.innerHTML = window.renderSkeletonTable(6, Math.min(bitacoraState.pageSize, 6));
+    }
+
     try {
         const res = await fetch(`${BITACORA_API_URL}?${params.toString()}`, { headers: bitacoraAuthHeaders() });
         if (!res.ok) {

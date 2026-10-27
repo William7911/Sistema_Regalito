@@ -236,7 +236,7 @@ class DashboardService(ABC):
     """Contrato del servicio de métricas del Panel Principal."""
 
     @abstractmethod
-    async def get_resumen(self) -> DashboardResumenResponse:
+    async def get_resumen(self, user_id: int) -> DashboardResumenResponse:
         ...
 
 

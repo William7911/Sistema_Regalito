@@ -172,6 +172,7 @@ class ProductoCreate(BaseModel):
     id_unidad: int
     nombre: str = Field(..., min_length=1, max_length=100)
     descripcion: Optional[str] = Field(default=None, max_length=255)
+    imagen_url: Optional[str] = Field(default=None, max_length=255)
     variante: VarianteCreate
     inventario: InventarioCreate
 
@@ -194,6 +195,7 @@ class ProductoUpdate(BaseModel):
     id_unidad: Optional[int] = None
     nombre: Optional[str] = Field(default=None, min_length=1, max_length=100)
     descripcion: Optional[str] = Field(default=None, max_length=255)
+    imagen_url: Optional[str] = Field(default=None, max_length=255)
     estado: Optional[str] = Field(default=None, max_length=20)
     variante: Optional[VarianteUpdate] = None
     inventario: Optional[InventarioUpdate] = None
@@ -226,6 +228,7 @@ class ProductoOut(BaseModel):
     id_unidad: int
     nombre: str
     descripcion: Optional[str] = None
+    imagen_url: Optional[str] = None
     estado: str
     fecha_creacion: Optional[datetime] = None
     subcategoria: Optional[SubcategoriaOut] = None

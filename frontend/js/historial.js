@@ -93,6 +93,10 @@ async function loadHistorial() {
     params.append('limit', historialState.pageSize);
     params.append('offset', (historialState.page - 1) * historialState.pageSize);
 
+    if (tbody && typeof window.renderSkeletonTable === 'function') {
+        tbody.innerHTML = window.renderSkeletonTable(6, Math.min(historialState.pageSize, 6));
+    }
+
     try {
         const res = await fetch(`${HISTORIAL_API_URL}?${params.toString()}`, { headers: historialAuthHeaders() });
         if (!res.ok) {

@@ -1,5 +1,11 @@
-/* Design Tokens & Custom Styles para El Regalito */
+/* ==========================================================================
+   DESIGN TOKENS Y SISTEMA DE VARIABLES DE TEMA (MODO CLARO / MODO OSCURO)
+   ==========================================================================
+   Variables de diseño centralizadas para alternar entre Modo Claro y Modo Oscuro
+   (Carbón) conservando intacto el verde esmeralda corporativo (--color-teal).
+*/
 :root {
+    /* Paleta corporativa oficial (RNF24) - CONSTANTES en ambos temas */
     --color-teal-dark: #0A5C5E;
     --color-teal: #0D7377;
     --color-teal-light: rgba(13, 115, 119, 0.1);
@@ -9,7 +15,7 @@
     --color-success: #10B981;
     --color-danger: #EF4444;
 
-    /* Paleta corporativa oficial (RNF24): celeste, rosado y verde */
+    /* Paleta de acentos corporativos oficial (RNF24): celeste, rosado y verde */
     --color-celeste: #38BDF8;
     --color-celeste-dark: #0284C7;
     --color-celeste-light: rgba(56, 189, 248, 0.12);
@@ -19,6 +25,23 @@
     --color-verde: #34D399;
     --color-verde-dark: #059669;
     --color-verde-light: rgba(52, 211, 153, 0.12);
+
+    /* === TOKENS DINÁMICOS: MODO CLARO (LIGHT THEME) === */
+    --theme-bg-body: #F4F6F8;
+    --theme-bg-surface: #FFFFFF;
+    --theme-bg-card: #FFFFFF;
+    --theme-bg-header: #FFFFFF;
+    --theme-bg-input: #FFFFFF;
+    --theme-bg-subtle: #F8FAFC;
+    --theme-text-main: #1F2937;
+    --theme-text-secondary: #4B5563;
+    --theme-text-muted: #6B7280;
+    --theme-text-subtle: #9CA3AF;
+    --theme-border: #E5E7EB;
+    --theme-border-subtle: #F3F4F6;
+    --theme-table-hover: rgba(0, 0, 0, 0.025);
+    --theme-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --theme-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
 }
 
 body {
@@ -166,12 +189,14 @@ table thead th,
     color: #FFFFFF !important;
 }
 
-/* Cabeceras de tabla del módulo de Catálogos (Celeste corporativo RNF24) */
+/* Cabeceras de tabla del módulo de Catálogos (Teal global del sistema)
+   REDISEÑO UI/UX: se sustituyó el azul corporativo por el verde esmeralda
+   usado en Caja y Usuarios para unificar la identidad visual. */
 .thead-catalog,
 .thead-catalog tr,
 .thead-catalog th {
-    background-color: var(--color-celeste-dark) !important;
-    background: linear-gradient(135deg, #0284C7, #0369A1) !important;
+    background-color: var(--color-teal-dark) !important;
+    background: linear-gradient(135deg, var(--color-teal), var(--color-teal-dark)) !important;
     color: #FFFFFF !important;
 }
 
@@ -264,21 +289,148 @@ table thead:not([class*="thead-"]) th.sortable .sort-icon {
     z-index: 2000;
 }
 
-/* Auth Module - Desert Background */
+/* ==========================================================================
+   MÓDULO DE AUTENTICACIÓN (LOGIN) - REDISEÑO MODERNO Y LIMPIO
+   ========================================================================== */
+
+/* 1. Fondo sólido limpio sin imágenes de distracción */
 .auth-bg {
-    background: linear-gradient(rgba(10, 92, 94, 0.6), rgba(10, 92, 94, 0.8)), url('https://images.unsplash.com/photo-1473448912268-2022ce9509d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center/cover no-repeat fixed;
+    background-color: #F9FAFB !important;
+    background-image: none !important;
 }
 
-/* Glassmorphism */
+[data-theme="dark"] .auth-bg,
+[data-bs-theme="dark"] .auth-bg {
+    background-color: #0F172A !important;
+    background-image: none !important;
+}
+
+/* Tarjeta Central con sombra difusa estilo Apple / Stripe */
+.auth-card,
 .glass-card {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: #FFFFFF !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    border-radius: 24px !important;
+    padding: 3rem 2.5rem !important;
+    box-shadow:
+        0 1px 3px 0 rgba(0, 0, 0, 0.02),
+        0 10px 25px -5px rgba(0, 0, 0, 0.04),
+        0 20px 48px -12px rgba(15, 23, 42, 0.08) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+[data-theme="dark"] .auth-card,
+[data-theme="dark"] .glass-card,
+[data-bs-theme="dark"] .auth-card,
+[data-bs-theme="dark"] .glass-card {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    box-shadow:
+        0 1px 3px 0 rgba(0, 0, 0, 0.2),
+        0 10px 25px -5px rgba(0, 0, 0, 0.35),
+        0 20px 48px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 2. Logo de la empresa ampliado un 30% con Turquesa Vibrante */
 .logo-circle {
-    width: 64px;
-    height: 64px;
+    width: 84px !important;
+    height: 84px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: linear-gradient(135deg, #0D9488, #0D7377) !important;
+    box-shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.35) !important;
+}
+
+.logo-circle i {
+    font-size: 2.35rem !important;
+    color: #FFFFFF !important;
+}
+
+/* 3. Campos de entrada táctiles (mínimo 44px -> 48px) y Anillo de Enfoque Turquesa */
+.auth-input-group {
+    border: 1.5px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+    background: #FFFFFF !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-input-group:focus-within {
+    border-color: #0D9488 !important;
+    box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.18) !important;
+}
+
+.auth-input-group .form-control,
+.auth-input-group .input-group-text {
+    border: none !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    background: transparent !important;
+}
+
+.auth-input-group .form-control {
+    font-size: 0.95rem;
+    color: #1F2937;
+    padding-left: 0.25rem !important;
+}
+
+.auth-input-group .form-control:focus {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+[data-theme="dark"] .auth-input-group,
+[data-bs-theme="dark"] .auth-input-group {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .auth-input-group .form-control,
+[data-bs-theme="dark"] .auth-input-group .form-control {
+    color: #F8FAFC !important;
+}
+
+/* Botón Ingresar al Sistema en Turquesa Vibrante */
+.btn-brand-turquoise,
+#btn-login-submit {
+    background: linear-gradient(135deg, #0D9488, #0D7377) !important;
+    border: none !important;
+    color: #FFFFFF !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    border-radius: 12px !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em;
+    box-shadow: 0 4px 14px rgba(13, 148, 136, 0.28) !important;
+    transition: all 0.2s ease !important;
+}
+
+.btn-brand-turquoise:hover,
+#btn-login-submit:hover {
+    background: linear-gradient(135deg, #0F766E, #0A5C5E) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(13, 148, 136, 0.38) !important;
+    color: #FFFFFF !important;
+}
+
+.btn-brand-turquoise:active,
+#btn-login-submit:active {
+    transform: translateY(0);
+}
+
+/* Enlace '¿Olvidaste tu contraseña?' en Rosa Coral */
+.login-forgot-link {
+    color: #F43F5E !important;
+    font-weight: 600;
+    transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+
+.login-forgot-link:hover {
+    color: #E11D48 !important;
+    text-decoration: underline !important;
 }
 
 .icon-circle {
@@ -427,4 +579,6014 @@ input[type="password"]::-ms-clear {
 }
 #form-login .input-group .form-control:focus {
     box-shadow: none !important;
+}
+
+/* ===== Rediseño Sidebar (solo apariencia) ===== */
+.sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.25) transparent;
+}
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 6px; }
+
+.sidebar .nav-link.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    font-size: .95rem;
+    font-weight: 500;
+    line-height: 1.25;
+    padding: .65rem .9rem;
+    position: relative;
+    transition: background-color .2s, transform .2s;
+}
+.sidebar .nav-link.sidebar-link i {
+    margin: 0 !important;
+    width: 1.4rem;
+    text-align: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+.sidebar .nav-link.sidebar-link:hover { transform: translateX(3px); }
+
+.sidebar .nav-link.active {
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.sidebar .nav-link.active::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 20%;
+    height: 60%;
+    width: 4px;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.sidebar-section {
+    display: block;
+    margin-top: .5rem;
+    padding: .25rem .9rem;
+    font-size: .7rem;
+    letter-spacing: .12em;
+}
+
+/* ============================================================================
+ * NAVEGACIÓN MÓVIL (Off-canvas en pantallas menores a 1024px)
+ * ============================================================================ */
+.sidebar-mobile-backdrop {
+    display: none;
+}
+
+@media (max-width: 1023.98px) {
+    /* Sidebar oculto fuera de pantalla por defecto */
+    #system-module > .sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        width: 280px !important;
+        max-width: 85vw !important;
+        height: 100vh !important;
+        z-index: 1055 !important;
+        transform: translateX(-100%) !important;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s ease !important;
+        box-shadow: none !important;
+        overflow-y: auto !important;
+    }
+
+    /* Sidebar visible cuando se activa la clase en el contenedor */
+    #system-module.mobile-sidebar-open > .sidebar {
+        transform: translateX(0) !important;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    /* Fondo semitransparente con desenfoque */
+    .sidebar-mobile-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+        z-index: 1050;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+    }
+
+    #system-module.mobile-sidebar-open .sidebar-mobile-backdrop {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    #system-module.mobile-sidebar-open {
+        overflow: hidden !important;
+    }
+
+    #btn-sidebar-toggle {
+        min-width: 42px;
+        min-height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+    }
+}
+
+/* ===== Sidebar v2: moderno y profesional ===== */
+.sidebar {
+    width: 272px !important;
+    padding: 1.25rem 1rem !important;
+    background: linear-gradient(180deg, #0B6063 0%, #084A4C 100%) !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,.12);
+    z-index: 10;
+}
+
+/* Marca */
+.sidebar-brand {
+    padding: .25rem .5rem 1.25rem !important;
+    margin-bottom: 1rem !important;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.sidebar-brand i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    font-size: 1.25rem !important;
+    border-radius: 12px;
+    background: rgba(255,255,255,.14);
+    color: #fff !important;
+    margin-right: .75rem !important;
+}
+.sidebar-brand span { font-size: 1.15rem !important; letter-spacing: .01em; }
+
+
+/* Opciones */
+.sidebar .nav-link.sidebar-link {
+    color: rgba(255,255,255,.78) !important;
+    border-radius: 10px;
+    padding: .6rem .85rem;
+    margin-bottom: 2px;
+}
+.sidebar .nav-link.sidebar-link i { opacity: .85; }
+.sidebar .nav-link.sidebar-link:hover {
+    background: rgba(255,255,255,.09);
+    color: #fff !important;
+    transform: translateX(2px);
+}
+.sidebar .nav-link.sidebar-link:hover i { opacity: 1; }
+
+/* Opción activa */
+.sidebar .nav-pills .nav-link.active,
+.sidebar .nav-link.active {
+    background: rgba(255,255,255,.16) !important;
+    color: #fff !important;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.sidebar .nav-link.active i { opacity: 1; color: #7FE3D4; }
+.sidebar .nav-link.active::before {
+    left: -1rem;
+    width: 4px;
+    background: #7FE3D4;
+    border-radius: 0 4px 4px 0;
+}
+
+/* Títulos de grupo */
+.sidebar-section {
+    margin-top: 1.1rem !important;
+    padding: .25rem .85rem .35rem;
+    font-size: .68rem;
+    letter-spacing: .14em;
+    color: rgba(255,255,255,.45) !important;
+}
+
+/* Usuario abajo */
+.sidebar hr { border-color: rgba(255,255,255,.14) !important; opacity: 1; margin: .75rem 0; }
+.sidebar > .dropdown > a {
+    padding: .6rem .75rem;
+    border-radius: 12px;
+    background: rgba(255,255,255,.08);
+    transition: background .2s;
+}
+.sidebar > .dropdown > a:hover { background: rgba(255,255,255,.14); }
+.sidebar > .dropdown > a strong { font-size: .9rem; font-weight: 600; }
+.sidebar > .dropdown > a img { border: 2px solid rgba(255,255,255,.35); }
+
+/* ===== Sidebar colapsable ===== */
+.sidebar { transition: width .25s ease; }
+
+.sidebar-collapsed .sidebar { width: 76px !important; padding: 1rem .6rem !important; }
+.sidebar-collapsed .sidebar-brand span,
+.sidebar-collapsed .sidebar-section,
+.sidebar-collapsed .sidebar .dropdown-toggle::after,
+.sidebar-collapsed .sidebar > .dropdown strong { display: none !important; }
+
+.sidebar-collapsed .sidebar-brand { justify-content: center; padding: 0 0 1rem !important; }
+.sidebar-collapsed .sidebar-brand i { margin: 0 !important; }
+
+.sidebar-collapsed .sidebar .nav-link.sidebar-link {
+    font-size: 0;              /* oculta el texto, deja el icono */
+    justify-content: center;
+    padding: .7rem 0;
+}
+.sidebar-collapsed .sidebar .nav-link.sidebar-link i { font-size: 1.25rem; width: auto; }
+.sidebar-collapsed .sidebar .nav-link.active::before { left: -.6rem; }
+
+.sidebar-collapsed .sidebar > .dropdown > a { justify-content: center; padding: .4rem; }
+.sidebar-collapsed .sidebar > .dropdown img { margin: 0 !important; }
+/* ============================================================================
+ * Panel Principal (Dashboard) - Rediseño
+ * Tarjetas, skeletons, gráfico y accesos rápidos. Misma paleta corporativa.
+ * ============================================================================ */
+
+/* Skeleton loading (shimmer suave sobre fondo claro) */
+.dash-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: #E9EDF1;
+    border-radius: 0.5rem;
+}
+.dash-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent);
+    animation: dashShimmer 1.2s infinite;
+}
+.dash-skeleton-line {
+    height: 14px;
+    border-radius: 6px;
+    background: #E9EDF1;
+    position: relative;
+    overflow: hidden;
+}
+.dash-skeleton-line::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent);
+    animation: dashShimmer 1.2s infinite;
+}
+.dash-skeleton-line.w-75 { width: 75%; }
+.dash-skeleton-line.w-50 { width: 50%; }
+@keyframes dashShimmer {
+    100% { transform: translateX(100%); }
+}
+
+.dash-chart-wrap {
+    position: relative;
+    min-height: 220px;
+}
+.dash-chart-wrap canvas {
+    max-height: 260px;
+    width: 100% !important;
+}
+
+/* Listas de métricas del panel (métodos de pago, top productos, stock, pendientes) */
+.dash-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid #F1F5F9;
+}
+.dash-list-item:last-child { border-bottom: none; }
+.dash-list-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dash-list-sub {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+.dash-list-value {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--color-text-dark);
+    white-space: nowrap;
+}
+
+/* Tendencia vs ayer (flecha verde/roja) */
+.dash-trend-up { color: var(--color-verde-dark) !important; }
+.dash-trend-down { color: var(--color-danger) !important; }
+.dash-trend-flat { color: var(--color-text-muted) !important; }
+
+/* Píldora de estado de caja en la barra superior */
+#dash-turno-badge.bg-success-subtle { background-color: var(--color-verde-light) !important; color: var(--color-verde-dark) !important; }
+#dash-turno-badge.bg-secondary-subtle { background-color: #E9EDF1 !important; color: #6B7280 !important; }
+
+/* Accesos rápidos grandes */
+.dash-quick-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 132px;
+}
+.dash-quick-action:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 18px -6px rgba(10, 92, 94, 0.25);
+}
+.dash-quick-action i { transition: transform 0.2s ease; }
+.dash-quick-action:hover i { transform: scale(1.12); }
+
+/* Utilidades de fondo corporativa (paleta RNF24) para tarjetas del panel */
+.bg-celeste-light { background-color: var(--color-celeste-light) !important; }
+.bg-rosado-light { background-color: var(--color-rosado-light) !important; }
+.bg-verde-light { background-color: var(--color-verde-light) !important; }
+
+/* ============================================================================
+ * Punto de Venta (POS) - Rediseño visual y experiencia de cobro
+ * ========================================================================== */
+
+.btn-outline-teal {
+    color: var(--color-teal);
+    border: 1px solid var(--color-teal);
+    background: transparent;
+    transition: all 0.18s ease;
+}
+.btn-outline-teal:hover,
+.btn-outline-teal:focus {
+    background: var(--color-teal);
+    border-color: var(--color-teal);
+    color: #fff;
+}
+
+.pos-search-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+.pos-search-bar .form-control {
+    height: 46px;
+    border-radius: 12px;
+    border-color: #DDE7E6;
+    background: #FBFDFC;
+}
+.pos-search-bar .form-control:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+    background: #fff;
+}
+.pos-kbd-hint {
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0.1rem 0.4rem;
+    border-radius: 6px;
+    border: 1px solid #D7E2E1;
+    background: #fff;
+    color: #64748B;
+    font-size: 0.65rem;
+    font-weight: 700;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.08);
+}
+
+.pos-category-pills {
+    display: flex;
+    gap: 0.45rem;
+    overflow-x: auto;
+    padding: 0.1rem 0.1rem 0.35rem;
+    scrollbar-width: thin;
+    max-width: 100%;
+}
+.pos-category-pill {
+    border: 1px solid #DDE7E6;
+    background: #fff;
+    color: #475569;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: all 0.18s ease;
+}
+.pos-category-pill:hover {
+    border-color: var(--color-teal);
+    color: var(--color-teal);
+}
+.pos-category-pill.active {
+    background: var(--color-teal-dark);
+    border-color: var(--color-teal-dark);
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(10, 92, 94, 0.2);
+}
+.pos-category-pill .count {
+    display: inline-block;
+    margin-left: 0.3rem;
+    opacity: 0.7;
+    font-size: 0.68rem;
+}
+.pos-shortcut-hint {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+}
+
+.pos-product-card {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    background: #fff;
+    border: 1px solid #E8EFEE !important;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.pos-product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0.75rem 1.5rem rgba(10, 92, 94, 0.14) !important;
+    border-color: rgba(13, 115, 119, 0.3) !important;
+}
+.pos-product-card:focus-visible {
+    outline: 3px solid rgba(13, 115, 119, 0.35);
+    outline-offset: 2px;
+}
+.pos-product-media {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: linear-gradient(135deg, #F8FBFA, #EAF3F1);
+}
+.pos-product-img {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+}
+.pos-product-card:hover .pos-product-img { transform: scale(1.04); }
+.pos-product-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-teal);
+    background:
+        radial-gradient(circle at 20% 20%, rgba(13, 115, 119, 0.12), transparent 45%),
+        linear-gradient(135deg, #F8FBFA, #E6F2F0);
+}
+.pos-product-initials {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    opacity: 0.8;
+}
+.pos-product-cat-icon {
+    position: absolute;
+    right: 0.6rem;
+    bottom: 0.5rem;
+    font-size: 1rem;
+    opacity: 0.5;
+}
+.pos-stock-badge {
+    position: absolute;
+    z-index: 2;
+    top: 0.55rem;
+    right: 0.55rem;
+    border-radius: 999px;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #fff;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+    letter-spacing: 0.01em;
+}
+.pos-stock-ok { background: var(--color-verde-dark); }
+.pos-stock-low { background: #F59E0B; color: #3B2500; }
+.pos-stock-out { background: #DC2626; }
+.pos-category-tag {
+    position: absolute;
+    z-index: 2;
+    left: 0.55rem;
+    bottom: 0.55rem;
+    max-width: calc(100% - 1.1rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--color-teal-dark);
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    backdrop-filter: blur(4px);
+}
+.pos-product-name {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--color-text-dark);
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.15em;
+}
+.pos-product-variant {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pos-product-price {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--color-teal-dark);
+    line-height: 1.1;
+}
+.pos-product-wholesale {
+    font-size: 0.7rem;
+    color: var(--color-verde-dark);
+    font-weight: 600;
+}
+.pos-add-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-teal);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    box-shadow: 0 4px 10px rgba(13, 115, 119, 0.25);
+}
+.pos-product-card.is-out {
+    opacity: 0.62;
+    cursor: not-allowed;
+    filter: grayscale(0.25);
+}
+.pos-product-card.is-out:hover {
+    transform: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
+    border-color: #E8EFEE !important;
+}
+.pos-product-card.is-out .pos-product-img { filter: grayscale(0.6); }
+.pos-product-card.is-out .pos-add-btn { background: #94A3B8; box-shadow: none; }
+
+.pos-cart-panel { min-height: 100%; }
+.pos-cart-list {
+    max-height: 340px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+    scrollbar-width: thin;
+}
+.pos-cart-item {
+    display: flex;
+    gap: 0.7rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px dashed #E2E8E7;
+}
+.pos-cart-item:last-child { border-bottom: none; }
+.pos-cart-thumb {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #F1F5F4;
+    flex: 0 0 auto;
+}
+.pos-cart-thumb img {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.pos-cart-thumb-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    color: var(--color-teal);
+    background: linear-gradient(135deg, #F8FBFA, #E6F2F0);
+}
+.pos-cart-info { flex: 1; min-width: 0; }
+.pos-cart-name {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--color-text-dark);
+    line-height: 1.25;
+}
+.pos-cart-meta {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    line-height: 1.3;
+}
+.pos-mayoreo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: #ECFDF5;
+    color: #047857;
+    border: 1px solid #A7F3D0;
+    font-size: 0.65rem;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 0.12rem 0.45rem;
+}
+.pos-cart-remove {
+    border: none;
+    background: transparent;
+    color: #94A3B8;
+    padding: 0.1rem 0.25rem;
+    line-height: 1;
+    border-radius: 6px;
+}
+.pos-cart-remove:hover { color: #DC2626; background: #FEF2F2; }
+.pos-qty {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #DDE7E6;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+}
+.pos-qty button {
+    border: none;
+    background: #F8FAF9;
+    color: var(--color-teal-dark);
+    width: 26px;
+    height: 26px;
+    font-weight: 800;
+    line-height: 1;
+}
+.pos-qty button:hover { background: var(--color-teal-light); }
+.pos-qty input {
+    width: 42px;
+    height: 28px;
+    border: none;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    -moz-appearance: textfield;
+}
+.pos-qty input::-webkit-outer-spin-button,
+.pos-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.pos-cart-line-total {
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: var(--color-teal-dark);
+    line-height: 1.2;
+}
+.pos-cart-line-savings {
+    font-size: 0.66rem;
+    color: var(--color-verde-dark);
+    font-weight: 600;
+}
+
+.pos-summary {
+    background: #F8FAF9;
+    border: 1px solid #E6EFEE;
+    border-radius: 16px;
+    padding: 0.85rem 1rem;
+}
+.pos-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    padding: 0.2rem 0;
+}
+.pos-summary-row strong { color: var(--color-text-dark); }
+.pos-summary-discount strong { color: var(--color-verde-dark); }
+.pos-summary-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    border-top: 1px solid #DDE7E6;
+    margin-top: 0.35rem;
+    padding-top: 0.55rem;
+    font-weight: 800;
+}
+.pos-summary-total span:first-child {
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+}
+.pos-summary-total span:last-child {
+    font-size: 1.85rem;
+    color: var(--color-teal-dark);
+    line-height: 1;
+}
+
+.pos-payment label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.pos-payment .input-group-text {
+    background: #F8FAF9;
+    border-color: #DDE7E6;
+    color: var(--color-teal-dark);
+    font-weight: 700;
+}
+.pos-payment .form-control {
+    border-color: #DDE7E6;
+    font-weight: 700;
+    font-size: 1rem;
+}
+.pos-payment .form-control:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+.pos-quick-cash {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.pos-cash-chip {
+    background: #fff;
+    border: 1px solid #DDE7E6;
+    color: var(--color-teal-dark);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.3rem 0.7rem;
+}
+.pos-cash-chip:hover {
+    background: var(--color-teal);
+    border-color: var(--color-teal);
+    color: #fff;
+}
+.pos-change-box {
+    background: linear-gradient(135deg, #ECFDF5, #F0FDF4);
+    border: 1px solid #A7F3D0;
+    border-radius: 16px;
+    padding: 0.75rem 1rem;
+}
+.pos-change-label {
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #047857;
+}
+.pos-change-value { font-size: 2rem; line-height: 1; }
+
+.btn-pos-charge {
+    background: linear-gradient(135deg, #0A5C5E, #064E4F);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 0.85rem 1rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    font-size: 1.05rem;
+    box-shadow: 0 8px 18px rgba(10, 92, 94, 0.28);
+    transition: all 0.18s ease;
+}
+.btn-pos-charge:hover:not(:disabled) {
+    background: linear-gradient(135deg, #0D7377, #0A5C5E);
+    color: #fff;
+    transform: translateY(-1px);
+}
+.btn-pos-charge:disabled {
+    background: #CBD5D4;
+    color: #64748B;
+    box-shadow: none;
+}
+.pos-charge-kbd {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 6px;
+}
+.btn-pos-charge:disabled .pos-charge-kbd {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.08);
+    color: #64748B;
+}
+
+.pos-client-card {
+    background: #F8FAF9;
+    border: 1px solid #E6EFEE;
+    border-radius: 14px;
+    padding: 0.6rem 0.75rem;
+}
+
+.pos-history-table-wrap {
+    max-height: 300px;
+    overflow-y: auto;
+    border-radius: 12px;
+}
+#pos-history-table thead th {
+    background: linear-gradient(135deg, var(--color-teal), var(--color-teal-dark)) !important;
+    color: #FFFFFF !important;
+    border-bottom: none !important;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+#pos-history-table tbody td { vertical-align: middle; }
+#pos-history-table .btn-group .btn { font-size: 0.72rem; font-weight: 600; }
+
+/* ============================================================================
+ * Ticket térmico 58 mm / 80 mm y reglas de impresión
+ * ========================================================================== */
+
+.pos-ticket-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.pos-ticket-preview-wrap {
+    display: flex;
+    justify-content: center;
+    background: #EEF2F1;
+    border: 1px solid #DDE7E6;
+    border-radius: 16px;
+    padding: 1.25rem;
+    overflow: auto;
+    max-height: 55vh;
+}
+.pos-ticket-preview {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+.ticket {
+    background: #FFFFFF;
+    color: #000000;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    line-height: 1.25;
+    padding: 4mm;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+.ticket--80 { width: 72mm; }
+.ticket--58 { width: 48mm; font-size: 10px; }
+.ticket-center { text-align: center; }
+.ticket-business {
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+}
+.ticket--58 .ticket-business { font-size: 12px; }
+.ticket-sub { font-size: 9px; }
+.ticket-sep { border-top: 1px dashed #000000; margin: 2mm 0; }
+.ticket-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 2mm;
+}
+.ticket-row span:last-child {
+    text-align: right;
+    white-space: nowrap;
+}
+.ticket-item { margin-bottom: 1.5mm; }
+.ticket-item-name { font-weight: 700; }
+.ticket-item-variant { font-size: 9px; }
+.ticket-item-tag {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+.ticket-total {
+    font-size: 13px;
+    font-weight: 800;
+    border-top: 1px solid #000000;
+    border-bottom: 1px solid #000000;
+    padding: 1mm 0;
+    margin: 1mm 0;
+}
+.ticket-change { font-size: 13px; font-weight: 800; }
+.ticket-thanks { font-size: 12px; font-weight: 800; margin-top: 1mm; }
+.ticket-foot { font-size: 8px; margin-top: 0.5mm; }
+.pos-ticket-tip {
+    font-size: 0.78rem;
+    color: #475569;
+    background: #F8FAF9;
+    border: 1px solid #E6EFEE;
+    border-radius: 12px;
+    padding: 0.6rem 0.75rem;
+    margin-top: 1rem;
+}
+.pos-ticket-print-area { display: none; }
+
+@media print {
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #FFFFFF !important;
+    }
+    body.pos-printing > *:not(#pos-ticket-print-area) { display: none !important; }
+    body.pos-printing #pos-ticket-print-area { display: block !important; }
+    #pos-ticket-print-area .ticket {
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 2mm !important;
+    }
+    #pos-ticket-print-area .ticket--80 { width: 72mm !important; }
+    #pos-ticket-print-area .ticket--58 { width: 48mm !important; }
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .pos-summary-total span:last-child { font-size: 1.55rem; }
+    .pos-change-value { font-size: 1.65rem; }
+    .pos-cart-list { max-height: none; }
+}
+
+/* Las utilidades de imagen del formulario de producto viven al final del archivo,
+   dentro del rediseño UI/UX del modal "Nuevo Producto". */
+
+/* ============================================================================
+ * POS Checkout v2 - Cero fricción (Square / Shopify POS)
+ * ========================================================================== */
+
+.pos-view { overflow: auto; background: #F4F7F6; }
+#pos-view:not(.d-none) { display: flex; flex-direction: column; min-height: 0; }
+.pos-header { flex: 0 0 auto; }
+.pos-header-btn {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 12px;
+    font-weight: 600;
+    padding: 0.48rem 0.8rem;
+    white-space: nowrap;
+}
+.pos-header-kbd {
+    background: #F1F5F4;
+    border: 1px solid #DDE7E6;
+    color: #64748B;
+    border-radius: 6px;
+    padding: 0.08rem 0.35rem;
+    font-size: 0.62rem;
+    font-weight: 800;
+}
+
+#pos-workspace { flex: 1 1 auto; min-height: 0; }
+.pos-workspace-row { min-height: 0; }
+.pos-workspace-row > [class*="col-"] { min-height: 0; }
+.pos-catalog-panel,
+.pos-checkout-panel { min-height: 0; }
+.pos-catalog-panel > .card-body { min-height: 0; overflow-y: auto; }
+.pos-checkout-panel > .card-body { min-height: 0; overflow: hidden; padding: 0.55rem; }
+
+@media (min-width: 768px) {
+    body:has(#system-module:not(.d-none)) { overflow: hidden; }
+    #system-module { height: 100vh; min-height: 100vh; overflow: hidden; }
+    #system-module > .sidebar { flex: 0 0 272px; }
+    #system-module.sidebar-collapsed > .sidebar { flex-basis: 76px; }
+    #system-module > main { min-width: 0; min-height: 0; height: 100vh; overflow: hidden; }
+    #system-module main > [data-main-view] { min-height: 0; }
+}
+
+@media (min-width: 1200px) {
+    #pos-workspace { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .pos-workspace-row { flex: 1 1 0; height: auto; min-height: 0; }
+    .pos-workspace-row > [class*="col-"] { height: 100%; max-height: 100%; overflow: hidden; }
+    .pos-catalog-panel,
+    .pos-checkout-panel { height: 100%; max-height: 100%; }
+}
+
+/* Omnibox unificado */
+.pos-omnibox {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    height: 58px;
+    padding: 0 0.7rem 0 1rem;
+    border: 1.5px solid #DDE7E6;
+    border-radius: 16px;
+    background: #FBFDFC;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.pos-omnibox:focus-within {
+    border-color: var(--color-teal);
+    background: #FFFFFF;
+    box-shadow: 0 0 0 0.25rem var(--color-teal-light);
+}
+.pos-omnibox-icon { font-size: 1.3rem; color: var(--color-teal); flex: 0 0 auto; }
+.pos-omnibox-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-dark);
+}
+.pos-omnibox-input::placeholder { color: #94A3B8; font-weight: 500; }
+.pos-omnibox-clear {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 50%;
+    background: #EEF2F1;
+    color: #64748B;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+}
+.pos-omnibox-clear:hover { background: #FEE2E2; color: #DC2626; }
+.pos-omnibox-kbd {
+    flex: 0 0 auto;
+    background: #FFFFFF;
+    border: 1px solid #D7E2E1;
+    color: #64748B;
+    border-radius: 6px;
+    padding: 0.12rem 0.4rem;
+    font-size: 0.62rem;
+    font-weight: 800;
+}
+
+/* Tarjetas de producto */
+.pos-product-media { aspect-ratio: 1 / 1; }
+.pos-product-placeholder { flex-direction: column; gap: 0.25rem; }
+.pos-product-price { font-size: 1.05rem; font-weight: 800; }
+.pos-product-wholesale {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0.15rem;
+    background: #ECFDF5;
+    border: 1px solid #A7F3D0;
+    color: #047857;
+    border-radius: 999px;
+    padding: 0.08rem 0.42rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+}
+
+/* Carrito */
+.pos-cart-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+    margin-bottom: 0.25rem;
+}
+.pos-clear-link {
+    border: 0;
+    background: transparent;
+    color: #94A3B8;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.1rem 0.2rem;
+}
+.pos-clear-link:hover { color: #DC2626; text-decoration: underline; }
+.pos-client-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 0 0 auto;
+    margin-bottom: 0.35rem;
+    padding: 0.24rem 0.35rem 0.24rem 0.65rem;
+    background: #F8FAF9;
+    border: 1px solid #E6EFEE;
+    border-radius: 12px;
+    min-height: 34px;
+}
+.pos-client-icon { color: var(--color-teal); flex: 0 0 auto; }
+.pos-client-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-dark);
+}
+.pos-client-input::placeholder { color: #94A3B8; font-weight: 500; }
+.pos-client-btn {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border: 1px solid #DDE7E6;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: var(--color-teal);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+}
+.pos-client-btn:hover { background: var(--color-teal); color: #FFFFFF; border-color: var(--color-teal); }
+.pos-client-badge {
+    flex: 0 0 auto;
+    max-width: 108px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: #E2E8F0;
+    color: #475569;
+    border-radius: 999px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+.pos-client-badge.is-found { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+.pos-client-badge.is-warning { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
+
+.pos-cart-empty {
+    flex: 1 1 auto;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    text-align: center;
+}
+.pos-cart-empty i { font-size: 2.2rem; opacity: 0.4; }
+.pos-cart-list {
+    flex: 1 1 auto;
+    min-height: 180px;
+    max-height: none;
+    overflow-y: auto;
+    margin: 0 -0.15rem;
+    padding-right: 0.25rem;
+    scrollbar-width: thin;
+}
+.pos-cart-item { padding: 0.55rem 0; gap: 0.6rem; }
+.pos-cart-thumb { width: 40px; height: 40px; border-radius: 10px; }
+.pos-cart-thumb-fallback { font-size: 0.8rem; }
+.pos-cart-name { font-size: 0.82rem; }
+.pos-cart-meta { font-size: 0.68rem; }
+.pos-cart-line-total { font-size: 0.82rem; }
+.pos-qty button { width: 26px; height: 26px; }
+.pos-qty input { width: 38px; height: 26px; font-size: 0.76rem; }
+.pos-mayoreo-badge { font-size: 0.62rem; }
+
+/* Footer de cobro */
+.pos-checkout-footer {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-top: 0;
+}
+.pos-checkout-footer .pos-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    font-size: 0.64rem;
+    line-height: 1;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+.pos-checkout-footer .pos-summary strong { color: var(--color-text-dark); font-weight: 800; }
+.pos-checkout-footer .pos-summary-discount strong { color: #047857; }
+.pos-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 0.4rem;
+}
+.pos-total-hero,
+.pos-change-box {
+    border-radius: 14px;
+    padding: 0.3rem 0.65rem;
+    min-width: 0;
+}
+.pos-total-hero {
+    background: linear-gradient(135deg, var(--color-teal-dark), #064E4F);
+    color: #FFFFFF;
+    box-shadow: 0 8px 18px rgba(10, 92, 94, 0.24);
+}
+.pos-total-hero span,
+.pos-change-label {
+    display: block;
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+.pos-total-hero span { color: rgba(255, 255, 255, 0.78); }
+.pos-total-hero strong {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: clamp(1.7rem, 2.3vw, 2rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+.pos-change-box {
+    background: linear-gradient(135deg, #ECFDF5, #F0FDF4);
+    border: 1px solid #A7F3D0;
+}
+.pos-change-box .pos-change-label { color: #047857; }
+.pos-change-value {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: clamp(1.6rem, 2.1vw, 1.85rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: #047857 !important;
+    font-variant-numeric: tabular-nums;
+}
+.pos-received-line {
+    display: none;
+    margin-top: 0.2rem;
+    font-size: 0.64rem;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pos-received-line strong { color: #0F172A; }
+
+.pos-payment { display: flex; flex-direction: column; gap: 0.22rem; }
+.pos-payment .form-label {
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.15rem;
+}
+.pos-cash-row { display: flex; align-items: center; gap: 0.55rem; }
+.pos-cash-row .form-label { flex: 0 0 auto; margin-bottom: 0; }
+.pos-cash-row .input-group { flex: 1 1 auto; }
+.pos-payment .input-group-text {
+    background: #F8FAF9;
+    border-color: #DDE7E6;
+    color: var(--color-teal-dark);
+    font-weight: 800;
+    padding: 0.4rem 0.65rem;
+}
+.pos-payment .form-control {
+    height: 32px;
+    border-color: #DDE7E6;
+    font-weight: 800;
+    font-size: 1rem;
+}
+.pos-payment .form-control:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+.pos-quick-cash { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.pos-cash-chip {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.68rem;
+    border-radius: 999px;
+}
+.pos-transfer-toggle {
+    border: 1px dashed #A7F3D0;
+    background: #F0FDF4;
+    color: #047857;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.pos-transfer-toggle:hover { color: #FFFFFF; background: var(--color-teal); border-color: var(--color-teal); }
+.pos-transfer-wrap { margin-top: 0.1rem; }
+.pos-transfer-wrap .form-label { margin-bottom: 0.15rem; }
+
+.btn-pos-charge {
+    min-height: 44px;
+    padding: 0.45rem 1rem;
+    font-size: 1.05rem;
+    border-radius: 16px;
+    margin-top: 0.1rem;
+}
+.pos-charge-kbd { font-size: 0.66rem; }
+/* Historial en modal */
+#pos-history-modal .pos-history-table-wrap { max-height: 60vh; border: 1px solid #E6EFEE; }
+#pos-history-modal #pos-history-table { background: #FFFFFF; }
+#pos-history-modal #pos-history-table thead th { white-space: nowrap; }
+
+@media (max-width: 1199.98px) {
+    .pos-workspace-row { height: auto; }
+    .pos-cart-list { max-height: 46vh; min-height: 220px; }
+    .pos-catalog-panel > .card-body { overflow-y: visible; }
+}
+
+@media (max-width: 575.98px) {
+    .pos-omnibox { height: 50px; border-radius: 14px; }
+    .pos-omnibox-input { font-size: 0.9rem; }
+    .pos-hero { grid-template-columns: 1fr; }
+    .pos-total-hero strong { font-size: 2.35rem; }
+    .pos-change-value { font-size: 2.1rem; }
+    .pos-cart-list { max-height: 42vh; min-height: 190px; }
+    .pos-cash-row { flex-direction: column; align-items: stretch; gap: 0.2rem; }
+    .pos-header-btn { padding: 0.45rem 0.6rem; }
+}
+
+/* Columnas extra del ticket térmico */
+.ticket-cols {
+    display: flex;
+    justify-content: space-between;
+    gap: 2mm;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    border-bottom: 1px solid #000000;
+    padding-bottom: 1mm;
+    margin-bottom: 1mm;
+}
+
+/* ===========================================================================
+   MÓDULO USUARIOS / PERSONAL — Rediseño visual UX/UI
+   NOTA: estas reglas son 100% estéticas. No alteran IDs, eventos, filtros,
+   validaciones ni llamadas a la API. Todos los selectores están acotados a
+   #users-view para evitar efectos secundarios en otros módulos.
+   =========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   Filtros: bordes suaves y neutrales para que los botones principales
+   ("+ Nuevo Usuario" y "Filtrar") sean los protagonistas visuales.
+   Se conservan intactas las clases de Bootstrap y los IDs usados por users.js.
+--------------------------------------------------------------------------- */
+#users-view .users-filter-bar .users-filter-control {
+    border: 1px solid #E2E8F0;
+    border-radius: 0.65rem;
+    background-color: #FFFFFF;
+    color: #334155;
+    min-height: 40px;
+    font-size: 0.875rem;
+    box-shadow: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+/* Feedback de foco sutil (accesible) sin competir con los botones primarios. */
+#users-view .users-filter-bar .users-filter-control:focus {
+    border-color: #94D3D5;
+    box-shadow: 0 0 0 0.2rem rgba(13, 115, 119, 0.12);
+}
+
+#users-view .users-filter-bar .users-filter-control::placeholder {
+    color: #94A3B8;
+}
+
+/* ---------------------------------------------------------------------------
+   Rango de fechas unificado (Desde / Hasta): ambos campos comparten un solo
+   contenedor, un solo borde y un divisor vertical, simulando un único rango.
+--------------------------------------------------------------------------- */
+#users-view .users-date-range {
+    display: flex;
+    align-items: stretch;
+    flex: 0 1 380px;
+    width: 100%;
+    max-width: 380px;
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 0.65rem;
+    overflow: hidden;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+#users-view .users-date-range:focus-within {
+    border-color: #94D3D5;
+    box-shadow: 0 0 0 0.2rem rgba(13, 115, 119, 0.12);
+}
+
+/* Cada mitad del rango: etiqueta pequeña arriba y fecha debajo. */
+#users-view .users-date-range-field {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.05rem;
+    margin: 0;
+    padding: 0.3rem 0.65rem;
+    cursor: text;
+}
+
+#users-view .users-date-range-label {
+    display: flex;
+    align-items: center;
+    font-size: 0.67rem;
+    font-weight: 600;
+    line-height: 1;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+/* El input pierde borde propio para fundirse con el contenedor del rango. */
+#users-view .users-date-range-field .form-control {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 1.2rem;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0;
+    background-color: transparent;
+    color: #334155;
+    font-size: 0.82rem;
+    box-shadow: none !important;
+}
+
+/* Divisor vertical que refuerza visualmente la idea de "un solo rango". */
+#users-view .users-date-range-divider {
+    width: 1px;
+    margin: 0.5rem 0;
+    background-color: #E2E8F0;
+    flex-shrink: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Jerarquía de acciones: refuerzo visual de "+ Nuevo Usuario" y "Filtrar".
+   Solo se añade sombra/peso; no se modifica el comportamiento de los botones.
+--------------------------------------------------------------------------- */
+#users-view .users-primary-action {
+    border-radius: 0.65rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    box-shadow: 0 4px 12px rgba(10, 92, 94, 0.18);
+}
+
+#users-view .users-primary-action:hover {
+    box-shadow: 0 6px 16px rgba(10, 92, 94, 0.24);
+}
+
+#users-view .users-primary-action:focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Inicio: Mejora visual de contraste en encabezado de tabla.
+   Se fuerza texto blanco puro (#FFFFFF) sobre el fondo verde oscuro actual.
+   Se usa mayor especificidad (#users-view) para vencer la regla base
+   `table thead th` que pintaba el texto en oscuro.
+--------------------------------------------------------------------------- */
+#users-view .users-table > .thead-users > tr > th {
+    color: #FFFFFF !important;
+    background-color: var(--color-teal-dark) !important;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* Los íconos/spans internos (incluido el indicador de orden) heredan blanco. */
+#users-view .users-table > .thead-users > tr > th a,
+#users-view .users-table > .thead-users > tr > th span,
+#users-view .users-table > .thead-users > tr > th i {
+    color: #FFFFFF !important;
+}
+/* Fin: Mejora visual de contraste en encabezado de tabla */
+
+/* ---------------------------------------------------------------------------
+   CORRECCIÓN 3: Badge "Activo" con contraste invertido (Soft Badge).
+   Fondo verde muy claro (#DCFCE7), texto verde oscuro (#166534),
+   tipografía 600 y forma pill. Sustituye el bloque sólido bg-success.
+   Se incluye el equivalente inactivo para mantener coherencia visual.
+--------------------------------------------------------------------------- */
+#users-view .users-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0;
+}
+
+/* Punto de estado: refuerzo visual sin depender solo del color (a11y). */
+#users-view .users-status-badge::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background-color: currentColor;
+    flex-shrink: 0;
+}
+
+/* Soft Badge Activo: #dcfce7 de fondo y #166534 de texto (requerido). */
+#users-view .users-status-badge--active {
+    background-color: #DCFCE7;
+    color: #166534;
+    border-color: #BBF7D0;
+}
+
+/* Soft Badge Inactivo: misma familia visual, en gris neutro. */
+#users-view .users-status-badge--inactive {
+    background-color: #F1F5F9;
+    color: #475569;
+    border-color: #E2E8F0;
+}
+
+/* ---------------------------------------------------------------------------
+   Inicio: Limpieza visual de la columna de acciones.
+   "Ver", "Editar" y "Eliminar" pasan de botones outline cuadrados a
+   ghost buttons: sin borde, solo ícono gris neutro que revela color en hover.
+--------------------------------------------------------------------------- */
+#users-view .users-actions-cell {
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   CORRECCIÓN 1: eliminar completamente los bordes de los tres botones.
+   Se aplica a todos sus estados (:hover, :focus, :active) para evitar que
+   Bootstrap resteure el borde del .btn. Solo queda visible el ícono.
+--------------------------------------------------------------------------- */
+#users-view .users-action-btn,
+#users-view .users-action-btn:hover,
+#users-view .users-action-btn:focus,
+#users-view .users-action-btn:active {
+    border: 0 !important;
+    border-width: 0 !important;
+    border-color: transparent !important;
+}
+
+#users-view .users-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0 !important;
+    border-width: 0 !important;
+    border-radius: 0.5rem;
+    background-color: transparent !important;
+    color: #64748B; /* Gris neutro en reposo para las tres acciones. */
+    box-shadow: none !important;
+    transition: color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+
+#users-view .users-action-btn + .users-action-btn {
+    margin-left: 0.125rem;
+}
+
+#users-view .users-action-btn i {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* Accesibilidad: foco visible y consistente en los ghost buttons. */
+#users-view .users-action-btn:focus-visible {
+    outline: 2px solid #94A3B8;
+    outline-offset: 2px;
+}
+
+#users-view .users-action-btn:hover {
+    transform: translateY(-1px);
+}
+
+#users-view .users-action-btn:active {
+    transform: translateY(0);
+}
+
+/* Ver: azul al pasar el cursor. */
+#users-view .users-action-btn--view:hover {
+    color: #0284C7;
+    background-color: #E0F2FE !important;
+}
+
+/* Editar: ámbar al pasar el cursor. */
+#users-view .users-action-btn--edit:hover {
+    color: #D97706;
+    background-color: #FEF3C7 !important;
+}
+
+/* Eliminar: rojo al pasar el cursor (ícono de papelera estándar). */
+#users-view .users-action-btn--delete:hover {
+    color: #DC2626;
+    background-color: #FEE2E2 !important;
+}
+/* Fin: Limpieza visual de la columna de acciones */
+
+/* ---------------------------------------------------------------------------
+   Responsive: en pantallas estrechas el rango de fechas ocupa todo el ancho
+   disponible para evitar que sus campos internos se compriman o desborden.
+--------------------------------------------------------------------------- */
+@media (max-width: 575.98px) {
+    #users-view .users-date-range {
+        flex: 1 1 100%;
+        max-width: 100%;
+    }
+}
+
+/* ============================================================================
+   REDISEÑO UI/UX · MÓDULO INVENTARIO Y BODEGA
+   Alcance: exclusivamente visual (tarjetas, búsqueda, switch, tabla y badges).
+   No altera consultas, endpoints ni el funcionamiento de los botones.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1) TARJETAS DE RESUMEN KPI (MICRO-DASHBOARD)
+   Tarjetas minimalistas con ícono en bloque de color suave. El valor lo
+   actualiza inventory.js desde los registros ya cargados.
+--------------------------------------------------------------------------- */
+.inventory-kpi-card {
+    border: 1px solid #E9EEF3 !important;
+    background-color: #FFFFFF;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.inventory-kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: #D5E7E3 !important;
+    box-shadow: 0 0.5rem 1rem rgba(15, 23, 42, 0.08) !important;
+}
+
+.inventory-kpi-icon {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+/* Colores semánticos: total (celeste), bajo (ámbar), agotado (rojo), unidades (verde) */
+.inventory-kpi-icon--total { background-color: #E0F2FE; color: #0284C7; }
+.inventory-kpi-icon--low { background-color: #FEF3C7; color: #B45309; }
+.inventory-kpi-icon--out { background-color: #FEE2E2; color: #B91C1C; }
+.inventory-kpi-icon--units { background-color: #D1FAE5; color: #047857; }
+
+.inventory-kpi-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748B;
+}
+
+.inventory-kpi-value {
+    font-size: 1.45rem;
+    font-weight: 800;
+    line-height: 1.15;
+    color: #0F172A;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   2) BÚSQUEDA Y FILTROS MODERNIZADOS
+   La búsqueda es el foco visual: crece, tiene altura cómoda y una lupa
+   embebida. El switch imita el patrón de Material Design / Tailwind.
+--------------------------------------------------------------------------- */
+.inventory-search {
+    position: relative;
+    flex: 1 1 420px;
+    max-width: 100%;
+}
+
+.inventory-search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    font-size: 1rem;
+    pointer-events: none;
+}
+
+.inventory-search-input {
+    height: 46px;
+    padding-left: 2.75rem;
+    padding-right: 2.9rem; /* Reserva espacio para el botón "X" integrado. */
+    border: 1px solid #DDE7E6;
+    border-radius: 12px;
+    background-color: #FBFDFC;
+    font-size: 0.925rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.inventory-search-input::placeholder { color: #94A3B8; }
+
+.inventory-search-input:focus {
+    border-color: var(--color-teal);
+    background-color: #FFFFFF;
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+
+/* ---------------------------------------------------------------------------
+   Botón "X" (clear) integrado dentro del buscador, estilo Google/Shopify.
+   Permanece oculto mientras el input está vacío y aparece al escribir.
+--------------------------------------------------------------------------- */
+.inventory-clear-btn {
+    position: absolute;
+    right: 0.55rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background-color: transparent;
+    color: #94A3B8; /* Gris sutil en reposo. */
+    font-size: 0.78rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+
+/* inventory.js activa esta clase cuando el input contiene texto. */
+.inventory-clear-btn.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* Hover: la "X" se oscurece y recibe un fondo tenue. */
+.inventory-clear-btn:hover {
+    color: #334155;
+    background-color: #F1F5F9;
+}
+
+/* Accesibilidad: foco visible para navegación con teclado. */
+.inventory-clear-btn:focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 2px;
+}
+
+/* El botón Filtrar iguala la altura de la búsqueda para una línea limpia. */
+#inventory-view #btn-filter-inventory {
+    height: 46px;
+    border-radius: 12px !important;
+    font-weight: 600;
+}
+
+/* Switch moderno: pista redondeada, pulgar de Bootstrap y acento teal */
+#inventory-view .inventory-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 46px;
+    margin-bottom: 0;
+    padding-left: 0;
+}
+
+#inventory-view .inventory-switch .form-check-input {
+    width: 2.75rem;
+    height: 1.5rem;
+    margin: 0;
+    border: 0;
+    border-radius: 999px;
+    background-color: #E2E8F0;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+    cursor: pointer;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#inventory-view .inventory-switch .form-check-input:focus {
+    border: 0;
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+
+#inventory-view .inventory-switch .form-check-input:checked {
+    background-color: var(--color-teal);
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+
+#inventory-view .inventory-switch .form-check-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* ---------------------------------------------------------------------------
+   3) IDENTIDAD VISUAL EN LA TABLA: MINIATURA DE PRODUCTO
+   Cuadro de 40x40 px con esquinas redondeadas y placeholder gris suave
+   con ícono de caja cuando el producto no tiene imagen.
+--------------------------------------------------------------------------- */
+#inventory-view .inventory-product-cell { min-width: 0; }
+
+#inventory-view .inventory-product-name {
+    display: block;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#inventory-view .inventory-product-thumb {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    object-fit: cover;
+    background-color: #F1F5F9;
+}
+
+#inventory-view .inventory-product-thumb--placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #F8FAFC;
+    color: #94A3B8;
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+#inventory-view .inventory-product-thumb-wrap {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: inline-flex;
+}
+
+#inventory-view .inventory-product-thumb-wrap .inventory-product-thumb {
+    position: absolute;
+    inset: 0;
+}
+
+#inventory-view .inventory-product-thumb-fallback {
+    display: none;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    background-color: #F8FAFC;
+    color: #94A3B8;
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+/* Se muestra el placeholder si la imagen falla al cargar. */
+#inventory-view .inventory-product-thumb-wrap.is-placeholder .inventory-product-thumb-fallback {
+    display: inline-flex;
+}
+
+/* Affordance de zoom: la miniatura con imagen real invita a ampliarla. */
+#inventory-view .inventory-product-thumb-wrap[data-zoom-src] {
+    cursor: zoom-in;
+}
+
+#inventory-view .inventory-product-thumb-wrap[data-zoom-src] .inventory-product-thumb {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#inventory-view .inventory-product-thumb-wrap[data-zoom-src]:hover .inventory-product-thumb,
+#inventory-view .inventory-product-thumb-wrap[data-zoom-src]:focus-visible .inventory-product-thumb {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 3px var(--color-teal-light);
+}
+
+#inventory-view .inventory-product-thumb-wrap:focus-visible {
+    outline: none;
+    border-radius: 10px;
+}
+
+/* ---------------------------------------------------------------------------
+   3.1) ZOOM FLOTANTE DE LA MINIATURA
+   Se monta fuera de la tabla con position: fixed y z-index alto para que el
+   overflow de .table-responsive no recorte la vista previa. No ocupa espacio
+   en la fila, por lo que la altura de la tabla permanece intacta.
+--------------------------------------------------------------------------- */
+.inventory-image-zoom,
+.catalog-image-zoom {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 3000;
+    width: 200px;
+    height: 200px;
+    padding: 7px;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    background-color: #FFFFFF;
+    box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.45), 0 0 0 1px rgba(15, 23, 42, 0.04);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-50%) scale(0.96);
+    transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
+}
+
+.inventory-image-zoom.is-visible,
+.catalog-image-zoom.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) scale(1);
+}
+
+.inventory-image-zoom img,
+.catalog-image-zoom img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
+    object-fit: contain;
+    background-color: #F8FAFC;
+}
+
+@media (max-width: 575.98px) {
+    .inventory-image-zoom,
+    .catalog-image-zoom {
+        width: 160px;
+        height: 160px;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   4) INSIGNIAS DE STOCK · UNIFICADAS CON EL THEME DE USUARIOS
+   Se copian 1:1 las propiedades de #users-view .users-status-badge para que
+   Inventario tenga exactamente el mismo look & feel que el estado "Activo".
+   Colores semánticos: verde pastel, ámbar pastel y rojo pastel.
+--------------------------------------------------------------------------- */
+#inventory-view .stock-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0;
+}
+
+/* Punto de estado: misma técnica y tamaño que el badge "Activo" de Usuarios. */
+#inventory-view .stock-badge::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background-color: currentColor;
+    flex-shrink: 0;
+}
+
+/* Stock normal: mismos colores exactos que .users-status-badge--active. */
+#inventory-view .stock-badge--ok {
+    background-color: #DCFCE7;
+    color: #166534;
+    border-color: #BBF7D0;
+}
+
+/* Cerca del mínimo: misma estructura pastel, en ámbar. */
+#inventory-view .stock-badge--warning {
+    background-color: #FEF3C7;
+    color: #B45309;
+    border-color: #FDE68A;
+}
+
+/* Igual o por debajo del mínimo: misma estructura pastel, en rojo. */
+#inventory-view .stock-badge--danger {
+    background-color: #FEE2E2;
+    color: #B91C1C;
+    border-color: #FECACA;
+}
+
+/* ---------------------------------------------------------------------------
+   5) ENCABEZADO DE TABLA · UNIFICADO CON EL THEME DE USUARIOS
+   Se copian exactamente las reglas de #users-view .users-table para que
+   Inventario use el mismo teal oscuro (var(--color-teal-dark)) y el mismo
+   texto blanco. Se eliminó el degradado esmeralda propio del módulo.
+--------------------------------------------------------------------------- */
+#inventory-view .inventory-table > .thead-users > tr > th {
+    color: #FFFFFF !important;
+    background-color: var(--color-teal-dark) !important;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* Los íconos/spans internos (incluido el indicador de orden) heredan blanco. */
+#inventory-view .inventory-table > .thead-users > tr > th a,
+#inventory-view .inventory-table > .thead-users > tr > th span,
+#inventory-view .inventory-table > .thead-users > tr > th i {
+    color: #FFFFFF !important;
+}
+
+/* ---------------------------------------------------------------------------
+   6) BOTÓN DE ACCIÓN · UNIFICADO CON EL GHOST BUTTON DE USUARIOS
+   Propiedades copiadas 1:1 de #users-view .users-action-btn: sin borde,
+   fondo transparente y color gris neutro. Al hacer hover se comporta como
+   la acción "Editar" (ámbar), ya que "Ajustar" modifica el stock.
+--------------------------------------------------------------------------- */
+#inventory-view .inventory-action-btn,
+#inventory-view .inventory-action-btn:hover,
+#inventory-view .inventory-action-btn:focus,
+#inventory-view .inventory-action-btn:active {
+    border: 0 !important;
+    border-width: 0 !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+#inventory-view .inventory-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0 !important;
+    border-width: 0 !important;
+    border-radius: 0.5rem;
+    background-color: transparent !important;
+    color: #64748B; /* Gris neutro en reposo, igual que Usuarios. */
+    box-shadow: none !important;
+    transition: color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+
+#inventory-view .inventory-action-btn i {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* Accesibilidad: foco visible y consistente con los ghost buttons de Usuarios. */
+#inventory-view .inventory-action-btn:focus-visible {
+    outline: 2px solid #94A3B8;
+    outline-offset: 2px;
+}
+
+#inventory-view .inventory-action-btn:hover {
+    color: #D97706;
+    background-color: #FEF3C7 !important;
+    transform: translateY(-1px);
+}
+
+#inventory-view .inventory-action-btn:active {
+    transform: translateY(0);
+}
+
+/* ---------------------------------------------------------------------------
+   7) AJUSTES RESPONSIVE DEL REDISEÑO
+   Evita desbordes de tarjetas, búsqueda y nombres en pantallas pequeñas.
+--------------------------------------------------------------------------- */
+@media (max-width: 991.98px) {
+    .inventory-search { flex-basis: 100%; }
+}
+
+@media (max-width: 575.98px) {
+    #inventory-view .inventory-kpi-card .card-body {
+        gap: 0.55rem !important;
+        padding: 0.75rem;
+    }
+
+    #inventory-view .inventory-kpi-icon {
+        width: 36px;
+        height: 36px;
+        flex-basis: 36px;
+        border-radius: 10px;
+        font-size: 0.95rem;
+    }
+
+    #inventory-view .inventory-kpi-label {
+        font-size: 0.62rem;
+        letter-spacing: 0.03em;
+    }
+
+    #inventory-view .inventory-kpi-value { font-size: 1.2rem; }
+
+    #inventory-view .inventory-switch { width: 100%; }
+
+    #inventory-view .inventory-product-name { max-width: 150px; }
+}
+
+/* ===========================================================================
+   REDISEÑO UI/UX · MÓDULO DE CATÁLOGOS (ESTÁNDAR E-COMMERCE)
+   Alcance exclusivamente visual. Todas las reglas están limitadas a
+   #catalog-view para no alterar otros módulos ni la lógica de datos.
+=========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1) THEME SYNC · BOTONES PRIMARIOS Y DE FILTRO
+   Se reemplaza el celeste/verde menta por el teal global del sistema para
+   mantener una sola jerarquía de acciones principales en todo el módulo.
+--------------------------------------------------------------------------- */
+#catalog-view .btn-celeste,
+#catalog-view .btn-verde {
+    background-color: var(--color-teal);
+    color: #FFFFFF;
+    border: none;
+    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#catalog-view .btn-celeste:hover,
+#catalog-view .btn-celeste:focus,
+#catalog-view .btn-verde:hover,
+#catalog-view .btn-verde:focus {
+    background-color: var(--color-teal-dark);
+    color: #FFFFFF;
+    transform: translateY(-1px);
+}
+
+#catalog-view .btn-celeste:focus-visible,
+#catalog-view .btn-verde:focus-visible {
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+    outline: none;
+}
+
+/* ---------------------------------------------------------------------------
+   2) PESTAÑAS PRINCIPALES + DROPDOWN DE CONFIGURACIONES ADICIONALES
+   Pestañas inactivas en gris; activa en teal con borde inferior grueso.
+   El resto de enlaces se agrupa en un desplegable a la derecha.
+--------------------------------------------------------------------------- */
+#catalog-view .catalog-tabs-toolbar {
+    border-bottom: 1px solid #E2E8F0;
+}
+
+#catalog-view .catalog-main-tabs {
+    border-bottom: 0;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+#catalog-view .catalog-main-tabs .nav-link {
+    border: 0;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    background-color: transparent;
+    color: #6B7280;
+    font-weight: 600;
+    padding: 0.65rem 0.9rem;
+    transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+#catalog-view .catalog-main-tabs .nav-link:hover,
+#catalog-view .catalog-main-tabs .nav-link:focus-visible {
+    color: var(--color-teal);
+    background-color: var(--color-teal-light);
+    outline: none;
+}
+
+#catalog-view .catalog-main-tabs .nav-link.active {
+    color: var(--color-teal) !important;
+    background-color: transparent;
+    border-bottom-color: var(--color-teal);
+    border-bottom-width: 3px;
+    font-weight: 700;
+}
+
+#catalog-view .catalog-extra-toggle {
+    border: 1px solid #E2E8F0;
+    border-radius: 0.65rem;
+    background-color: #FFFFFF;
+    color: #475569;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.55rem 0.9rem;
+    transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+#catalog-view .catalog-extra-toggle:hover,
+#catalog-view .catalog-extra-toggle:focus-visible,
+#catalog-view .catalog-extra-toggle.show,
+#catalog-view .catalog-extra-toggle.active {
+    border-color: var(--color-teal);
+    background-color: var(--color-teal-light);
+    color: var(--color-teal);
+    box-shadow: none;
+}
+
+#catalog-view .catalog-extra-menu {
+    min-width: 250px;
+    border: 1px solid #E2E8F0;
+    border-radius: 0.75rem;
+    padding: 0.4rem;
+    box-shadow: 0 18px 40px -18px rgba(15, 23, 42, 0.35);
+}
+
+#catalog-view .catalog-extra-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    border-radius: 0.5rem;
+    color: #475569;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+}
+
+#catalog-view .catalog-extra-menu .dropdown-item:hover,
+#catalog-view .catalog-extra-menu .dropdown-item:focus {
+    background-color: var(--color-teal-light);
+    color: var(--color-teal);
+}
+
+#catalog-view .catalog-extra-menu .dropdown-item.active,
+#catalog-view .catalog-extra-menu .dropdown-item:active {
+    background-color: var(--color-teal);
+    color: #FFFFFF;
+}
+
+/* ---------------------------------------------------------------------------
+   3) BARRA DE BÚSQUEDA · CAMPOS AMPLIADOS Y BOTÓN "X" (CLEAR)
+   La "X" permanece oculta hasta que el campo tiene texto y limpia el filtro
+   sin necesidad de seleccionar todo el contenido manualmente.
+--------------------------------------------------------------------------- */
+#catalog-view .catalog-search-field {
+    position: relative;
+    flex: 1 1 240px;
+    min-width: 210px;
+    max-width: 380px;
+}
+
+#catalog-view .catalog-search-field--name {
+    max-width: 420px;
+}
+
+#catalog-view .catalog-search-field--barcode {
+    flex-basis: 210px;
+    max-width: 330px;
+}
+
+#catalog-view .catalog-search-field .form-control {
+    padding-left: 2.35rem;
+    padding-right: 2.35rem;
+}
+
+#catalog-view .catalog-search-icon {
+    position: absolute;
+    top: 50%;
+    left: 0.85rem;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    font-size: 0.95rem;
+    line-height: 1;
+    pointer-events: none;
+}
+
+#catalog-view .catalog-clear-btn {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 0.4rem;
+    background-color: transparent;
+    color: #94A3B8;
+    font-size: 0.8rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+
+#catalog-view .catalog-search-field.has-value .catalog-clear-btn {
+    opacity: 1;
+    visibility: visible;
+}
+
+#catalog-view .catalog-clear-btn:hover {
+    background-color: #FEE2E2;
+    color: #B91C1C;
+}
+
+/* ---------------------------------------------------------------------------
+   4) MINIATURA DEL PRODUCTO · 40x40 px CON EFECTO ZOOM (LUPA) AL HOVER
+   Si no hay imagen se muestra el ícono de caja 📦 solicitado.
+--------------------------------------------------------------------------- */
+#catalog-view .catalog-product-cell {
+    min-width: 0;
+}
+
+#catalog-view .catalog-product-name {
+    display: block;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#catalog-view .catalog-product-thumb {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    object-fit: cover;
+    background-color: #F1F5F9;
+}
+
+#catalog-view .catalog-product-thumb--placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #F8FAFC;
+    color: #94A3B8;
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+#catalog-view .catalog-product-thumb-wrap {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: inline-flex;
+}
+
+#catalog-view .catalog-product-thumb-wrap .catalog-product-thumb {
+    position: absolute;
+    inset: 0;
+}
+
+#catalog-view .catalog-product-thumb-fallback {
+    display: none;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    background-color: #F8FAFC;
+    color: #94A3B8;
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+/* Se muestra el placeholder si la imagen falla al cargar. */
+#catalog-view .catalog-product-thumb-wrap.is-placeholder .catalog-product-thumb-fallback {
+    display: inline-flex;
+}
+
+/* Affordance de zoom: la miniatura con imagen real invita a ampliarla (idéntico a Inventario). */
+#catalog-view .catalog-product-thumb-wrap[data-zoom-src] {
+    cursor: zoom-in;
+}
+
+#catalog-view .catalog-product-thumb-wrap[data-zoom-src] .catalog-product-thumb {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#catalog-view .catalog-product-thumb-wrap[data-zoom-src]:hover .catalog-product-thumb,
+#catalog-view .catalog-product-thumb-wrap[data-zoom-src]:focus-visible .catalog-product-thumb {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 3px var(--color-teal-light);
+}
+
+#catalog-view .catalog-product-thumb-wrap:focus-visible {
+    outline: none;
+    border-radius: 10px;
+}
+
+/* ---------------------------------------------------------------------------
+   5) SOFT BADGES · ESTADO DEL CATÁLOGO
+   Mismo lenguaje visual de Inventario/Usuarios: fondo pastel, texto oscuro,
+   punto de estado y bordes completamente redondeados.
+--------------------------------------------------------------------------- */
+/* La clase se usa también en los modales de detalle, que viven fuera de
+   #catalog-view; por eso el estilo del Soft Badge es global pero namespaced. */
+.catalog-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0;
+}
+
+.catalog-status-badge::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+.catalog-status-badge--active {
+    background-color: #DCFCE7;
+    color: #166534;
+    border-color: #BBF7D0;
+}
+
+.catalog-status-badge--inactive {
+    background-color: #F1F5F9;
+    color: #475569;
+    border-color: #E2E8F0;
+}
+
+#catalog-view .catalog-stock-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+#catalog-view .catalog-stock-badge::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+#catalog-view .catalog-stock-badge--ok {
+    background-color: #DCFCE7;
+    color: #166534;
+    border-color: #BBF7D0;
+}
+
+#catalog-view .catalog-stock-badge--danger {
+    background-color: #FEE2E2;
+    color: #B91C1C;
+    border-color: #FECACA;
+}
+
+/* ---------------------------------------------------------------------------
+   6) ACCIONES LIMPIAS · GHOST BUTTONS EN TABLAS DEL CATÁLOGO
+   Se eliminan bordes y fondos cuadrados manteniendo el color semántico solo
+   al hacer hover. Aplica a todas las tablas del módulo sin tocar su lógica.
+--------------------------------------------------------------------------- */
+#catalog-view td .btn.btn-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0.5rem;
+    background-color: transparent !important;
+    color: #64748B !important;
+    box-shadow: none !important;
+    transition: color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+
+#catalog-view td .btn.btn-sm i {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+#catalog-view td .btn.btn-sm:hover {
+    color: #0F172A !important;
+    background-color: #F1F5F9 !important;
+    transform: translateY(-1px);
+}
+
+#catalog-view td .btn.btn-sm:focus-visible {
+    outline: 2px solid #94A3B8;
+    outline-offset: 2px;
+}
+
+/* Se repiten .btn.btn-sm para superar en especificidad al hover genérico. */
+#catalog-view td .btn.btn-sm.btn-outline-info:hover {
+    color: var(--color-teal-dark) !important;
+    background-color: var(--color-teal-light) !important;
+}
+
+#catalog-view td .btn.btn-sm.btn-outline-rosado:hover,
+#catalog-view td .btn.btn-sm.btn-outline-secondary:hover {
+    color: #B45309 !important;
+    background-color: #FEF3C7 !important;
+}
+
+#catalog-view td .btn.btn-sm.btn-outline-danger:hover {
+    color: #B91C1C !important;
+    background-color: #FEE2E2 !important;
+}
+
+#catalog-view td .btn.btn-sm.btn-outline-success:hover {
+    color: #15803D !important;
+    background-color: #DCFCE7 !important;
+}
+
+/* ---------------------------------------------------------------------------
+   7) AJUSTES RESPONSIVE DEL REDISEÑO
+--------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+    #catalog-view .catalog-search-field,
+    #catalog-view .catalog-search-field--name,
+    #catalog-view .catalog-search-field--barcode {
+        flex-basis: 100%;
+        max-width: none;
+    }
+
+    #catalog-view .catalog-extra-tabs {
+        width: 100%;
+    }
+
+    #catalog-view .catalog-extra-toggle {
+        width: 100%;
+    }
+}
+
+@media (max-width: 575.98px) {
+    #catalog-view .catalog-product-name {
+        max-width: 150px;
+    }
+}
+
+/* ============================================================================
+ * REDISEÑO UI/UX · MODAL "NUEVO PRODUCTO" (estándar e-commerce)
+ * Tarjetas blancas sobre fondo gris, campos jerarquizados, prefijos de moneda,
+ * dropzone para imágenes y botones alineados al tema teal corporativo.
+ * Todo está acotado a #product-modal para no afectar otros formularios.
+ * ========================================================================== */
+#product-modal .product-form-modal {
+    border: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px -24px rgba(15, 23, 42, 0.35);
+}
+/* El formulario envuelve header/body/footer; al hacerlo flex logramos que solo
+   el cuerpo haga scroll y el encabezado y el pie permanezcan visibles. */
+#product-modal .product-form-modal > form {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+#product-modal .product-form-modal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Encabezado del modal ------------------------------------------------------ */
+#product-modal .product-form-header {
+    align-items: flex-start;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #E5E7EB;
+    background-color: #FFFFFF;
+}
+#product-modal .product-form-header-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background-color: var(--color-teal-light);
+    color: var(--color-teal);
+    font-size: 1.15rem;
+}
+#product-modal .product-form-header .modal-title {
+    color: #0F172A;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+#product-modal .product-form-header-subtitle {
+    margin-top: 0.15rem;
+    color: #6B7280;
+    font-size: 0.8rem;
+}
+#product-modal .product-form-header .btn-close {
+    margin-top: 0.15rem;
+}
+
+/* Área scrolleable gris + tarjetas ----------------------------------------- */
+#product-modal .modal-body {
+    padding: 1.25rem 1.5rem;
+    background-color: #F3F4F6;
+}
+#product-modal .product-form-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+#product-modal .product-form-card {
+    padding: 1.25rem;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    background-color: #FFFFFF;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+#product-modal .product-form-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    color: #1F2937;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+#product-modal .product-form-section-title i {
+    color: var(--color-teal);
+    font-size: 1rem;
+}
+#product-modal .product-form-optional {
+    color: #9CA3AF;
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+#product-modal .product-form-alert,
+#product-modal #product-form-alert {
+    margin-bottom: 0;
+    border-radius: 10px;
+}
+
+/* Campos ------------------------------------------------------------------- */
+#product-modal .product-form-label {
+    margin-bottom: 0.35rem;
+    color: #4B5563;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+#product-modal .form-control,
+#product-modal .form-select {
+    min-height: 42px;
+    border-color: #D1D5DB;
+    border-radius: 10px;
+    color: #111827;
+    font-size: 0.925rem;
+    box-shadow: none;
+}
+#product-modal .form-control:focus,
+#product-modal .form-select:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+#product-modal .form-control::placeholder {
+    color: #9CA3AF;
+}
+#product-modal textarea.form-control {
+    min-height: 84px;
+    resize: vertical;
+}
+#product-modal .product-form-name {
+    min-height: 48px;
+    padding: 0.65rem 0.9rem;
+    font-size: 1.05rem;
+    font-weight: 500;
+}
+
+/* Precios con prefijo "Q" integrado --------------------------------------- */
+#product-modal .product-price-group {
+    border-radius: 10px;
+}
+#product-modal .product-price-group .input-group-text {
+    padding-right: 0.65rem;
+    padding-left: 0.8rem;
+    border-color: #D1D5DB;
+    border-right: 0;
+    border-radius: 10px 0 0 10px;
+    background-color: #F9FAFB;
+    color: #6B7280;
+    font-weight: 600;
+}
+#product-modal .product-price-group .form-control {
+    padding-left: 0.5rem;
+    border-left: 0;
+    border-radius: 0 10px 10px 0;
+}
+#product-modal .product-price-group:focus-within {
+    border-radius: 10px;
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+#product-modal .product-price-group:focus-within .input-group-text {
+    border-color: var(--color-teal);
+    color: var(--color-teal);
+}
+#product-modal .product-price-group .form-control:focus {
+    box-shadow: none;
+}
+#product-modal .product-price-group .invalid-feedback {
+    flex-basis: 100%;
+    margin-top: 0.35rem;
+}
+#product-modal .product-price-group:has(.is-invalid) .input-group-text {
+    border-color: #DC3545;
+    color: #B02A37;
+}
+
+/* Atributo universal (combobox de captura rápida) ---------------------------
+   Campo optimizado para inventarios mixtos: un único input libre con
+   sugerencias de valores usados antes. No restringe la entrada (datalist). */
+#product-modal .product-attribute-combobox {
+    position: relative;
+}
+#product-modal .product-attribute-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1060;
+    margin: 0.2rem;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #D1D5DB;
+    border-radius: 10px;
+    background-color: #FFFFFF;
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+    list-style: none;
+}
+#product-modal .product-attribute-suggestions .product-attribute-option {
+    padding: 0.45rem 0.75rem;
+    border-top: 1px solid #F3F4F6;
+    color: #1F2937;
+    font-size: 0.875rem;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#product-modal .product-attribute-suggestions .product-attribute-option:last-child {
+    border-bottom: 0;
+}
+#product-modal .product-attribute-suggestions .product-attribute-option:hover,
+#product-modal .product-attribute-suggestions .product-attribute-option.is-active {
+    background-color: var(--color-teal-light);
+}
+#product-modal .product-attribute-suggestions .product-attribute-suggestions-empty {
+    padding: 0.45rem 0.75rem;
+    color: #6B7280;
+    font-size: 0.8125rem;
+    font-style: normal;
+}
+#product-modal .product-attribute-hint {
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+}
+
+/* Dropzone de imagen ------------------------------------------------------- */
+#product-modal .product-dropzone {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 170px;
+    padding: 1.5rem;
+    overflow: hidden;
+    border: 1.5px dashed #CBD5E1;
+    border-radius: 12px;
+    background-color: #F9FAFB;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+#product-modal .product-dropzone:hover,
+#product-modal .product-dropzone:focus-visible,
+#product-modal .product-dropzone.is-dragover {
+    border-color: var(--color-teal);
+    background-color: #F0FDFA;
+    outline: none;
+}
+#product-modal .product-dropzone.is-uploading {
+    cursor: progress;
+}
+#product-modal .product-dropzone-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+#product-modal .product-dropzone-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 0.35rem;
+    border: 1px solid #E5E7EB;
+    border-radius: 50%;
+    background-color: #FFFFFF;
+    color: var(--color-teal);
+    font-size: 1.3rem;
+}
+#product-modal .product-dropzone-title {
+    color: #374151;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+#product-modal .product-dropzone-hint {
+    color: #9CA3AF;
+    font-size: 0.75rem;
+}
+#product-modal .product-dropzone-image {
+    width: auto;
+    max-width: 100%;
+    max-height: 220px;
+    border-radius: 10px;
+    object-fit: contain;
+}
+#product-modal .product-dropzone-uploading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 12px;
+    background-color: rgba(255, 255, 255, 0.85);
+    color: #0F172A;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+#product-modal .product-media-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.65rem;
+}
+#product-modal .product-remove-image {
+    padding: 0.35rem 0.65rem;
+    border: 1px solid #FECACA;
+    border-radius: 8px;
+    background-color: #FFFFFF;
+    color: #B91C1C;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+#product-modal .product-remove-image:hover,
+#product-modal .product-remove-image:focus-visible {
+    border-color: #FCA5A5;
+    background-color: #FEF2F2;
+    color: #991B1B;
+}
+#product-modal .product-url-toggle {
+    padding: 0.25rem 0;
+    border: 0;
+    background-color: transparent;
+    color: #6B7280;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+#product-modal .product-url-toggle:hover,
+#product-modal .product-url-toggle:focus-visible {
+    color: var(--color-teal);
+    outline: none;
+}
+#product-modal .product-url-field {
+    margin-top: 0.65rem;
+    padding: 0.85rem;
+    border: 1px solid #E5E7EB;
+    border-radius: 10px;
+    background-color: #F9FAFB;
+}
+
+/* Switch de estado + pie del modal ---------------------------------------- */
+#product-modal .product-active-switch .form-check-input {
+    width: 2.2rem;
+    height: 1.15rem;
+    margin-top: 0.1rem;
+    cursor: pointer;
+}
+#product-modal .product-active-switch .form-check-input:checked {
+    border-color: var(--color-teal);
+    background-color: var(--color-teal);
+}
+#product-modal .product-active-switch .form-check-input:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+#product-modal .product-active-switch .form-check-label {
+    cursor: pointer;
+}
+#product-modal .product-form-footer {
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #E5E7EB;
+    background-color: #FFFFFF;
+}
+#product-modal .product-cancel-btn {
+    padding: 0.55rem 0.9rem;
+    border: 0;
+    border-radius: 10px;
+    background-color: transparent;
+    color: #374151;
+    font-weight: 600;
+}
+#product-modal .product-cancel-btn:hover,
+#product-modal .product-cancel-btn:focus-visible {
+    background-color: #F3F4F6;
+    color: #111827;
+    outline: none;
+}
+#product-modal .product-save-btn {
+    min-width: 130px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+@media (max-width: 575.98px) {
+    #product-modal .product-form-header,
+    #product-modal .product-form-footer {
+        padding-right: 1rem;
+        padding-left: 1rem;
+    }
+    #product-modal .modal-body {
+        padding: 1rem;
+    }
+    #product-modal .product-form-card {
+        padding: 1rem;
+    }
+    #product-modal .product-dropzone {
+        min-height: 150px;
+        padding: 1.1rem;
+    }
+    #product-modal .product-media-actions {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+}
+
+/* ===========================================================================
+   REDISEÑO UI/UX · MÓDULO DE REPORTES Y ESTADÍSTICAS (ESTÁNDAR SHOPIFY/STRIPE)
+   Cambios 100% visuales. Todas las reglas están limitadas a #reportes-view
+   para no afectar otros módulos ni la lógica de datos (queries intactas).
+=========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1) THEME SYNC · PESTAÑAS PRINCIPALES SUBRAYADAS
+   Mismo patrón que Catálogos: inactivas en gris, activa en teal con borde
+   inferior grueso. Se elimina el look de "pills" azulados del sistema viejo.
+--------------------------------------------------------------------------- */
+#reportes-view .reportes-main-tabs {
+    border-bottom: 1px solid #E2E8F0;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+#reportes-view .reportes-main-tabs .nav-link {
+    border: 0;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    margin-bottom: 0; /* anula el desplazamiento por defecto de .nav-tabs */
+    background-color: transparent;
+    color: #6B7280; /* Gris neutro para pestañas inactivas */
+    font-weight: 600;
+    padding: 0.65rem 0.9rem;
+    transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+#reportes-view .reportes-main-tabs .nav-link:hover,
+#reportes-view .reportes-main-tabs .nav-link:focus-visible {
+    color: var(--color-teal);
+    background-color: var(--color-teal-light);
+    outline: none;
+}
+
+/* Pestaña activa: texto teal + borde inferior grueso teal. */
+#reportes-view .reportes-main-tabs .nav-link.active {
+    color: var(--color-teal) !important;
+    background-color: transparent;
+    border-bottom-color: var(--color-teal);
+    border-bottom-width: 3px;
+    font-weight: 700;
+}
+
+/* Theme sync: el botón "Consultar" ahora usa .btn-teal directamente en el HTML,
+   por lo que hereda el verde esmeralda global sin reglas adicionales. */
+
+/* ---------------------------------------------------------------------------
+   2) KPI SEMÁNTICOS · COLORES DE PROCESAMIENTO RÁPIDO
+   Verde esmeralda vibrante para ventas, carmesí para mermas. El tono de
+   "Total Compras" se mantiene oscuro/neutro por jerarquía.
+   (Nombres tipo Tailwind text-emerald-600 / text-red-600.)
+--------------------------------------------------------------------------- */
+#reportes-view .text-emerald-600 { color: #059669 !important; } /* Total Ventas */
+#reportes-view .text-red-600     { color: #DC2626 !important; }  /* Total Mermas */
+
+/* ---------------------------------------------------------------------------
+   3) SELECTOR DE RANGO DE FECHAS (DATE RANGE PICKER · UI PREPARADA)
+   Botón único con ícono de calendario que muestra "Desde - Hasta". El panel
+   flotante incluye atajos rápidos y un área reservada para el futuro
+   calendario doble. Los inputs de fecha reales quedan ocultos (d-none) y
+   reportes.js continúa leyendo su .value sin ningún cambio.
+--------------------------------------------------------------------------- */
+#reportes-view .reportes-date-range {
+    position: relative;
+}
+
+#reportes-view .reportes-date-range-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border: 1px solid #E2E8F0;
+    border-radius: 0.65rem;
+    background-color: #FFFFFF;
+    color: #475569;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.55rem 0.9rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+#reportes-view .reportes-date-range-btn:hover,
+#reportes-view .reportes-date-range-btn:focus-visible,
+#reportes-view .reportes-date-range-btn.active {
+    border-color: var(--color-teal);
+    color: var(--color-teal);
+    background-color: var(--color-teal-light);
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+    outline: none;
+}
+
+/* Panel desplegable (se muestra con la clase .open que controla el script UI). */
+#reportes-view .reportes-date-range-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 1050;
+    display: none;
+    min-width: 300px;
+    max-width: calc(100vw - 2rem);
+    border: 1px solid #E2E8F0;
+    border-radius: 0.85rem;
+    background-color: #FFFFFF;
+    padding: 0.85rem;
+    box-shadow: 0 18px 40px -18px rgba(15, 23, 42, 0.35);
+}
+
+#reportes-view .reportes-date-range-panel.open {
+    display: block;
+    animation: reportesPanelFade 0.15s ease;
+}
+
+@keyframes reportesPanelFade {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+#reportes-view .reportes-date-picker-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #94A3B8;
+}
+
+/* Atajos rápidos tipo chips ghost */
+#reportes-view .reportes-preset-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+#reportes-view .reportes-preset {
+    border: 1px solid #E2E8F0;
+    border-radius: 2rem;
+    background-color: #FFFFFF;
+    color: #475569;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.35rem 0.7rem;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+#reportes-view .reportes-preset:hover,
+#reportes-view .reportes-preset:focus-visible {
+    border-color: var(--color-teal);
+    background-color: var(--color-teal-light);
+    color: var(--color-teal);
+    outline: none;
+}
+
+#reportes-view .reportes-preset:active {
+    transform: translateY(0);
+}
+
+/* Espacio reservado para el calendario doble del futuro Date Range Picker. */
+#reportes-view .reportes-date-picker-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+    padding: 1.25rem;
+    text-align: center;
+    border: 1px dashed #CBD5E1;
+    border-radius: 0.6rem;
+    background-color: var(--color-bg-light);
+    color: #94A3B8;
+    font-size: 0.82rem;
+}
+
+#reportes-view .reportes-date-picker-placeholder i {
+    font-size: 1.4rem;
+    color: var(--color-teal);
+    opacity: 0.4;
+}
+
+/* ---------------------------------------------------------------------------
+   4) PANEL INTERACTIVO DE MÉTRICAS (GRÁFICA + RANKINGS · PLACEHOLDER)
+   Fila única en Grid 60% / 40% (3fr / 2fr) entre los KPI y la tabla; en
+   móvil las dos tarjetas se apilan (1fr). La tarjeta de gráfica tiene un
+   área de lienzo fija de 300px con fondo gris muy tenue e ícono de barras.
+--------------------------------------------------------------------------- */
+#reportes-view .reportes-metrics-grid {
+    display: grid;
+    grid-template-columns: 3fr 2fr; /* 60% / 40% en escritorio */
+    gap: 1.25rem;
+    align-items: stretch; /* ambas tarjetas con la misma altura de fila */
+}
+
+/* Tarjeta de gráfica: el título estático se reemplaza por píldoras (tabs).
+   Píldoras con borde suave; la activa usa el verde esmeralda global. */
+#reportes-view .reportes-chart-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+#reportes-view .reportes-chart-pill {
+    border: 1px solid #E2E8F0;
+    border-radius: 2rem;
+    background-color: #F8FAFC;
+    color: #475569;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.4rem 0.8rem;
+    white-space: nowrap;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+#reportes-view .reportes-chart-pill:hover,
+#reportes-view .reportes-chart-pill:focus-visible {
+    border-color: var(--color-teal);
+    background-color: var(--color-teal-light);
+    color: var(--color-teal);
+    outline: none;
+}
+
+#reportes-view .reportes-chart-pill.active {
+    background-color: var(--color-teal);
+    border-color: var(--color-teal);
+    color: #FFFFFF;
+}
+
+#reportes-view .reportes-chart-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 300px; /* lienzo de la gráfica (UX: sin scroll) */
+    border: 1px dashed #CBD5E1;
+    border-radius: 0.75rem;
+    background-color: #F8FAFC; /* gris claro solicitado */
+    color: #94A3B8;
+}
+
+#reportes-view .reportes-chart-cta {
+    text-align: center;
+    color: #94A3B8;
+}
+
+#reportes-view .reportes-chart-cta i {
+    display: block;
+    font-size: 2.25rem;
+    margin-bottom: 0.6rem;
+    color: var(--color-teal);
+    opacity: 0.35;
+}
+
+/* ---------------------------------------------------------------------------
+   4b) WIDGET DE RANKINGS (LEADERBOARD · 40%)
+   Tarjeta compacta de igual altura que la gráfica (height: 100%). Cabecera
+   con título gris oscuro (text-gray-700) + desplegable pequeño sin bordes
+   bruscos. Lista <ul> de filas: ranking en círculo, nombre truncado a la
+   izquierda y monto/cantidad en verde esmeralda a la derecha.
+
+   FLEXIBILIDAD VISUAL:
+   · .reportes-rank-controls agrupa el select principal con el mini-select
+     de límite (Top 5 / 10 / 20), discreto y en gris suave (text-gray-500).
+   · .reportes-rank-meta es la etiqueta minúscula (text-xs text-gray-400)
+     que aclara que el ranking hereda el rango de fecha superior.
+   · La lista usa max-height + overflow-y sutil: con "Top 20" la tarjeta no
+     crece y se activa un scroll interno solo para esa lista.
+--------------------------------------------------------------------------- */
+#reportes-view .reportes-rank-card {
+    height: 100%; /* misma altura que la tarjeta de gráfica */
+}
+
+#reportes-view .reportes-rank-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+/* Grupo de controles: select principal + mini-select de límite alineados. */
+#reportes-view .reportes-rank-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+#reportes-view .reportes-rank-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #374151; /* gris oscuro (text-gray-700) */
+    margin: 0;
+}
+
+#reportes-view .reportes-rank-select {
+    border: 1px solid #E2E8F0;
+    border-radius: 0.65rem;
+    background-color: #FFFFFF;
+    color: #374151;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.4rem 0.7rem;
+    max-width: 220px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#reportes-view .reportes-rank-select:hover,
+#reportes-view .reportes-rank-select:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 0.15rem var(--color-teal-light);
+}
+
+/* Mini-select de cantidad de resultados: discreto, texto y padding reducidos
+   y color gris suave (text-gray-500). Complementa al select principal. */
+#reportes-view .reportes-rank-limit {
+    border: 1px solid #E2E8F0;
+    border-radius: 0.5rem;
+    background-color: #FFFFFF;
+    color: #6B7280; /* gris suave (text-gray-500) */
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.28rem 0.5rem;
+    max-width: 110px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#reportes-view .reportes-rank-limit:hover,
+#reportes-view .reportes-rank-limit:focus {
+    border-color: var(--color-teal);
+    color: var(--color-teal);
+    box-shadow: 0 0 0 0.12rem var(--color-teal-light);
+}
+
+/* Etiqueta semántica de herencia de fecha (text-xs text-gray-400). */
+#reportes-view .reportes-rank-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+    margin-top: 0.4rem;
+    font-size: 0.7rem; /* text-xs */
+    font-weight: 500;
+    color: #94A3B8; /* gris claro (text-gray-400) */
+}
+
+#reportes-view .reportes-rank-card .card-body {
+    display: flex;
+    min-height: 0; /* permite que el scroll interno respete max-height */
+}
+
+#reportes-view .reportes-rank-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+    max-height: 256px; /* aprox. max-h-64: la tarjeta no crece con Top 20 */
+    overflow-y: auto;  /* scroll interno sutil solo para la lista */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #CBD5E1 transparent;
+    padding-right: 0.15rem;
+}
+
+/* Scrollbar sutil (WebKit/Chromium). */
+#reportes-view .reportes-rank-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#reportes-view .reportes-rank-list::-webkit-scrollbar-track {
+    background-color: transparent;
+}
+
+#reportes-view .reportes-rank-list::-webkit-scrollbar-thumb {
+    background-color: #CBD5E1;
+    border-radius: 3px;
+}
+
+#reportes-view .reportes-rank-list::-webkit-scrollbar-thumb:hover {
+    background-color: #94A3B8;
+}
+
+#reportes-view .reportes-rank-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex: 0 0 auto; /* no crece: el scroll solo se activa por contenido */
+    padding: 0.45rem 0.6rem;
+    border-radius: 0.6rem;
+    background-color: #F8FAFC;
+    min-width: 0;
+}
+
+#reportes-view .reportes-rank-num {
+    flex: 0 0 auto;
+    width: 1.6rem;
+    height: 1.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background-color: var(--color-teal);
+    color: #FFFFFF;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+#reportes-view .reportes-rank-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #374151;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+#reportes-view .reportes-rank-amount {
+    flex: 0 0 auto;
+    color: #059669; /* verde esmeralda (acento global) */
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+   5) EXPORTACIÓN UNIFICADA (BOTÓN GHOST + MENÚ)
+   Un solo botón "Descargar Reporte" tipo outline/teal. El menú conserva los
+   ids originales (btn-export-excel / btn-export-csv) sin tocar reportes.js.
+--------------------------------------------------------------------------- */
+#reportes-view .reportes-export-menu {
+    min-width: 220px;
+    border: 1px solid #E2E8F0;
+    border-radius: 0.75rem;
+    padding: 0.4rem;
+    box-shadow: 0 18px 40px -18px rgba(15, 23, 42, 0.35);
+}
+
+#reportes-view .reportes-export-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    border-radius: 0.5rem;
+    color: #475569;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+}
+
+#reportes-view .reportes-export-menu .dropdown-item:hover,
+#reportes-view .reportes-export-menu .dropdown-item:focus {
+    background-color: var(--color-teal-light);
+    color: var(--color-teal);
+}
+
+#reportes-view .reportes-export-menu .dropdown-item:active {
+    background-color: var(--color-teal);
+    color: #FFFFFF;
+}
+
+/* ---------------------------------------------------------------------------
+   6) AJUSTES RESPONSIVE DEL REDISEÑO
+   En pantallas < 992px el Grid 60/40 se apila: la tarjeta de rankings queda
+   debajo de la gráfica y ambas ocupan el ancho completo. El lienzo de la
+   gráfica reduce ligeramente su alto en móviles pequeños.
+--------------------------------------------------------------------------- */
+@media (max-width: 991.98px) {
+    #reportes-view .reportes-metrics-grid {
+        grid-template-columns: 1fr; /* apiladas en móvil / tablet */
+    }
+}
+
+@media (max-width: 575.98px) {
+    #reportes-view .reportes-chart-placeholder {
+        height: 240px;
+    }
+    #reportes-view .reportes-rank-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    #reportes-view .reportes-rank-controls {
+        width: 100%;
+    }
+    #reportes-view .reportes-rank-select,
+    #reportes-view .reportes-rank-limit {
+        max-width: 100%;
+        width: 100%;
+    }
+}
+
+
+
+/* ===========================================================================
+   MÓDULO DE MERMAS - REDISEÑO UI/UX & THEME SYNC
+   =========================================================================== */
+
+/* 1) Encabezado de tabla sólido corporativo (Theme Sync con Usuarios e Inventario) */
+#mermas-view .mermas-table > thead > tr > th,
+#mermas-view .mermas-table > .thead-users > tr > th {
+    background-color: var(--color-teal-dark) !important;
+    background-image: none !important;
+    background: var(--color-teal-dark) !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    border: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    vertical-align: middle;
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+}
+
+#mermas-view .mermas-table > thead > tr > th:first-child,
+#mermas-view .mermas-table > .thead-users > tr > th:first-child {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+}
+
+#mermas-view .mermas-table > thead > tr > th:last-child,
+#mermas-view .mermas-table > .thead-users > tr > th:last-child {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+}
+
+#mermas-view .mermas-table th span,
+#mermas-view .mermas-table th i {
+    color: #FFFFFF !important;
+}
+
+/* Eliminar líneas divisorias verticales y bordes laterales de la tabla */
+#mermas-view .mermas-table th,
+#mermas-view .mermas-table td {
+    border-left: none !important;
+    border-right: none !important;
+}
+
+#mermas-view .mermas-table tbody tr:hover {
+    background-color: rgba(13, 115, 119, 0.03);
+}
+
+/* 2) Tarjetas de Resumen (KPIs Financieros) */
+.merma-kpi-card {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    background: #FFFFFF;
+    border: 1px solid #F1F5F9;
+}
+
+.merma-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
+}
+
+.merma-kpi-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.merma-kpi-icon--danger {
+    background-color: #FEE2E2;
+    color: #DC2626;
+}
+
+.merma-kpi-icon--teal {
+    background-color: #CCFBF1;
+    color: #0D9488;
+}
+
+.merma-kpi-icon--amber {
+    background-color: #FEF3C7;
+    color: #D97706;
+}
+
+.merma-kpi-val--danger {
+    color: #B91C1C !important; /* Rojo sutil / oscuro financiero */
+}
+
+/* 3) Miniatura de Producto (40x40px) */
+.merma-product-thumb {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    border-radius: 10px;
+    border: 1px solid #E2E8F0;
+    background-color: #F8FAFC;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.merma-product-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.merma-product-thumb .merma-thumb-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+    color: #64748B;
+}
+
+/* 4) Soft Badges según gravedad del motivo */
+.badge-soft-danger {
+    background-color: #FEE2E2 !important;
+    color: #991B1B !important;
+    border: 1px solid #FECACA !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.badge-soft-warning {
+    background-color: #FEF3C7 !important;
+    color: #92400E !important;
+    border: 1px solid #FDE68A !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.badge-soft-purple {
+    background-color: #EDE9FE !important;
+    color: #5B21B6 !important;
+    border: 1px solid #DDD6FE !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.badge-soft-secondary {
+    background-color: #F1F5F9 !important;
+    color: #334155 !important;
+    border: 1px solid #E2E8F0 !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* 5) Columna Costo Pérdida */
+#mermas-view .merma-costo-perdida {
+    font-weight: 600 !important;
+    color: #991B1B !important; /* Rojo oscuro financiero */
+    font-variant-numeric: tabular-nums;
+    font-size: 0.92rem;
+}
+
+/* 6) Estado Vacío Amigable */
+.merma-empty-state {
+    padding: 3rem 1.5rem;
+}
+
+.merma-empty-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-color: #F0FDF4;
+    color: #16A34A;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    box-shadow: 0 0 0 8px #DCFCE7;
+}
+
+/* 7) Campo Compacto Rango de Fechas */
+.mermas-date-range-group {
+    background-color: #FFFFFF;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.mermas-date-range-group .input-group-text {
+    background-color: #F8FAFC;
+    color: var(--color-teal);
+    border-color: #CBD5E1;
+}
+
+.mermas-date-range-group .form-control {
+    border-color: #CBD5E1;
+    font-size: 0.82rem;
+}
+
+.mermas-date-range-group .form-control:focus {
+    border-color: var(--color-teal);
+    box-shadow: none;
+}
+
+
+/* 8) Ordenamiento de columnas (Sort) en Mermas - Theme Sync 1:1 con Inventario */
+#mermas-view th.sortable {
+    cursor: pointer !important;
+    user-select: none;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+#mermas-view th.sortable:hover {
+    filter: brightness(1.12);
+    color: #FFFFFF !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px;
+    cursor: pointer !important;
+}
+
+#mermas-view th.sortable .sort-icon {
+    font-size: 0.75em;
+    margin-left: 5px;
+    display: inline-block;
+    vertical-align: middle;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#mermas-view th.sortable:hover .sort-icon {
+    opacity: 1 !important;
+}
+
+
+/* ==========================================================================
+   REDISEÑO UI/UX: MÓDULO DE CLIENTES (DIRECTORIO RÁPIDO & THEME SYNC)
+   ========================================================================== */
+
+/* 1) Pestañas superiores estilizadas */
+#clients-view .clients-main-tabs {
+    border-bottom: 1px solid #E2E8F0;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+#clients-view .clients-main-tabs .nav-link {
+    border: 0;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    margin-bottom: 0;
+    background-color: transparent;
+    color: #64748B;
+    font-weight: 600;
+    padding: 0.65rem 1rem;
+    transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+#clients-view .clients-main-tabs .nav-link:hover,
+#clients-view .clients-main-tabs .nav-link:focus-visible {
+    color: var(--color-teal);
+    background-color: var(--color-teal-light);
+    outline: none;
+}
+
+#clients-view .clients-main-tabs .nav-link.active {
+    color: var(--color-teal) !important;
+    background-color: transparent;
+    border-bottom-color: var(--color-teal);
+    border-bottom-width: 3px;
+    font-weight: 700;
+}
+
+/* 2) Buscadores rápidos con ícono y botón "X" integrado */
+#clients-view .client-search-field {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+#clients-view .client-search-icon {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    font-size: 0.95rem;
+    line-height: 1;
+    pointer-events: none;
+}
+
+#clients-view .client-search-input {
+    height: 42px;
+    padding-left: 2.35rem;
+    padding-right: 2.35rem;
+    border: 1px solid #DDE7E6;
+    border-radius: 10px;
+    background-color: #FBFDFC;
+    font-size: 0.9rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+#clients-view .client-search-input::placeholder {
+    color: #94A3B8;
+}
+
+#clients-view .client-search-input:focus {
+    border-color: var(--color-teal);
+    background-color: #FFFFFF;
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+
+#clients-view .client-filter-select {
+    height: 42px;
+    border: 1px solid #DDE7E6;
+    border-radius: 10px;
+    background-color: #FBFDFC;
+    font-size: 0.9rem;
+    color: #334155;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+#clients-view .client-filter-select:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+
+#clients-view .client-clear-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background-color: transparent;
+    color: #94A3B8;
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+
+#clients-view .client-clear-btn.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+#clients-view .client-clear-btn:hover {
+    color: #1E293B;
+    background-color: #E2E8F0;
+}
+
+#clients-view .client-clear-btn:focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 1px;
+}
+
+/* 3) Encabezado de tabla corporativo (Theme Sync) */
+#clients-view .clients-table > thead > tr > th,
+#clients-view .clients-table > .thead-users > tr > th {
+    background-color: var(--color-teal-dark) !important;
+    background-image: none !important;
+    background: var(--color-teal-dark) !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    border: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    vertical-align: middle;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+#clients-view .clients-table > thead > tr > th:first-child,
+#clients-view .clients-table > .thead-users > tr > th:first-child {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+}
+
+#clients-view .clients-table > thead > tr > th:last-child,
+#clients-view .clients-table > .thead-users > tr > th:last-child {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+}
+
+#clients-view .clients-table th span,
+#clients-view .clients-table th i {
+    color: #FFFFFF;
+}
+
+/* 4) Interactividad de ordenamiento (Sort) en Clientes - Copia 1:1 de Inventario */
+#clients-view .clients-table th.sortable {
+    cursor: pointer !important;
+    user-select: none;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+#clients-view .clients-table th.sortable:hover {
+    filter: brightness(1.12);
+    color: #FFFFFF !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px;
+    cursor: pointer !important;
+}
+
+#clients-view .clients-table th.sortable .sort-icon {
+    font-size: 0.75em;
+    margin-left: 5px;
+    display: inline-block;
+    vertical-align: middle;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#clients-view .clients-table th.sortable:hover .sort-icon {
+    opacity: 1 !important;
+}
+
+/* 5) Soft Badges Semánticos sin contornos grises */
+.badge-soft-blue {
+    background-color: #E0F2FE !important;
+    color: #0369A1 !important;
+    border: none !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.badge-soft-slate {
+    background-color: #F1F5F9 !important;
+    color: #475569 !important;
+    border: none !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.badge-soft-emerald {
+    background-color: #D1FAE5 !important;
+    color: #065F46 !important;
+    border: none !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* 6) Botones Ghost para Acciones (sin marcos cuadrados) */
+#clients-view .client-action-btn,
+#clients-view .client-action-btn:hover,
+#clients-view .client-action-btn:focus,
+#clients-view .client-action-btn:active {
+    border: 0 !important;
+    border-width: 0 !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+#clients-view .client-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0.5rem;
+    background-color: transparent !important;
+    color: #64748B;
+    box-shadow: none !important;
+    transition: color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+
+#clients-view .client-action-btn + .client-action-btn {
+    margin-left: 0.2rem;
+}
+
+#clients-view .client-action-btn i {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+#clients-view .client-action-btn:focus-visible {
+    outline: 2px solid #94A3B8;
+    outline-offset: 2px;
+}
+
+#clients-view .client-action-btn:hover {
+    transform: translateY(-1px);
+}
+
+#clients-view .client-action-btn:active {
+    transform: translateY(0);
+}
+
+#clients-view .client-action-btn--view:hover {
+    color: #0284C7;
+    background-color: #E0F2FE !important;
+}
+
+#clients-view .client-action-btn--edit:hover {
+    color: #D97706;
+    background-color: #FEF3C7 !important;
+}
+
+#clients-view .client-action-btn--delete:hover {
+    color: #DC2626;
+    background-color: #FEE2E2 !important;
+}
+
+#clients-view .client-action-btn--activate:hover {
+    color: #059669;
+    background-color: #D1FAE5 !important;
+}
+
+#clients-view .client-action-btn:disabled,
+#clients-view .client-action-btn.disabled {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    pointer-events: none;
+}
+
+
+/* ==========================================================================
+   REDISEÑO UI/UX: MÓDULO DE CLIENTES (DIRECTORIO RÁPIDO & THEME SYNC)
+   ========================================================================== */
+
+/* 1) Pestañas superiores estilizadas */
+#clients-view .clients-main-tabs {
+    border-bottom: 1px solid #E2E8F0;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+#clients-view .clients-main-tabs .nav-link {
+    border: 0;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    margin-bottom: 0;
+    background-color: transparent;
+    color: #64748B;
+    font-weight: 600;
+    padding: 0.65rem 1rem;
+    transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+#clients-view .clients-main-tabs .nav-link:hover,
+#clients-view .clients-main-tabs .nav-link:focus-visible {
+    color: var(--color-teal);
+    background-color: var(--color-teal-light);
+    outline: none;
+}
+
+#clients-view .clients-main-tabs .nav-link.active {
+    color: var(--color-teal) !important;
+    background-color: transparent;
+    border-bottom-color: var(--color-teal);
+    border-bottom-width: 3px;
+    font-weight: 700;
+}
+
+/* 2) Buscadores rápidos con ícono y botón "X" integrado */
+#clients-view .client-search-field {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+#clients-view .client-search-icon {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    font-size: 0.95rem;
+    line-height: 1;
+    pointer-events: none;
+}
+
+#clients-view .client-search-input {
+    height: 42px;
+    padding-left: 2.35rem;
+    padding-right: 2.35rem;
+    border: 1px solid #DDE7E6;
+    border-radius: 10px;
+    background-color: #FBFDFC;
+    font-size: 0.9rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+#clients-view .client-search-input::placeholder {
+    color: #94A3B8;
+}
+
+#clients-view .client-search-input:focus {
+    border-color: var(--color-teal);
+    background-color: #FFFFFF;
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+
+#clients-view .client-filter-select {
+    height: 42px;
+    border: 1px solid #DDE7E6;
+    border-radius: 10px;
+    background-color: #FBFDFC;
+    font-size: 0.9rem;
+    color: #334155;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+#clients-view .client-filter-select:focus {
+    border-color: var(--color-teal);
+    box-shadow: 0 0 0 0.2rem var(--color-teal-light);
+}
+
+#clients-view .client-clear-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background-color: transparent;
+    color: #94A3B8;
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+
+#clients-view .client-clear-btn.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+#clients-view .client-clear-btn:hover {
+    color: #1E293B;
+    background-color: #E2E8F0;
+}
+
+#clients-view .client-clear-btn:focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 1px;
+}
+
+/* 3) Encabezado de tabla corporativo (Theme Sync) */
+#clients-view .clients-table > thead > tr > th,
+#clients-view .clients-table > .thead-users > tr > th {
+    background-color: var(--color-teal-dark) !important;
+    background-image: none !important;
+    background: var(--color-teal-dark) !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    border: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    vertical-align: middle;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+#clients-view .clients-table > thead > tr > th:first-child,
+#clients-view .clients-table > .thead-users > tr > th:first-child {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+}
+
+#clients-view .clients-table > thead > tr > th:last-child,
+#clients-view .clients-table > .thead-users > tr > th:last-child {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+}
+
+#clients-view .clients-table th span,
+#clients-view .clients-table th i {
+    color: #FFFFFF;
+}
+
+/* 4) Interactividad de ordenamiento (Sort) en Clientes - Copia 1:1 de Inventario */
+#clients-view .clients-table th.sortable {
+    cursor: pointer !important;
+    user-select: none;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+#clients-view .clients-table th.sortable:hover {
+    filter: brightness(1.12);
+    color: #FFFFFF !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px;
+    cursor: pointer !important;
+}
+
+#clients-view .clients-table th.sortable .sort-icon {
+    font-size: 0.75em;
+    margin-left: 5px;
+    display: inline-block;
+    vertical-align: middle;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#clients-view .clients-table th.sortable:hover .sort-icon {
+    opacity: 1 !important;
+}
+
+/* 5) Soft Badges Semánticos sin contornos grises */
+.badge-soft-blue {
+    background-color: #E0F2FE !important;
+    color: #0369A1 !important;
+    border: none !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.badge-soft-slate {
+    background-color: #F1F5F9 !important;
+    color: #475569 !important;
+    border: none !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.badge-soft-emerald {
+    background-color: #D1FAE5 !important;
+    color: #065F46 !important;
+    border: none !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 50rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* 6) Botones Ghost para Acciones (sin marcos cuadrados) */
+#clients-view .client-action-btn,
+#clients-view .client-action-btn:hover,
+#clients-view .client-action-btn:focus,
+#clients-view .client-action-btn:active {
+    border: 0 !important;
+    border-width: 0 !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+#clients-view .client-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0.5rem;
+    background-color: transparent !important;
+    color: #64748B;
+    box-shadow: none !important;
+    transition: color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+
+#clients-view .client-action-btn + .client-action-btn {
+    margin-left: 0.2rem;
+}
+
+#clients-view .client-action-btn i {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+#clients-view .client-action-btn:focus-visible {
+    outline: 2px solid #94A3B8;
+    outline-offset: 2px;
+}
+
+#clients-view .client-action-btn:hover {
+    transform: translateY(-1px);
+}
+
+#clients-view .client-action-btn:active {
+    transform: translateY(0);
+}
+
+#clients-view .client-action-btn--view:hover {
+    color: #0284C7;
+    background-color: #E0F2FE !important;
+}
+
+#clients-view .client-action-btn--edit:hover {
+    color: #D97706;
+    background-color: #FEF3C7 !important;
+}
+
+#clients-view .client-action-btn--delete:hover {
+    color: #DC2626;
+    background-color: #FEE2E2 !important;
+}
+
+#clients-view .client-action-btn--activate:hover {
+    color: #059669;
+    background-color: #D1FAE5 !important;
+}
+
+#clients-view .client-action-btn:disabled,
+#clients-view .client-action-btn.disabled {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    pointer-events: none;
+}
+
+
+
+/* ==========================================================================
+   REDISEÑO UI/UX: MÓDULO DE CAJA (THEME SYNC & CONTROL DE FLUJO DE EFECTIVO)
+   ========================================================================== */
+
+/* 1) Botón Cerrar Turno - Acción crítica */
+#cash-view #btn-close-cash {
+    border: 1.5px solid #DC2626 !important;
+    color: #DC2626 !important;
+    background-color: transparent !important;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+#cash-view #btn-close-cash:hover {
+    background-color: #DC2626 !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+/* 2) Botón Registrar Movimiento en Tarjeta de Caja */
+#cash-view .cash-movement-btn {
+    background-color: #F8FAFC !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #475569 !important;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.38rem 0.85rem;
+    transition: all 0.18s ease;
+}
+
+#cash-view .cash-movement-btn:hover {
+    background-color: #E2E8F0 !important;
+    color: #0F172A !important;
+    border-color: #94A3B8 !important;
+    transform: translateY(-1px);
+}
+
+/* 3) Rango de Fechas Compacto en Filtros de Caja */
+.cash-date-range-group {
+    height: 38px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.cash-date-range-group .input-group-text {
+    border-color: #DDE7E6;
+}
+
+.cash-date-range-group .form-control {
+    border-color: #DDE7E6;
+    background-color: #FFFFFF;
+    font-size: 0.85rem;
+    height: 38px;
+}
+
+.cash-date-range-group .form-control:focus {
+    border-color: var(--color-teal);
+    box-shadow: none;
+}
+
+/* 4) Encabezado Corporativo Sólido y Sin Líneas Divisorias Verticales */
+#cash-view .cash-table > thead > tr > th,
+#cash-view .cash-table > .thead-users > tr > th {
+    background-color: var(--color-teal-dark) !important;
+    background-image: none !important;
+    background: var(--color-teal-dark) !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    border: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    vertical-align: middle;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+#cash-view .cash-table > thead > tr > th:first-child,
+#cash-view .cash-table > .thead-users > tr > th:first-child {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+}
+
+#cash-view .cash-table > thead > tr > th:last-child,
+#cash-view .cash-table > .thead-users > tr > th:last-child {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+}
+
+#cash-view .cash-table th,
+#cash-view .cash-table td {
+    border-left: none !important;
+    border-right: none !important;
+}
+
+#cash-view .cash-table th span,
+#cash-view .cash-table th i {
+    color: #FFFFFF !important;
+}
+
+/* 5) Interactividad de ordenamiento (Sort 1:1 con Inventario) */
+#cash-view .cash-table th.sortable {
+    cursor: pointer !important;
+    user-select: none;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+#cash-view .cash-table th.sortable:hover {
+    filter: brightness(1.12);
+    color: #FFFFFF !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px;
+    cursor: pointer !important;
+}
+
+#cash-view .cash-table th.sortable .sort-icon {
+    font-size: 0.75em;
+    margin-left: 5px;
+    display: inline-block;
+    vertical-align: middle;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#cash-view .cash-table th.sortable:hover .sort-icon {
+    opacity: 1 !important;
+}
+
+
+/* ==========================================================================
+   REDISEÑO UI/UX: MÓDULO DE CAJA (THEME SYNC & CONTROL DE FLUJO DE EFECTIVO)
+   ========================================================================== */
+
+/* 1) Botón Cerrar Turno - Acción crítica */
+#cash-view #btn-close-cash {
+    border: 1.5px solid #DC2626 !important;
+    color: #DC2626 !important;
+    background-color: transparent !important;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+#cash-view #btn-close-cash:hover {
+    background-color: #DC2626 !important;
+    color: #FFFFFF !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+/* 2) Botón Registrar Movimiento en Tarjeta de Caja */
+#cash-view .cash-movement-btn {
+    background-color: #F8FAFC !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #475569 !important;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    padding: 0.38rem 0.85rem;
+    transition: all 0.18s ease;
+}
+
+#cash-view .cash-movement-btn:hover {
+    background-color: #E2E8F0 !important;
+    color: #0F172A !important;
+    border-color: #94A3B8 !important;
+    transform: translateY(-1px);
+}
+
+/* 3) Rango de Fechas Compacto en Filtros de Caja */
+.cash-date-range-group {
+    height: 38px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.cash-date-range-group .input-group-text {
+    border-color: #DDE7E6;
+}
+
+.cash-date-range-group .form-control {
+    border-color: #DDE7E6;
+    background-color: #FFFFFF;
+    font-size: 0.85rem;
+    height: 38px;
+}
+
+.cash-date-range-group .form-control:focus {
+    border-color: var(--color-teal);
+    box-shadow: none;
+}
+
+/* 4) Encabezado Corporativo Sólido y Sin Líneas Divisorias Verticales */
+#cash-view .cash-table > thead > tr > th,
+#cash-view .cash-table > .thead-users > tr > th {
+    background-color: var(--color-teal-dark) !important;
+    background-image: none !important;
+    background: var(--color-teal-dark) !important;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    border: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    vertical-align: middle;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+#cash-view .cash-table > thead > tr > th:first-child,
+#cash-view .cash-table > .thead-users > tr > th:first-child {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+}
+
+#cash-view .cash-table > thead > tr > th:last-child,
+#cash-view .cash-table > .thead-users > tr > th:last-child {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+}
+
+#cash-view .cash-table th,
+#cash-view .cash-table td {
+    border-left: none !important;
+    border-right: none !important;
+}
+
+#cash-view .cash-table th span,
+#cash-view .cash-table th i {
+    color: #FFFFFF !important;
+}
+
+/* 5) Interactividad de ordenamiento (Sort 1:1 con Inventario) */
+#cash-view .cash-table th.sortable {
+    cursor: pointer !important;
+    user-select: none;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+#cash-view .cash-table th.sortable:hover {
+    filter: brightness(1.12);
+    color: #FFFFFF !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px;
+    cursor: pointer !important;
+}
+
+#cash-view .cash-table th.sortable .sort-icon {
+    font-size: 0.75em;
+    margin-left: 5px;
+    display: inline-block;
+    vertical-align: middle;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#cash-view .cash-table th.sortable:hover .sort-icon {
+    opacity: 1 !important;
+}
+
+
+
+/* ============================================================================
+ * SISTEMA GLOBAL DE DISEÑO RESPONSIVO (Móviles y Tablets)
+ * Requisitos:
+ * 1. Menú Hamburguesa / Off-canvas (< 1024px)
+ * 2. Protección de Tablas (Scroll Horizontal overflow-x-auto)
+ * 3. Apilamiento Vertical de Tarjetas KPI y Bloques (100% width en móvil)
+ * 4. Modales y Formularios Táctiles (95% ancho y controles táctiles >= 44px)
+ * ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+ * 2. PROTECCIÓN GLOBAL DE TABLAS (SCROLL HORIZONTAL)
+ * Envuelve y protege las tablas contra compresión de columnas
+ * --------------------------------------------------------------------------- */
+.table-responsive,
+.overflow-x-auto {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+/* Ancho mínimo de seguridad para prevenir aplastamiento de columnas */
+.table-responsive > .table,
+.table-responsive > table,
+.overflow-x-auto > .table,
+.overflow-x-auto > table {
+    margin-bottom: 0;
+    min-width: 680px;
+}
+
+/* Tablas densas con múltiples columnas operativas */
+#inventory-table,
+#mermas-table,
+#clients-table,
+#cash-table,
+#users-table,
+#bitacora-table,
+#table-reporte-usuarios,
+#table-reporte-clientes,
+#table-reporte-ventas,
+#roles-table,
+#catalog-products-table,
+#pos-history-table {
+    min-width: 760px !important;
+}
+
+/* Scrollbar horizontal sutil y accesible */
+.table-responsive::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar {
+    height: 6px;
+}
+.table-responsive::-webkit-scrollbar-track,
+.overflow-x-auto::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb,
+.overflow-x-auto::-webkit-scrollbar-thumb {
+    background: rgba(11, 96, 99, 0.25);
+    border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb:hover,
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: rgba(11, 96, 99, 0.45);
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. APILAMIENTO DE TARJETAS (STACKING) & 4. MODALES TÁCTILES (< 768px)
+ * --------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+    /* --- 3. Apilamiento vertical a 1 sola columna (100% ancho) de KPIs --- */
+    #dashboard-kpis > [class*="col-"],
+    #inventory-kpis > [class*="col-"],
+    #mermas-kpi-row > [class*="col-"],
+    #reportes-kpis > [class*="col-"],
+    #reportes-summary-cards > [class*="col-"],
+    .dashboard-kpi-card,
+    .inventory-kpi-card,
+    .merma-kpi-card,
+    .reportes-kpi-card,
+    [data-dashblock^="kpi-"] {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin-bottom: 0.75rem !important;
+    }
+
+    /* Bloques del Dashboard y Reportes apilados verticalmente ocupando 100% */
+    [data-dashblock="grafico-ventas"],
+    [data-dashblock="top-productos"],
+    [data-dashblock="alertas-stock"],
+    [data-dashblock="turnos-pendientes"],
+    [data-dashblock="turno-bar"],
+    .reportes-grid-row > [class*="col-"],
+    #reportes-grafica-container,
+    #reportes-rankings-card,
+    .reportes-chart-card,
+    .reportes-rank-card {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin-bottom: 1rem !important;
+    }
+
+    /* Adaptación de contenido principal y cabecera en móviles */
+    #dashboard-content,
+    .pos-view,
+    [data-main-view] {
+        padding: 0.85rem 0.65rem !important;
+    }
+
+    header.bg-white {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        padding-top: 0.65rem !important;
+        padding-bottom: 0.65rem !important;
+    }
+
+    #header-greeting {
+        font-size: 0.95rem !important;
+    }
+
+    /* Barras de herramientas y filtros en columna */
+    .catalog-tabs-toolbar,
+    .reportes-main-tabs,
+    .filter-toolbar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.5rem !important;
+    }
+
+    /* --- 4. Modales Táctiles expandidos dinámicamente al 95% del ancho --- */
+    .modal-dialog {
+        width: 95vw !important;
+        max-width: 95vw !important;
+        margin: 0.5rem auto !important;
+    }
+
+    .modal-content {
+        border-radius: 14px !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25) !important;
+    }
+
+    .modal-header {
+        padding: 0.85rem 1rem !important;
+    }
+
+    .modal-body {
+        padding: 1rem 0.85rem !important;
+        max-height: calc(100vh - 135px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .modal-footer {
+        padding: 0.75rem 1rem !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem;
+    }
+
+    .modal-footer .btn {
+        flex: 1 1 50%;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Controles de formulario táctiles con ergonomía táctil (área táctil >= 44px) */
+    .modal .form-control,
+    .modal .form-select,
+    .modal .btn {
+        min-height: 44px;
+        font-size: 16px !important; /* Previene auto-zoom forzado en dispositivos iOS Safari */
+    }
+
+    .modal .form-label {
+        font-size: 0.85rem;
+        margin-bottom: 0.35rem;
+        font-weight: 500;
+    }
+
+    .btn-close {
+        padding: 0.75rem !important;
+    }
+}
+
+
+/* ==========================================================================
+   MODO OSCURO NATIVO (DARK THEME / CARBÓN)
+   ==========================================================================
+   Variables de diseño adaptativas y reglas de renderizado para evitar la
+   fatiga visual nocturna o en condiciones de baja iluminación.
+   - Fondos: Gris carbón oscuro (#0F172A / #1E293B).
+   - Textos: Grises claros y blancos suaves (#F8FAFC / #CBD5E1).
+   - Paleta corporativa: Verde esmeralda (--color-teal) permanece intacto.
+   ========================================================================== */
+
+[data-theme="dark"],
+[data-bs-theme="dark"] {
+    /* Reemplazo de variables base en modo oscuro */
+    --color-bg-light: #0F172A;
+    --color-text-dark: #F8FAFC;
+    --color-text-muted: #94A3B8;
+
+    /* Superficies de modo oscuro (Carbón) */
+    --theme-bg-body: #0F172A;          /* Fondo general de la plataforma */
+    --theme-bg-surface: #1E293B;       /* Contenedores, tarjetas y paneles */
+    --theme-bg-card: #1E293B;          /* Tarjetas de módulos y KPIs */
+    --theme-bg-header: #1E293B;        /* Barra de navegación superior */
+    --theme-bg-input: #0F172A;         /* Entradas de formulario y buscadores */
+    --theme-bg-subtle: #334155;        /* Fondos secundarios, hovers de ítems */
+    --theme-text-main: #F8FAFC;        /* Texto principal de alto contraste */
+    --theme-text-secondary: #CBD5E1;   /* Texto secundario y descriptivo */
+    --theme-text-muted: #94A3B8;       /* Texto tenue y subtítulos */
+    --theme-text-subtle: #64748B;      /* Placeholders y detalles sutiles */
+    --theme-border: #334155;           /* Bordes de división y tarjetas */
+    --theme-border-subtle: #1E293B;
+    --theme-table-hover: rgba(255, 255, 255, 0.04);
+    --theme-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --theme-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
+}
+
+/* Reglas de superficie y cuerpo */
+[data-theme="dark"] body,
+[data-bs-theme="dark"] body {
+    background-color: var(--theme-bg-body) !important;
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] main,
+[data-bs-theme="dark"] main,
+[data-theme="dark"] .bg-light-gray,
+[data-bs-theme="dark"] .bg-light-gray {
+    background-color: var(--theme-bg-body) !important;
+    color: var(--theme-text-main);
+}
+
+/* Encabezado superior */
+[data-theme="dark"] header.bg-white,
+[data-bs-theme="dark"] header.bg-white {
+    background-color: var(--theme-bg-header) !important;
+    border-color: var(--theme-border) !important;
+}
+
+/* Tarjetas y Contenedores */
+[data-theme="dark"] .card,
+[data-bs-theme="dark"] .card {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+    box-shadow: var(--theme-shadow-sm) !important;
+}
+
+[data-theme="dark"] .bg-white:not(.badge):not(.sidebar-brand-icon),
+[data-bs-theme="dark"] .bg-white:not(.badge):not(.sidebar-brand-icon) {
+    background-color: var(--theme-bg-card) !important;
+}
+
+[data-theme="dark"] .bg-light,
+[data-bs-theme="dark"] .bg-light {
+    background-color: var(--theme-bg-body) !important;
+}
+
+/* Tipografía de contraste */
+[data-theme="dark"] .text-dark,
+[data-bs-theme="dark"] .text-dark {
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] .text-muted,
+[data-bs-theme="dark"] .text-muted {
+    color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .text-secondary,
+[data-bs-theme="dark"] .text-secondary {
+    color: var(--theme-text-secondary) !important;
+}
+
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3,
+[data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6,
+[data-bs-theme="dark"] h1, [data-bs-theme="dark"] h2, [data-bs-theme="dark"] h3,
+[data-bs-theme="dark"] h4, [data-bs-theme="dark"] h5, [data-bs-theme="dark"] h6 {
+    color: var(--theme-text-main) !important;
+}
+
+/* Bordes y líneas divisorias */
+[data-theme="dark"] .border,
+[data-theme="dark"] .border-bottom,
+[data-theme="dark"] .border-top,
+[data-theme="dark"] .border-start,
+[data-theme="dark"] .border-end,
+[data-bs-theme="dark"] .border,
+[data-bs-theme="dark"] .border-bottom,
+[data-bs-theme="dark"] .border-top,
+[data-bs-theme="dark"] .border-start,
+[data-bs-theme="dark"] .border-end {
+    border-color: var(--theme-border) !important;
+}
+
+/* Entradas de Formulario y Búsqueda */
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background-color: var(--theme-bg-input) !important;
+    color: var(--theme-text-main) !important;
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-select:focus,
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    background-color: var(--theme-bg-input) !important;
+    color: var(--theme-text-main) !important;
+    border-color: var(--color-teal) !important;
+    box-shadow: 0 0 0 0.2rem rgba(13, 115, 119, 0.25) !important;
+}
+
+[data-theme="dark"] .form-control::placeholder,
+[data-bs-theme="dark"] .form-control::placeholder {
+    color: var(--theme-text-subtle) !important;
+    opacity: 1;
+}
+
+[data-theme="dark"] .input-group-text,
+[data-bs-theme="dark"] .input-group-text {
+    background-color: var(--theme-bg-card) !important;
+    color: var(--theme-text-muted) !important;
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .form-check-label,
+[data-bs-theme="dark"] .form-check-label {
+    color: var(--theme-text-main) !important;
+}
+
+/* Ventanas Modales */
+[data-theme="dark"] .modal-content,
+[data-bs-theme="dark"] .modal-content {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+    box-shadow: var(--theme-shadow-md) !important;
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer,
+[data-bs-theme="dark"] .modal-header,
+[data-bs-theme="dark"] .modal-footer {
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .btn-close,
+[data-bs-theme="dark"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Menús Desplegables (Dropdowns) */
+[data-theme="dark"] .dropdown-menu,
+[data-bs-theme="dark"] .dropdown-menu {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+    box-shadow: var(--theme-shadow-md) !important;
+}
+
+[data-theme="dark"] .dropdown-header,
+[data-bs-theme="dark"] .dropdown-header {
+    color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .dropdown-item,
+[data-bs-theme="dark"] .dropdown-item {
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] .dropdown-item:hover,
+[data-theme="dark"] .dropdown-item:focus,
+[data-bs-theme="dark"] .dropdown-item:hover,
+[data-bs-theme="dark"] .dropdown-item:focus {
+    background-color: var(--theme-bg-subtle) !important;
+    color: var(--color-celeste) !important;
+}
+
+[data-theme="dark"] .dropdown-divider,
+[data-bs-theme="dark"] .dropdown-divider {
+    border-color: var(--theme-border) !important;
+}
+
+/* Tablas de Datos */
+[data-theme="dark"] .table,
+[data-bs-theme="dark"] .table {
+    color: var(--theme-text-main) !important;
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.02);
+    --bs-table-hover-bg: var(--theme-table-hover);
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .table > :not(caption) > * > *,
+[data-bs-theme="dark"] .table > :not(caption) > * > * {
+    background-color: transparent !important;
+    color: var(--theme-text-main) !important;
+    border-bottom-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .table-hover > tbody > tr:hover > *,
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover > * {
+    background-color: var(--theme-table-hover) !important;
+    color: var(--theme-text-main) !important;
+}
+
+/* PROTECCIÓN DE COLOR CORPORATIVO: Los encabezados verde esmeralda permanecen intactos */
+[data-theme="dark"] .table thead,
+[data-theme="dark"] thead.thead-users,
+[data-theme="dark"] thead.thead-catalog,
+[data-theme="dark"] thead.thead-cash,
+[data-bs-theme="dark"] .table thead,
+[data-bs-theme="dark"] thead.thead-users,
+[data-bs-theme="dark"] thead.thead-catalog,
+[data-bs-theme="dark"] thead.thead-cash {
+    background-color: var(--color-teal-dark) !important;
+    background: linear-gradient(135deg, var(--color-teal), var(--color-teal-dark)) !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] thead th,
+[data-bs-theme="dark"] thead th {
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] thead th a,
+[data-theme="dark"] thead th span,
+[data-theme="dark"] thead th i,
+[data-bs-theme="dark"] thead th a,
+[data-bs-theme="dark"] thead th span,
+[data-bs-theme="dark"] thead th i {
+    color: #FFFFFF !important;
+}
+
+/* Botones Auxiliares */
+[data-theme="dark"] .btn-light,
+[data-bs-theme="dark"] .btn-light {
+    background-color: var(--theme-bg-subtle) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] .btn-light:hover,
+[data-bs-theme="dark"] .btn-light:hover {
+    background-color: var(--theme-border) !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .btn-outline-secondary,
+[data-bs-theme="dark"] .btn-outline-secondary {
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-secondary) !important;
+}
+
+[data-theme="dark"] .btn-outline-secondary:hover,
+[data-bs-theme="dark"] .btn-outline-secondary:hover {
+    background-color: var(--theme-bg-subtle) !important;
+    color: #FFFFFF !important;
+}
+
+/* Pestañas de Navegación */
+[data-theme="dark"] .nav-tabs,
+[data-bs-theme="dark"] .nav-tabs {
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .nav-tabs .nav-link,
+[data-bs-theme="dark"] .nav-tabs .nav-link {
+    color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .nav-tabs .nav-link:hover,
+[data-bs-theme="dark"] .nav-tabs .nav-link:hover {
+    color: var(--theme-text-main) !important;
+    border-color: transparent !important;
+}
+
+[data-theme="dark"] .nav-tabs .nav-link.active,
+[data-bs-theme="dark"] .nav-tabs .nav-link.active {
+    background-color: transparent !important;
+    color: var(--color-celeste) !important;
+    border-color: transparent transparent var(--color-teal) transparent !important;
+}
+
+/* Soft Badges adaptados para modo oscuro */
+[data-theme="dark"] .bg-teal-light,
+[data-bs-theme="dark"] .bg-teal-light {
+    background-color: rgba(13, 115, 119, 0.28) !important;
+    color: #AEE2E4 !important;
+}
+
+[data-theme="dark"] .badge.bg-light,
+[data-bs-theme="dark"] .badge.bg-light {
+    background-color: var(--theme-bg-subtle) !important;
+    color: var(--theme-text-main) !important;
+}
+
+/* List Groups */
+[data-theme="dark"] .list-group-item,
+[data-bs-theme="dark"] .list-group-item {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+}
+
+/* PROTECCIÓN DE SIDEBAR CORPORATIVO */
+[data-theme="dark"] .sidebar,
+[data-bs-theme="dark"] .sidebar {
+    background: linear-gradient(180deg, #0B6063 0%, #084A4C 100%) !important;
+}
+
+[data-theme="dark"] .sidebar .nav-link.sidebar-link,
+[data-bs-theme="dark"] .sidebar .nav-link.sidebar-link {
+    color: rgba(255, 255, 255, 0.78) !important;
+}
+
+[data-theme="dark"] .sidebar .nav-link.sidebar-link:hover,
+[data-bs-theme="dark"] .sidebar .nav-link.sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.09) !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .sidebar .nav-link.sidebar-link.active,
+[data-bs-theme="dark"] .sidebar .nav-link.sidebar-link.active {
+    background: rgba(255, 255, 255, 0.16) !important;
+    color: #FFFFFF !important;
+}
+
+/* Botón Interruptor de Modo Oscuro / Claro en cabecera */
+#btn-theme-toggle {
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+#btn-theme-toggle:hover {
+    transform: scale(1.08);
+}
+
+
+/* ==========================================================================
+   ADAPTACIÓN COMPLETA DE MODO OSCURO PARA EL MÓDULO POS / VENTAS (#pos-view)
+   ==========================================================================
+   Elimina cualquier remanente blanco en el POS durante el modo oscuro:
+   - Contenedor principal y cabecera con fondo carbón (#0F172A / #1E293B).
+   - Omnibox de búsqueda y lector de barras con fondo oscuro.
+   - Píldoras de categoría y atajos en modo carbón.
+   - Medios, placeholders de iniciales y tarjetas de producto oscuros.
+   - Buscador de cliente, carrito, lista de productos y controles de cantidad.
+   - Resumen financiero, caja de cambio, fichas de efectivo rápido y botón de cobro.
+   ========================================================================== */
+
+/* Fondo general de la vista POS */
+[data-theme="dark"] .pos-view,
+[data-bs-theme="dark"] .pos-view {
+    background: var(--theme-bg-body) !important;
+}
+
+/* Cabecera del POS */
+[data-theme="dark"] #pos-view .pos-header h4,
+[data-bs-theme="dark"] #pos-view .pos-header h4 {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] #pos-view .pos-header-btn.btn-outline-secondary,
+[data-bs-theme="dark"] #pos-view .pos-header-btn.btn-outline-secondary {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    color: #E2E8F0 !important;
+}
+
+[data-theme="dark"] #pos-view .pos-header-btn.btn-outline-secondary:hover,
+[data-bs-theme="dark"] #pos-view .pos-header-btn.btn-outline-secondary:hover {
+    background: #334155 !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] #pos-view .pos-header-kbd,
+[data-bs-theme="dark"] #pos-view .pos-header-kbd {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] #pos-view .btn-outline-teal.pos-header-btn,
+[data-bs-theme="dark"] #pos-view .btn-outline-teal.pos-header-btn {
+    background: #1E293B !important;
+    border-color: var(--color-teal) !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] #pos-view .btn-outline-teal.pos-header-btn:hover,
+[data-bs-theme="dark"] #pos-view .btn-outline-teal.pos-header-btn:hover {
+    background: var(--color-teal) !important;
+    color: #FFFFFF !important;
+}
+
+/* Paneles del POS (Catálogo y Carrito/Cobro) */
+[data-theme="dark"] .pos-catalog-panel,
+[data-theme="dark"] .pos-checkout-panel,
+[data-bs-theme="dark"] .pos-catalog-panel,
+[data-bs-theme="dark"] .pos-checkout-panel {
+    background: #1E293B !important;
+    border: 1px solid #334155 !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Omnibox / Buscador y lector de código de barras */
+[data-theme="dark"] .pos-omnibox,
+[data-bs-theme="dark"] .pos-omnibox {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .pos-omnibox:focus-within,
+[data-bs-theme="dark"] .pos-omnibox:focus-within {
+    background: #0F172A !important;
+    border-color: var(--color-teal) !important;
+    box-shadow: 0 0 0 0.25rem rgba(13, 115, 119, 0.25) !important;
+}
+
+[data-theme="dark"] .pos-omnibox-input,
+[data-bs-theme="dark"] .pos-omnibox-input {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-omnibox-input::placeholder,
+[data-bs-theme="dark"] .pos-omnibox-input::placeholder {
+    color: #64748B !important;
+}
+
+[data-theme="dark"] .pos-omnibox-icon,
+[data-bs-theme="dark"] .pos-omnibox-icon {
+    color: var(--color-teal) !important;
+}
+
+[data-theme="dark"] .pos-omnibox-kbd,
+[data-bs-theme="dark"] .pos-omnibox-kbd {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-omnibox-clear,
+[data-bs-theme="dark"] .pos-omnibox-clear {
+    background: #334155 !important;
+    color: #CBD5E1 !important;
+}
+
+[data-theme="dark"] .pos-omnibox-clear:hover,
+[data-bs-theme="dark"] .pos-omnibox-clear:hover {
+    background: #EF4444 !important;
+    color: #FFFFFF !important;
+}
+
+/* Píldoras de categoría */
+[data-theme="dark"] .pos-category-pill,
+[data-bs-theme="dark"] .pos-category-pill {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #CBD5E1 !important;
+}
+
+[data-theme="dark"] .pos-category-pill:hover,
+[data-bs-theme="dark"] .pos-category-pill:hover {
+    border-color: var(--color-teal) !important;
+    color: #38BDF8 !important;
+    background: #1E293B !important;
+}
+
+[data-theme="dark"] .pos-category-pill.active,
+[data-bs-theme="dark"] .pos-category-pill.active {
+    background: var(--color-teal) !important;
+    border-color: var(--color-teal) !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 10px rgba(10, 92, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .pos-shortcut-hint,
+[data-bs-theme="dark"] .pos-shortcut-hint {
+    color: #94A3B8 !important;
+}
+
+/* Tarjetas de Producto en la grilla */
+[data-theme="dark"] .pos-product-card,
+[data-bs-theme="dark"] .pos-product-card {
+    background: #1E293B !important;
+    border: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .pos-product-card:hover,
+[data-bs-theme="dark"] .pos-product-card:hover {
+    border-color: var(--color-teal) !important;
+    box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.45) !important;
+}
+
+[data-theme="dark"] .pos-product-media,
+[data-bs-theme="dark"] .pos-product-media {
+    background: #0F172A !important;
+}
+
+[data-theme="dark"] .pos-product-placeholder,
+[data-bs-theme="dark"] .pos-product-placeholder {
+    background: linear-gradient(135deg, #0F172A, #1E293B) !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-product-initials,
+[data-bs-theme="dark"] .pos-product-initials {
+    color: #38BDF8 !important;
+    opacity: 0.95;
+}
+
+[data-theme="dark"] .pos-product-cat-icon,
+[data-bs-theme="dark"] .pos-product-cat-icon {
+    color: #64748B !important;
+}
+
+[data-theme="dark"] .pos-category-tag,
+[data-bs-theme="dark"] .pos-category-tag {
+    background: rgba(15, 23, 42, 0.88) !important;
+    color: #CBD5E1 !important;
+    border: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .pos-product-name,
+[data-bs-theme="dark"] .pos-product-name {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-product-variant,
+[data-bs-theme="dark"] .pos-product-variant {
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-product-price,
+[data-bs-theme="dark"] .pos-product-price {
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-product-wholesale,
+[data-bs-theme="dark"] .pos-product-wholesale {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    color: #6EE7B7 !important;
+}
+
+/* Paginación del catálogo */
+[data-theme="dark"] #pos-grid-pagination .btn,
+[data-bs-theme="dark"] #pos-grid-pagination .btn {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #CBD5E1 !important;
+}
+
+[data-theme="dark"] #pos-grid-pagination .btn:hover,
+[data-bs-theme="dark"] #pos-grid-pagination .btn:hover {
+    background: #334155 !important;
+    color: #FFFFFF !important;
+}
+
+/* Carrito y Cliente */
+[data-theme="dark"] .pos-cart-head h6,
+[data-bs-theme="dark"] .pos-cart-head h6 {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-clear-link,
+[data-bs-theme="dark"] .pos-clear-link {
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-clear-link:hover,
+[data-bs-theme="dark"] .pos-clear-link:hover {
+    color: #EF4444 !important;
+}
+
+[data-theme="dark"] .pos-client-line,
+[data-bs-theme="dark"] .pos-client-line {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .pos-client-input,
+[data-bs-theme="dark"] .pos-client-input {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-client-input::placeholder,
+[data-bs-theme="dark"] .pos-client-input::placeholder {
+    color: #64748B !important;
+}
+
+[data-theme="dark"] .pos-client-btn,
+[data-bs-theme="dark"] .pos-client-btn {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-client-btn:hover,
+[data-bs-theme="dark"] .pos-client-btn:hover {
+    background: var(--color-teal) !important;
+    color: #FFFFFF !important;
+    border-color: var(--color-teal) !important;
+}
+
+[data-theme="dark"] .pos-client-badge,
+[data-bs-theme="dark"] .pos-client-badge {
+    background: #334155 !important;
+    color: #CBD5E1 !important;
+}
+
+/* Carrito - Ítems y Lista */
+[data-theme="dark"] .pos-cart-empty,
+[data-bs-theme="dark"] .pos-cart-empty {
+    color: #64748B !important;
+}
+
+[data-theme="dark"] .pos-cart-item,
+[data-bs-theme="dark"] .pos-cart-item {
+    border-bottom: 1px dashed #334155 !important;
+}
+
+[data-theme="dark"] .pos-cart-thumb,
+[data-bs-theme="dark"] .pos-cart-thumb {
+    background: #0F172A !important;
+}
+
+[data-theme="dark"] .pos-cart-thumb-fallback,
+[data-bs-theme="dark"] .pos-cart-thumb-fallback {
+    background: #0F172A !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-cart-name,
+[data-bs-theme="dark"] .pos-cart-name {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-cart-meta,
+[data-bs-theme="dark"] .pos-cart-meta {
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-cart-line-total,
+[data-bs-theme="dark"] .pos-cart-line-total {
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-qty,
+[data-bs-theme="dark"] .pos-qty {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .pos-qty button,
+[data-bs-theme="dark"] .pos-qty button {
+    background: #1E293B !important;
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-qty button:hover,
+[data-bs-theme="dark"] .pos-qty button:hover {
+    background: #334155 !important;
+}
+
+[data-theme="dark"] .pos-qty input,
+[data-bs-theme="dark"] .pos-qty input {
+    background: #0F172A !important;
+    color: #F8FAFC !important;
+}
+
+/* Resumen financiero y Totales */
+[data-theme="dark"] .pos-checkout-footer .pos-summary strong,
+[data-bs-theme="dark"] .pos-checkout-footer .pos-summary strong {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-checkout-footer .pos-summary-discount strong,
+[data-bs-theme="dark"] .pos-checkout-footer .pos-summary-discount strong {
+    color: #34D399 !important;
+}
+
+/* Caja de Cambio (Vuelto) */
+[data-theme="dark"] .pos-change-box,
+[data-bs-theme="dark"] .pos-change-box {
+    background: #0F172A !important;
+    border: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .pos-change-box .pos-change-label,
+[data-bs-theme="dark"] .pos-change-box .pos-change-label {
+    color: #34D399 !important;
+}
+
+[data-theme="dark"] .pos-change-value,
+[data-bs-theme="dark"] .pos-change-value {
+    color: #34D399 !important;
+}
+
+/* Input de Efectivo Recibido y Botones de Pago */
+[data-theme="dark"] .pos-payment .form-label,
+[data-bs-theme="dark"] .pos-payment .form-label {
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-payment .input-group-text,
+[data-bs-theme="dark"] .pos-payment .input-group-text {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-payment .form-control,
+[data-bs-theme="dark"] .pos-payment .form-control {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #F8FAFC !important;
+}
+
+/* Fichas de Efectivo Rápido (Chips) */
+[data-theme="dark"] .pos-cash-chip,
+[data-bs-theme="dark"] .pos-cash-chip {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-cash-chip:hover,
+[data-bs-theme="dark"] .pos-cash-chip:hover {
+    background: var(--color-teal) !important;
+    border-color: var(--color-teal) !important;
+    color: #FFFFFF !important;
+}
+
+/* Botón Transferencia */
+[data-theme="dark"] .pos-transfer-toggle,
+[data-bs-theme="dark"] .pos-transfer-toggle {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    color: #6EE7B7 !important;
+}
+
+[data-theme="dark"] .pos-transfer-toggle:hover,
+[data-bs-theme="dark"] .pos-transfer-toggle:hover {
+    background: var(--color-teal) !important;
+    border-color: var(--color-teal) !important;
+    color: #FFFFFF !important;
+}
+
+/* Botón Cobrar Deshabilitado */
+[data-theme="dark"] .btn-pos-charge:disabled,
+[data-bs-theme="dark"] .btn-pos-charge:disabled {
+    background: #243248 !important;
+    color: #64748B !important;
+    border: 1px solid #334155 !important;
+    box-shadow: none !important;
+}
+
+[data-theme="dark"] .btn-pos-charge:disabled .pos-charge-kbd,
+[data-bs-theme="dark"] .btn-pos-charge:disabled .pos-charge-kbd {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    color: #64748B !important;
+}
+
+/* Modal de Historial y Ticket */
+[data-theme="dark"] #pos-history-modal .pos-history-table-wrap,
+[data-bs-theme="dark"] #pos-history-modal .pos-history-table-wrap {
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] #pos-history-modal #pos-history-table,
+[data-bs-theme="dark"] #pos-history-modal #pos-history-table {
+    background: transparent !important;
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-ticket-preview-wrap,
+[data-bs-theme="dark"] .pos-ticket-preview-wrap {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+
+/* ==========================================================================
+   1. NOTIFICACIONES FLOTANTES (TOASTS MINIMALISTAS - ESQUINA SUPERIOR DERECHA)
+   ==========================================================================
+   Toasts no bloqueantes en la esquina superior derecha que expiran en 3 segundos.
+   - Borde verde para éxito (#10B981)
+   - Borde rojo para error (#EF4444)
+   - Tipografía nítida, sombras elegantes y soporte para Modo Claro / Oscuro.
+   ========================================================================== */
+
+.toast-container {
+    pointer-events: none;
+    z-index: 1100 !important;
+}
+
+.custom-toast {
+    pointer-events: auto;
+    min-width: 290px;
+    max-width: 420px;
+    background-color: var(--theme-bg-card, #FFFFFF) !important;
+    color: var(--theme-text-main, #1F2937) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+    padding: 0.85rem 1.1rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.85rem !important;
+    margin-bottom: 0.75rem !important;
+    border: 1px solid var(--theme-border, #E5E7EB);
+    border-left: 5px solid #10B981 !important; /* Borde verde default */
+    animation: toastSlideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+@keyframes toastSlideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(40px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+/* Borde verde para éxito */
+.custom-toast.toast-success {
+    border-left-color: #10B981 !important;
+}
+.custom-toast.toast-success .toast-icon {
+    color: #10B981 !important;
+}
+
+/* Borde rojo para error / peligro */
+.custom-toast.toast-danger,
+.custom-toast.toast-error {
+    border-left-color: #EF4444 !important;
+}
+.custom-toast.toast-danger .toast-icon,
+.custom-toast.toast-error .toast-icon {
+    color: #EF4444 !important;
+}
+
+/* Advertencia e Info */
+.custom-toast.toast-warning {
+    border-left-color: #F59E0B !important;
+}
+.custom-toast.toast-warning .toast-icon {
+    color: #F59E0B !important;
+}
+
+.custom-toast.toast-info {
+    border-left-color: #38BDF8 !important;
+}
+.custom-toast.toast-info .toast-icon {
+    color: #38BDF8 !important;
+}
+
+.custom-toast .toast-msg {
+    font-size: 0.88rem;
+    font-weight: 500;
+    line-height: 1.35;
+    flex-grow: 1;
+}
+
+.custom-toast .btn-close-toast {
+    background: transparent;
+    border: none;
+    color: var(--theme-text-muted, #94A3B8);
+    padding: 0.2rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    opacity: 0.65;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+.custom-toast .btn-close-toast:hover {
+    opacity: 1;
+    color: var(--theme-text-main, #1F2937);
+}
+
+/* Toasts en Modo Oscuro */
+[data-theme="dark"] .custom-toast,
+[data-bs-theme="dark"] .custom-toast {
+    background-color: #1E293B !important;
+    color: #F8FAFC !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+    border-top-color: #334155 !important;
+    border-right-color: #334155 !important;
+    border-bottom-color: #334155 !important;
+}
+[data-theme="dark"] .custom-toast .btn-close-toast,
+[data-bs-theme="dark"] .custom-toast .btn-close-toast {
+    color: #94A3B8 !important;
+}
+[data-theme="dark"] .custom-toast .btn-close-toast:hover,
+[data-bs-theme="dark"] .custom-toast .btn-close-toast:hover {
+    color: #FFFFFF !important;
+}
+
+
+/* ==========================================================================
+   2. ANILLOS DE ENFOQUE ACCESIBLE (:focus-visible)
+   ==========================================================================
+   Al navegar con la tecla Tab, los controles interactivos muestran un anillo
+   exterior verde brillante accesible (#10B981 / #34D399) sin ensuciar el clic
+   habitual del ratón.
+   ========================================================================== */
+
+:focus-visible {
+    outline: 2px solid #10B981 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.35) !important;
+    transition: outline-offset 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Campos de formulario */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.pos-omnibox-input:focus-visible,
+.pos-client-input:focus-visible {
+    outline: 2px solid #10B981 !important;
+    outline-offset: 1px !important;
+    border-color: #10B981 !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.35) !important;
+}
+
+/* Botones y controles de acción */
+button:focus-visible,
+.btn:focus-visible,
+[role="button"]:focus-visible,
+a.btn:focus-visible,
+.pos-category-pill:focus-visible,
+.pos-cash-chip:focus-visible,
+.pos-product-card:focus-visible,
+.nav-link:focus-visible,
+.dropdown-item:focus-visible,
+.page-link:focus-visible {
+    outline: 2px solid #10B981 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.45) !important;
+}
+
+/* Resalte optimizado en Modo Oscuro */
+[data-theme="dark"] :focus-visible,
+[data-bs-theme="dark"] :focus-visible {
+    outline-color: #34D399 !important;
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.45) !important;
+}
+
+[data-theme="dark"] input:focus-visible,
+[data-theme="dark"] select:focus-visible,
+[data-theme="dark"] textarea:focus-visible,
+[data-theme="dark"] .form-control:focus-visible,
+[data-theme="dark"] .form-select:focus-visible,
+[data-bs-theme="dark"] input:focus-visible,
+[data-bs-theme="dark"] select:focus-visible,
+[data-bs-theme="dark"] textarea:focus-visible,
+[data-bs-theme="dark"] .form-control:focus-visible,
+[data-bs-theme="dark"] .form-select:focus-visible {
+    outline-color: #34D399 !important;
+    border-color: #34D399 !important;
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.4) !important;
+}
+
+
+/* ==========================================================================
+   3. SKELETON LOADERS (ANIMACIÓN DE PULSO / SHIMMER PARA TABLAS Y TARJETAS)
+   ==========================================================================
+   Reemplaza los íconos giratorios por bloques que simulan la estructura exacta
+   de las filas de tablas y tarjetas mientras se cargan los datos.
+   ========================================================================== */
+
+@keyframes skeletonPulse {
+    0% {
+        opacity: 1;
+        background-color: #E2E8F0;
+    }
+    50% {
+        opacity: 0.45;
+        background-color: #CBD5E1;
+    }
+    100% {
+        opacity: 1;
+        background-color: #E2E8F0;
+    }
+}
+
+@keyframes skeletonShimmerAnim {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.skeleton,
+.skeleton-line,
+.skeleton-circle,
+.skeleton-box {
+    display: inline-block;
+    background: linear-gradient(90deg, #E2E8F0 25%, #F1F5F9 37%, #E2E8F0 63%);
+    background-size: 400% 100%;
+    animation: skeletonShimmerAnim 1.4s ease infinite;
+    border-radius: 6px;
+    vertical-align: middle;
+}
+
+/* Modo oscuro: tonos carbón y pizarra suaves */
+[data-theme="dark"] .skeleton,
+[data-theme="dark"] .skeleton-line,
+[data-theme="dark"] .skeleton-circle,
+[data-theme="dark"] .skeleton-box,
+[data-bs-theme="dark"] .skeleton,
+[data-bs-theme="dark"] .skeleton-line,
+[data-bs-theme="dark"] .skeleton-circle,
+[data-bs-theme="dark"] .skeleton-box {
+    background: linear-gradient(90deg, #1E293B 25%, #334155 37%, #1E293B 63%) !important;
+    background-size: 400% 100% !important;
+}
+
+.skeleton-line {
+    height: 14px;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+.skeleton-line:last-child {
+    margin-bottom: 0;
+}
+.skeleton-line.sm { height: 10px; }
+.skeleton-line.lg { height: 20px; }
+.skeleton-line.w-25 { width: 25%; }
+.skeleton-line.w-40 { width: 40%; }
+.skeleton-line.w-50 { width: 50%; }
+.skeleton-line.w-60 { width: 60%; }
+.skeleton-line.w-75 { width: 75%; }
+.skeleton-line.w-90 { width: 90%; }
+.skeleton-line.w-100 { width: 100%; }
+
+.skeleton-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.skeleton-card {
+    padding: 1.25rem;
+    border-radius: 14px;
+    background-color: var(--theme-bg-card, #FFFFFF);
+    border: 1px solid var(--theme-border, #E5E7EB);
+}
+[data-theme="dark"] .skeleton-card,
+[data-bs-theme="dark"] .skeleton-card {
+    background-color: #1E293B !important;
+    border-color: #334155 !important;
+}
+
+/* Filas simuladas en tablas */
+.skeleton-table-row td {
+    padding: 0.85rem 1rem !important;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--theme-border, #E5E7EB);
+}
+[data-theme="dark"] .skeleton-table-row td,
+[data-bs-theme="dark"] .skeleton-table-row td {
+    border-bottom-color: #334155 !important;
+}
+
+
+/* ==========================================================================
+   ESTÁNDARES VISUALES MODERNOS: ENCABEZADOS FIJOS, DESENFOQUE Y TABULAR-NUMS
+   ========================================================================== */
+
+/* 1. ENCABEZADOS FIJOS (POSITION: STICKY EN TODAS LAS TABLAS)
+   Mantiene el título de las columnas permanentemente visible durante el scroll */
+
+.table-responsive {
+    position: relative;
+    overflow-y: auto;
+    overflow-x: auto;
+    max-height: calc(100vh - 250px);
+    scrollbar-width: thin;
+}
+
+.modal .table-responsive {
+    max-height: 52vh;
+}
+
+.table thead,
+table thead {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+}
+
+.table thead th,
+table thead th,
+.table > thead > tr > th,
+table > thead > tr > th,
+.thead-users th,
+.thead-catalog th,
+.thead-cash th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background-color: var(--color-teal-dark) !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .table thead th,
+[data-theme="dark"] table thead th,
+[data-bs-theme="dark"] .table thead th,
+[data-bs-theme="dark"] table thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background-color: var(--color-teal-dark) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+
+/* 2. DESENFOQUE DE MODALES (BACKDROP-FILTER: BLUR)
+   Aísla visualmente el formulario del sistema de fondo mediante desenfoque */
+
+.modal-backdrop {
+    background-color: rgba(15, 23, 42, 0.58) !important;
+}
+
+.modal-backdrop.show {
+    opacity: 1 !important;
+    backdrop-filter: blur(8px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(8px) saturate(180%) !important;
+}
+
+.modal.fade.show,
+.modal.show {
+    backdrop-filter: blur(6px) saturate(160%);
+    -webkit-backdrop-filter: blur(6px) saturate(160%);
+}
+
+[data-theme="dark"] .modal-backdrop,
+[data-bs-theme="dark"] .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.75) !important;
+}
+
+[data-theme="dark"] .modal-backdrop.show,
+[data-bs-theme="dark"] .modal-backdrop.show {
+    backdrop-filter: blur(10px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(10px) saturate(190%) !important;
+}
+
+[data-theme="dark"] .modal.fade.show,
+[data-theme="dark"] .modal.show,
+[data-bs-theme="dark"] .modal.fade.show,
+[data-bs-theme="dark"] .modal.show {
+    backdrop-filter: blur(8px) saturate(180%);
+    -webkit-backdrop-filter: blur(8px) saturate(180%);
+}
+
+
+/* 3. TIPOGRAFÍA TABULAR (FONT-VARIANT-NUMERIC: TABULAR-NUMS)
+   Alineación matemática perfecta para dígitos, decimales y cifras monetarias */
+
+.table td,
+.table th,
+table td,
+table th,
+.pos-product-price,
+.pos-product-wholesale,
+.pos-cart-line-total,
+.pos-cart-line-savings,
+.pos-summary-total,
+.pos-summary strong,
+.pos-change-value,
+.pos-total-hero strong,
+.pos-total-hero span,
+.pos-cash-chip,
+.pos-stock-badge,
+.pos-qty input,
+.kpi-value,
+.kpi-number,
+.kpi-card h3,
+.kpi-card h4,
+.kpi-card .display-6,
+.kpi-card strong,
+.badge,
+.card h2,
+.card h3,
+.card h4,
+[class*="price"],
+[class*="precio"],
+[class*="monto"],
+[class*="total"],
+[class*="costo"],
+[class*="perdida"],
+[class*="stock"],
+[class*="cant"],
+[class*="cifra"],
+[class*="valor"],
+.ticket {
+    font-variant-numeric: tabular-nums lining-nums !important;
+    font-feature-settings: "tnum" 1, "lnum" 1 !important;
 }

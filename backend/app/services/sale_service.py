@@ -26,6 +26,21 @@ class ConcreteSaleService:
             data.nit_receptor is not None or data.nombre_receptor is not None
         )
 
+    def _to_response(self, sale: Venta) -> sale_schema.SaleResponse:
+        response = sale_schema.SaleResponse.model_validate(sale)
+        detalles_por_id = {d.id_detalle_venta: d for d in (sale.detalles or [])}
+        for detalle_out in response.detalles:
+            detalle = detalles_por_id.get(detalle_out.id_detalle_venta)
+            if not detalle or not detalle.variante:
+                continue
+            variante = detalle.variante
+            producto = variante.producto
+            detalle_out.nombre_producto = producto.nombre if producto else None
+            detalle_out.imagen_url = producto.imagen_url if producto else None
+            detalle_out.talla = variante.talla
+            detalle_out.color = variante.color
+        return response
+
     async def registrar_venta(
         self,
         data: sale_schema.SaleCreate,
@@ -201,7 +216,7 @@ class ConcreteSaleService:
             descripcion=f"Registró venta ID {fresh.id_venta} por Q{total_venta:.2f}.",
         )
         await self.uow.commit()
-        response = sale_schema.SaleResponse.model_validate(fresh)
+        response = self._to_response(fresh)
         response.cambio = cambio_total
         return response
 
@@ -215,7 +230,7 @@ class ConcreteSaleService:
             limit=filters.limit,
             offset=filters.offset,
         )
-        return [sale_schema.SaleResponse.model_validate(s) for s in sales]
+        return [self._to_response(s) for s in sales]
 
     async def count_sales(self, filters: sale_schema.SaleFilter) -> int:
         return await self.uow.sales.count_search(
@@ -230,5 +245,5 @@ class ConcreteSaleService:
         sale = await self.uow.sales.get_sale_by_id(sale_id)
         if not sale:
             raise HTTPException(status_code=404, detail="Venta no encontrada")
-        return sale_schema.SaleResponse.model_validate(sale)
+        return self._to_response(sale)
 

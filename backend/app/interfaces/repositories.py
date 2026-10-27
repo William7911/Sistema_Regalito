@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Tuple, Any
+from datetime import date
 from decimal import Decimal
 from app.db.models import (
     Categoria, Subcategoria, UnidadMedida, Sucursal, AreaBodega,
     Producto, VarianteProducto, InventarioSucursal,
     Rol, DepartamentoGeografico, Usuario,
     Caja, TurnoCaja, Venta, Compra, FacturaFel,
+    OrdenCompra, TrasladoInventario,
 )
 
 
@@ -338,11 +340,35 @@ class DashboardRepository(ABC):
     """Contrato de acceso a datos para las métricas del Panel Principal."""
 
     @abstractmethod
+    async def get_turno_actual(self, user_id: int) -> Optional[TurnoCaja]:
+        ...
+
+    @abstractmethod
     async def get_ventas_hoy(self) -> Tuple[Decimal, int]:
         ...
 
     @abstractmethod
+    async def get_ventas_por_dia(self, desde: date, hasta: date) -> List[Tuple[date, Decimal]]:
+        ...
+
+    @abstractmethod
+    async def get_ventas_por_metodo_hoy(self) -> List[Tuple[str, Decimal]]:
+        ...
+
+    @abstractmethod
+    async def get_mermas_mes(self) -> Decimal:
+        ...
+
+    @abstractmethod
+    async def get_ventas_top_productos(self, desde: date, hasta: date, limit: int = 5) -> List[Any]:
+        ...
+
+    @abstractmethod
     async def count_stock_critico(self) -> int:
+        ...
+
+    @abstractmethod
+    async def get_stock_critico(self, limit: int = 5) -> List[InventarioSucursal]:
         ...
 
     @abstractmethod
@@ -351,6 +377,18 @@ class DashboardRepository(ABC):
 
     @abstractmethod
     async def count_turnos_activos(self) -> int:
+        ...
+
+    @abstractmethod
+    async def get_ordenes_pendientes(self, limit: int = 5) -> List[OrdenCompra]:
+        ...
+
+    @abstractmethod
+    async def get_traslados_pendientes(self, limit: int = 5) -> List[TrasladoInventario]:
+        ...
+
+    @abstractmethod
+    async def get_ultimas_ventas(self, limit: int = 5) -> List[Venta]:
         ...
 
 

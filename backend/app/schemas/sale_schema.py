@@ -31,6 +31,10 @@ class SaleItemResponse(BaseModel):
     precio_unitario: Decimal
     descuento_item: Decimal
     subtotal: Decimal
+    nombre_producto: Optional[str] = None
+    imagen_url: Optional[str] = None
+    talla: Optional[str] = None
+    color: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

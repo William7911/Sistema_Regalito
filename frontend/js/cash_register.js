@@ -276,11 +276,21 @@ function renderCashStatusCard(turno) {
         const cajaEl = document.getElementById('cash-active-caja');
         const cajeroEl = document.getElementById('cash-active-cajero');
         const montoEl = document.getElementById('cash-active-monto');
+        const ventasEl = document.getElementById('cash-active-ventas');
+        const esperadoEl = document.getElementById('cash-active-esperado');
         const fechaEl = document.getElementById('cash-active-fecha');
+        const btnMovimiento = document.getElementById('btn-cash-movement');
 
         if (cajaEl) cajaEl.textContent = cajaNombre;
         if (cajeroEl) cajeroEl.textContent = cajeroNombre;
         if (montoEl) montoEl.textContent = formatCurrency(turno.monto_apertura);
+
+        const montoInicial = Number(turno.monto_apertura || 0);
+        const ventasEfectivo = Number(turno.ventas_efectivo != null ? turno.ventas_efectivo : (turno.total_ventas_efectivo != null ? turno.total_ventas_efectivo : 0));
+        const efectivoEsperado = Number(turno.efectivo_esperado != null ? turno.efectivo_esperado : (montoInicial + ventasEfectivo));
+
+        if (ventasEl) ventasEl.textContent = formatCurrency(ventasEfectivo);
+        if (esperadoEl) esperadoEl.textContent = formatCurrency(efectivoEsperado);
         if (fechaEl) fechaEl.textContent = formatDateTime(turno.fecha_apertura);
 
         if (detailsRow) detailsRow.classList.remove('d-none');
@@ -289,6 +299,7 @@ function renderCashStatusCard(turno) {
         // Botones contextuales
         if (btnOpen) btnOpen.classList.add('d-none');
         if (btnClose) btnClose.classList.remove('d-none');
+        if (btnMovimiento) btnMovimiento.classList.remove('d-none');
     } else {
         // Estado CERRADA
         if (titleEl) titleEl.textContent = 'Caja Cerrada';
@@ -305,6 +316,8 @@ function renderCashStatusCard(turno) {
         if (closedMsg) closedMsg.classList.remove('d-none');
 
         // Botones contextuales
+        const btnMovimiento = document.getElementById('btn-cash-movement');
+        if (btnMovimiento) btnMovimiento.classList.add('d-none');
         if (btnOpen) btnOpen.classList.remove('d-none');
         if (btnClose) btnClose.classList.add('d-none');
     }
@@ -550,6 +563,51 @@ async function handleCloseCashSubmit(e) {
 // Historial de Turnos de Caja (Búsqueda, Filtros, Ordenamiento y Paginación)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Modal y Gestión de Movimientos de Caja (Gastos Menores / Entrada)
+// ---------------------------------------------------------------------------
+
+window.openCashMovementModal = function() {
+    const form = document.getElementById('cash-movement-form');
+    if (form) {
+        form.reset();
+        form.classList.remove('was-validated');
+    }
+    const modal = getModal('cash-movement-modal');
+    if (modal) modal.show();
+};
+
+function handleCashMovementSubmit(e) {
+    e.preventDefault();
+    const form = document.getElementById('cash-movement-form');
+    if (!form) return;
+
+    const type = document.getElementById('cash-movement-type')?.value;
+    const amount = parseFloat(document.getElementById('cash-movement-amount')?.value);
+    const concept = document.getElementById('cash-movement-concept')?.value.trim();
+
+    if (!amount || isNaN(amount) || amount <= 0 || !concept) {
+        form.classList.add('was-validated');
+        return;
+    }
+
+    // Actualizar indicador de efectivo esperado en pantalla
+    const esperadoEl = document.getElementById('cash-active-esperado');
+    if (esperadoEl) {
+        const currentExpected = parseFloat(esperadoEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+        const newExpected = type === 'gasto' ? Math.max(0, currentExpected - amount) : (currentExpected + amount);
+        esperadoEl.textContent = formatCurrency(newExpected);
+    }
+
+    const modal = getModal('cash-movement-modal');
+    if (modal) modal.hide();
+
+    if (typeof window.showToast === 'function') {
+        const typeLabel = type === 'gasto' ? 'Gasto menor' : 'Entrada para cambio';
+        window.showToast(`${typeLabel} registrado (${formatCurrency(amount)}): "${escapeHtml(concept)}"`, 'success');
+    }
+}
+
 async function loadCashTurnos() {
     const tbody = document.getElementById('cash-table-body');
     const empty = document.getElementById('cash-empty');
@@ -567,6 +625,10 @@ async function loadCashTurnos() {
     params.append('sort_dir', cashHistoryState.sortDir);
     params.append('limit', cashHistoryState.pageSize);
     params.append('offset', (cashHistoryState.page - 1) * cashHistoryState.pageSize);
+
+    if (tbody && typeof window.renderSkeletonTable === 'function') {
+        tbody.innerHTML = window.renderSkeletonTable(8, 5);
+    }
 
     try {
         const res = await fetch(`${CASH_API}/turnos?${params.toString()}`, { headers: authHeaders() });
@@ -613,6 +675,7 @@ async function loadCashTurnos() {
         }
 
         renderCashPagination();
+        updateCashSortIndicators();
     } catch (err) {
         console.error('Error al cargar historial de turnos:', err);
         if (typeof window.showToast === 'function') {
@@ -676,15 +739,17 @@ function toggleCashSort(column) {
 function updateCashSortIndicators() {
     document.querySelectorAll('#cash-view th.sortable').forEach(th => {
         const col = th.getAttribute('data-sort');
-        const iconSpan = th.querySelector('.sort-icon');
-        if (iconSpan) {
-            if (col === cashHistoryState.sortBy) {
-                iconSpan.textContent = cashHistoryState.sortDir === 'asc' ? '▲' : '▼';
-                iconSpan.style.opacity = '1';
-            } else {
-                iconSpan.textContent = '';
-                iconSpan.style.opacity = '0.3';
-            }
+        let iconSpan = th.querySelector('.sort-icon');
+        if (!iconSpan) {
+            iconSpan = document.createElement('span');
+            iconSpan.className = 'sort-icon';
+            th.appendChild(iconSpan);
+        }
+        if (col === cashHistoryState.sortBy) {
+            const arrowClass = cashHistoryState.sortDir === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down';
+            iconSpan.innerHTML = `<i class="bi ${arrowClass} text-white ms-1"></i>`;
+        } else {
+            iconSpan.innerHTML = `<i class="bi bi-arrow-down-up text-white-50 ms-1"></i>`;
         }
     });
 }
@@ -722,6 +787,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeForm = document.getElementById('close-cash-form');
     if (closeForm) closeForm.addEventListener('submit', handleCloseCashSubmit);
+
+    const movementForm = document.getElementById('cash-movement-form');
+    if (movementForm) movementForm.addEventListener('submit', handleCashMovementSubmit);
 
     // Limpieza de validación en tiempo real al escribir
     [openForm, closeForm].forEach(form => {
