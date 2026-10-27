@@ -97,6 +97,11 @@ app.include_router(historial_precios.router, prefix="/api/historial-precios", ta
 app.include_router(traslados.router, prefix="/api/traslados", tags=["traslados"])
 app.include_router(visitas.router, prefix="/api/visitas", tags=["visitas"])
 
+# Servir imágenes subidas por los usuarios
+uploads_path = os.path.join(os.path.dirname(__file__), "..", "uploads")
+os.makedirs(uploads_path, exist_ok=True)
+app.mount("/api/uploads", StaticFiles(directory=uploads_path), name="uploads")
+
 # Servir archivos estáticos del frontend en la ruta principal (Recomendado para simplicidad)
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
 if os.path.exists(frontend_path):

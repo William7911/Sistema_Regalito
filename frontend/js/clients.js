@@ -52,6 +52,7 @@
             // Filtros Clientes
             filterName: document.getElementById('filter-client-name'),
             filterNit: document.getElementById('filter-client-nit'),
+            filterPhone: document.getElementById('filter-client-phone'),
             filterType: document.getElementById('filter-client-type'),
             filterActive: document.getElementById('filter-client-active'),
             filterDateFrom: document.getElementById('filter-client-date-from'),
@@ -129,6 +130,51 @@
     // -----------------------------------------------------------------------
     // Inicialización del Módulo
     // -----------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    // Funciones Auxiliares UI / UX Clientes
+    // -----------------------------------------------------------------------
+    function escapeHtml(text) {
+        if (text == null) return '';
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    }
+
+    function getClientTypeBadge(tipo) {
+        if (!tipo || !tipo.nombre) {
+            return '<span class="text-muted">—</span>';
+        }
+        const name = tipo.nombre.trim();
+        const lower = name.toLowerCase();
+        let badgeClass = 'badge-soft-slate';
+
+        if (lower.includes('mayorista')) {
+            badgeClass = 'badge-soft-blue';
+        } else if (lower.includes('consumidor') || lower.includes('final') || lower === 'cf') {
+            badgeClass = 'badge-soft-slate';
+        } else if (lower.includes('preferencial') || lower.includes('frecuente') || lower.includes('vip')) {
+            badgeClass = 'badge-soft-purple';
+        } else if (lower.includes('minorista') || lower.includes('regular') || lower.includes('general')) {
+            badgeClass = 'badge-soft-emerald';
+        } else {
+            badgeClass = 'badge-soft-blue';
+        }
+
+        return `<span class="badge ${badgeClass}">${escapeHtml(name)}</span>`;
+    }
+
+    function syncClearBtn(input) {
+        if (!input) return;
+        const wrap = input.closest('.client-search-field');
+        const clearBtn = wrap ? wrap.querySelector('.client-clear-btn') : null;
+        if (clearBtn) {
+            if (input.value.trim().length > 0) {
+                clearBtn.classList.add('is-visible');
+            } else {
+                clearBtn.classList.remove('is-visible');
+            }
+        }
+    }
+
     window.showClientsModule = async function () {
         initDOM();
         if (!DOM.view) return;
@@ -151,12 +197,49 @@
         }
 
         bindEvents();
+        updateSortIcons();
         await loadCatalogs();
         await loadClients();
         await loadTiposCliente();
     };
 
     function bindEvents() {
+        // Inputs de búsqueda rápida con botón "X" integrado (Nombre, NIT, Teléfono)
+        ['filter-client-name', 'filter-client-nit', 'filter-client-phone'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input && !input.dataset.boundClear) {
+                input.dataset.boundClear = 'true';
+                const updateBtn = () => syncClearBtn(input);
+                input.addEventListener('input', updateBtn);
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        state.page = 1;
+                        loadClients();
+                    }
+                });
+                updateBtn();
+            }
+        });
+
+        // Botones "X" (Clear) individuales dentro de cada input
+        document.querySelectorAll('#clients-view .client-clear-btn').forEach(btn => {
+            if (!btn.dataset.bound) {
+                btn.dataset.bound = 'true';
+                btn.addEventListener('click', () => {
+                    const targetId = btn.dataset.target;
+                    const input = document.getElementById(targetId);
+                    if (input) {
+                        input.value = '';
+                        btn.classList.remove('is-visible');
+                        input.focus();
+                        state.page = 1;
+                        loadClients();
+                    }
+                });
+            }
+        });
+
         // Filtros y Paginación Clientes
         if (DOM.btnFilter && !DOM.btnFilter.dataset.bound) {
             DOM.btnFilter.dataset.bound = 'true';
@@ -184,8 +267,8 @@
             });
         }
 
-        // Ordenamiento por encabezados de tabla
-        document.querySelectorAll('[data-client-sort]').forEach(th => {
+        // Ordenamiento por encabezados de tabla (Theme Sync 1:1 con Inventario)
+        document.querySelectorAll('#clients-view [data-client-sort]').forEach(th => {
             if (!th.dataset.bound) {
                 th.dataset.bound = 'true';
                 th.addEventListener('click', () => {
@@ -246,20 +329,31 @@
     }
 
     function updateSortIcons() {
-        document.querySelectorAll('[data-client-sort]').forEach(th => {
-            const icon = th.querySelector('i');
-            if (!icon) return;
+        document.querySelectorAll('#clients-view [data-client-sort]').forEach(th => {
+            const sortIcon = th.querySelector('.sort-icon') || th.querySelector('i');
+            if (!sortIcon) return;
             if (th.dataset.clientSort === state.sortBy) {
-                icon.className = `bi bi-arrow-${state.sortOrder === 'asc' ? 'up' : 'down'} text-teal small ms-1`;
+                const arrowClass = state.sortOrder === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down';
+                sortIcon.innerHTML = `<i class="bi ${arrowClass} text-white ms-1"></i>`;
             } else {
-                icon.className = 'bi bi-arrow-down-up text-muted small ms-1';
+                sortIcon.innerHTML = `<i class="bi bi-arrow-down-up text-white-50 ms-1"></i>`;
             }
         });
     }
 
     function resetFilters() {
-        if (DOM.filterName) DOM.filterName.value = '';
-        if (DOM.filterNit) DOM.filterNit.value = '';
+        if (DOM.filterName) {
+            DOM.filterName.value = '';
+            syncClearBtn(DOM.filterName);
+        }
+        if (DOM.filterNit) {
+            DOM.filterNit.value = '';
+            syncClearBtn(DOM.filterNit);
+        }
+        if (DOM.filterPhone) {
+            DOM.filterPhone.value = '';
+            syncClearBtn(DOM.filterPhone);
+        }
         if (DOM.filterType) DOM.filterType.value = '';
         if (DOM.filterActive) DOM.filterActive.value = 'true';
         if (DOM.filterDateFrom) DOM.filterDateFrom.value = '';
@@ -362,8 +456,14 @@
         const params = new URLSearchParams();
         params.append('limit', state.limit);
         params.append('offset', (state.page - 1) * state.limit);
-        params.append('sort_by', state.sortBy);
-        params.append('sort_order', state.sortOrder);
+
+        if (state.sortBy === 'total_comprado') {
+            params.append('sort_by', 'id_cliente');
+            params.append('sort_order', state.sortOrder);
+        } else {
+            params.append('sort_by', state.sortBy);
+            params.append('sort_order', state.sortOrder);
+        }
 
         if (DOM.filterName && DOM.filterName.value.trim()) params.append('nombre', DOM.filterName.value.trim());
         if (DOM.filterNit && DOM.filterNit.value.trim()) params.append('nit', DOM.filterNit.value.trim());
@@ -377,9 +477,35 @@
             if (!res.ok) throw new Error('Error al consultar clientes');
             const data = await res.json();
 
-            state.total = data.total;
-            renderClientsTable(data.items);
+            let items = Array.isArray(data.items) ? [...data.items] : [];
+
+            // Filtro dinámico por teléfono (fidelización POS)
+            const phoneTerm = DOM.filterPhone ? DOM.filterPhone.value.trim() : '';
+            if (phoneTerm) {
+                const cleanPhone = phoneTerm.toLowerCase().replace(/[^0-9]/g, '');
+                items = items.filter(c => {
+                    if (!c.contactos || !Array.isArray(c.contactos)) return false;
+                    return c.contactos.some(ct => {
+                        if (!ct.telefono) return false;
+                        const ctClean = String(ct.telefono).replace(/[^0-9]/g, '');
+                        return ctClean.includes(cleanPhone) || String(ct.telefono).toLowerCase().includes(phoneTerm.toLowerCase());
+                    });
+                });
+            }
+
+            // Ordenamiento por Total Comprado (client-side) si está activo
+            if (state.sortBy === 'total_comprado') {
+                items.sort((a, b) => {
+                    const valA = Number(a.total_comprado) || 0;
+                    const valB = Number(b.total_comprado) || 0;
+                    return state.sortOrder === 'asc' ? valA - valB : valB - valA;
+                });
+            }
+
+            state.total = phoneTerm ? items.length : data.total;
+            renderClientsTable(items);
             renderPagination();
+            updateSortIcons();
         } catch (err) {
             DOM.tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger"><i class="bi bi-exclamation-circle me-1"></i>${err.message}</td></tr>`;
         }
@@ -398,14 +524,15 @@
                 ? '<span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle">Activo</span>'
                 : '<span class="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle">Inactivo</span>';
 
-            const tipoBadge = c.tipo_cliente
-                ? `<span class="badge bg-light text-dark border">${c.tipo_cliente.nombre}</span>`
-                : '<span class="text-muted">—</span>';
+            // Soft Badge semántico sin contornos grises
+            const tipoBadge = getClientTypeBadge(c.tipo_cliente);
 
-            const ubicacion = c.municipio_nombre || (c.direccion ? c.direccion : '<span class="text-muted">—</span>');
+            // Reemplazo estratégico de Ubicación por Total Comprado (placeholder numérico de valor)
+            const totalCompradoVal = Number(c.total_comprado != null ? c.total_comprado : 0);
+            const totalCompradoHtml = `<span class="font-monospace text-dark fw-semibold">Q ${totalCompradoVal.toFixed(2)}</span>`;
 
             const contactosCount = (c.contactos && c.contactos.length > 0)
-                ? (c.contactos[0].telefono ? `<i class="bi bi-telephone me-1 text-muted"></i>${c.contactos[0].telefono}` : (c.contactos[0].correo || '—'))
+                ? (c.contactos[0].telefono ? `<i class="bi bi-telephone me-1 text-muted"></i>${escapeHtml(c.contactos[0].telefono)}` : (escapeHtml(c.contactos[0].correo) || '—'))
                 : '<span class="text-muted">—</span>';
 
             const extraContactos = (c.contactos && c.contactos.length > 1)
@@ -414,25 +541,25 @@
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><strong class="font-monospace text-teal">${c.nit}</strong></td>
+                <td><strong class="font-monospace text-teal">${escapeHtml(c.nit || '')}</strong></td>
                 <td>
-                    <div class="fw-semibold">${c.nombre_comercial}</div>
-                    ${c.direccion ? `<small class="text-muted text-truncate d-block" style="max-width: 250px;">${c.direccion}</small>` : ''}
+                    <div class="fw-semibold text-dark">${escapeHtml(c.nombre_comercial || '')}</div>
+                    ${c.direccion ? `<small class="text-muted text-truncate d-block" style="max-width: 250px;">${escapeHtml(c.direccion)}</small>` : ''}
                 </td>
                 <td>${tipoBadge}</td>
-                <td><small class="text-muted">${ubicacion}</small></td>
+                <td class="text-end">${totalCompradoHtml}</td>
                 <td><small>${contactosCount}${extraContactos}</small></td>
                 <td>${statusBadge}</td>
-                <td class="text-end">
-                    <button class="btn btn-sm btn-outline-info me-1" data-action="view-card" data-id="${c.id_cliente}" title="Ver ficha del cliente">
+                <td class="text-end text-nowrap">
+                    <button type="button" class="client-action-btn client-action-btn--view" data-action="view-card" data-id="${c.id_cliente}" title="Ver ficha del cliente" aria-label="Ver ficha del cliente">
                         <i class="bi bi-eye"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary me-1" data-action="edit" data-id="${c.id_cliente}" title="Editar cliente">
+                    <button type="button" class="client-action-btn client-action-btn--edit" data-action="edit" data-id="${c.id_cliente}" title="Editar cliente" aria-label="Editar cliente">
                         <i class="bi bi-pencil"></i>
                     </button>
                     ${isCF
-                        ? `<button class="btn btn-sm btn-outline-secondary opacity-50" disabled title="Consumidor Final no puede desactivarse"><i class="bi bi-trash"></i></button>`
-                        : `<button class="btn btn-sm ${c.estado === 'Activo' ? 'btn-outline-danger' : 'btn-outline-success'}" data-action="toggle-status" data-id="${c.id_cliente}" data-name="${c.nombre_comercial}" data-status="${c.estado}" title="${c.estado === 'Activo' ? 'Desactivar cliente' : 'Activar cliente'}">
+                        ? `<button type="button" class="client-action-btn client-action-btn--delete disabled" disabled title="Consumidor Final no puede desactivarse" aria-label="Consumidor Final"><i class="bi bi-trash"></i></button>`
+                        : `<button type="button" class="client-action-btn ${c.estado === 'Activo' ? 'client-action-btn--delete' : 'client-action-btn--activate'}" data-action="toggle-status" data-id="${c.id_cliente}" data-name="${escapeHtml(c.nombre_comercial || '')}" data-status="${c.estado}" title="${c.estado === 'Activo' ? 'Desactivar cliente' : 'Activar cliente'}" aria-label="${c.estado === 'Activo' ? 'Desactivar' : 'Activar'}">
                             <i class="bi ${c.estado === 'Activo' ? 'bi-trash' : 'bi-check-circle'}"></i>
                            </button>`
                     }

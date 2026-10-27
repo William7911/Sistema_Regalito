@@ -11,6 +11,9 @@ from app.schemas.reportes_schema import (
     ReporteConsolidadoResponse,
     UsuarioReporteDTO,
     ClienteReporteDTO,
+    KPITotalesDTO,
+    GraficaResponse,
+    RankingResponse,
 )
 
 router = APIRouter(prefix="/api/reportes", tags=["Reportes"])
@@ -20,6 +23,7 @@ router = APIRouter(prefix="/api/reportes", tags=["Reportes"])
 # Reporte Consolidado Operativo (Existente)
 # ---------------------------------------------------------------------------
 
+@router.get("", response_model=ReporteConsolidadoResponse, include_in_schema=False)
 @router.get("/", response_model=ReporteConsolidadoResponse)
 async def get_reportes(
     fecha_inicio: date = Query(...),
@@ -44,6 +48,48 @@ async def exportar_reportes(
         media_type=result.media_type,
         headers={"Content-Disposition": f'attachment; filename="{result.filename}"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# Dashboard de Estadísticas: KPI / Gráficas / Rankings
+# (Motor central de fechas -> el frontend dispara estos 3 endpoints en
+# paralelo cada vez que el usuario presiona "Consultar")
+# ---------------------------------------------------------------------------
+
+@router.get("/kpi", response_model=KPITotalesDTO)
+async def get_kpi_reportes(
+    fecha_inicio: date = Query(...),
+    fecha_fin: date = Query(...),
+    current_user: Usuario = Depends(require_permission("REPORTE_VER")),
+    service: ReportesService = Depends(get_reporte_service),
+):
+    """Totales agregados (ventas netas, mermas, compras) del rango de fechas."""
+    return await service.obtener_kpi(fecha_inicio, fecha_fin, current_user.id_usuario)
+
+
+@router.get("/grafica", response_model=GraficaResponse)
+async def get_grafica_reportes(
+    tipo: str = Query("tendencia", pattern="^(tendencia|categoria|hora)$"),
+    fecha_inicio: date = Query(...),
+    fecha_fin: date = Query(...),
+    current_user: Usuario = Depends(require_permission("REPORTE_VER")),
+    service: ReportesService = Depends(get_reporte_service),
+):
+    """Datos de la gráfica activa (pestaña: tendencia, categoría u hora)."""
+    return await service.obtener_grafica(tipo, fecha_inicio, fecha_fin, current_user.id_usuario)
+
+
+@router.get("/ranking", response_model=RankingResponse)
+async def get_ranking_reportes(
+    tipo_reporte: str = Query("productos", pattern="^(productos|clientes|estancados)$"),
+    limite: int = Query(5, ge=1, le=100),
+    fecha_inicio: date = Query(...),
+    fecha_fin: date = Query(...),
+    current_user: Usuario = Depends(require_permission("REPORTE_VER")),
+    service: ReportesService = Depends(get_reporte_service),
+):
+    """Rankings (Top Productos / Clientes / Estancados) con límite configurable."""
+    return await service.obtener_ranking(tipo_reporte, fecha_inicio, fecha_fin, limite, current_user.id_usuario)
 
 
 # ---------------------------------------------------------------------------

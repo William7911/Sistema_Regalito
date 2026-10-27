@@ -14,6 +14,7 @@
         filterSku: document.getElementById('filter-inv-sku'),
         filterLowStock: document.getElementById('filter-inv-low-stock'),
         btnFilter: document.getElementById('btn-filter-inventory'),
+        clearSearch: document.getElementById('btn-clear-inventory-search'),
         pageSize: document.getElementById('inventory-page-size'),
         prevPage: document.getElementById('inventory-prev-page'),
         nextPage: document.getElementById('inventory-next-page'),
@@ -48,6 +49,44 @@
         if (DOM.btnFilter) DOM.btnFilter.addEventListener('click', () => {
             currentPage = 1;
             applyFilters();
+        });
+
+        /* ------------------------------------------------------------------
+           UX · BOTÓN "X" DEL BUSCADOR DE INVENTARIO
+           Dos acciones simultáneas al hacer clic:
+             1) Vacía el texto del input.
+             2) Re-renderiza la tabla con todos los registros (sin exigir un
+                segundo clic en "Filtrar").
+           La "X" solo se muestra cuando el input contiene texto.
+           ------------------------------------------------------------------ */
+        if (DOM.filterSku && DOM.clearSearch) {
+            const syncClearButton = () => {
+                DOM.clearSearch.classList.toggle('is-visible', DOM.filterSku.value.length > 0);
+            };
+
+            DOM.filterSku.addEventListener('input', syncClearButton);
+
+            DOM.clearSearch.addEventListener('click', () => {
+                DOM.filterSku.value = '';
+                syncClearButton();
+                currentPage = 1;
+                applyFilters();        // Restaura la tabla al instante.
+                DOM.filterSku.focus(); // Mantiene el foco en el buscador.
+            });
+
+            syncClearButton();
+        }
+
+        /* Ocultar el zoom si la imagen ampliada falla, al desplazarse o al
+           redimensionar. Así nunca queda una vista previa flotante huérfana. */
+        const zoomImage = document.getElementById('inventory-image-zoom-img');
+        if (zoomImage) {
+            zoomImage.addEventListener('error', hideInventoryImageZoom);
+        }
+        window.addEventListener('scroll', hideInventoryImageZoom, true);
+        window.addEventListener('resize', hideInventoryImageZoom);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') hideInventoryImageZoom();
         });
 
         const btnAlertas = document.getElementById('btn-inventory-alerts');
@@ -189,6 +228,8 @@
             }
             
             inventoryData = await res.json();
+            // Rediseño UI/UX: refresca las tarjetas KPI con los datos ya cargados.
+            updateInventoryKpis();
             applyFilters();
         } catch (err) {
             if (typeof window.showToast === 'function') {
@@ -240,8 +281,169 @@
         });
     }
 
+    /* ----------------------------------------------------------------------
+       REDISEÑO UI/UX · INSIGNIAS SEMÁNTICAS DE STOCK (SOFT BADGES)
+       Solo define la variante visual del stock, sin modificar los datos:
+         - danger  : stock igual o por debajo del mínimo (incluye agotados).
+         - warning : stock dentro del margen de alerta (hasta 50% sobre el mínimo).
+         - ok      : stock holgado, muy por encima del mínimo.
+       ---------------------------------------------------------------------- */
+    function getStockBadgeMeta(stockActual, stockMinimo) {
+        const actual = Number(stockActual) || 0;
+        const minimo = Number(stockMinimo) || 0;
+
+        if (actual <= minimo) {
+            return {
+                className: 'stock-badge--danger',
+                label: actual === 0 ? 'Producto agotado' : 'Stock igual o por debajo del mínimo'
+            };
+        }
+
+        if (actual <= Math.ceil(minimo * 1.5)) {
+            return {
+                className: 'stock-badge--warning',
+                label: 'Stock cerca del mínimo'
+            };
+        }
+
+        return {
+            className: 'stock-badge--ok',
+            label: 'Stock holgado'
+        };
+    }
+
+    /* ----------------------------------------------------------------------
+       REDISEÑO UI/UX · MINIATURA DEL PRODUCTO
+       Si el registro incluye imagen_url se muestra la foto; en caso contrario
+       se usa el placeholder gris con el ícono de caja. No hace peticiones.
+       ---------------------------------------------------------------------- */
+    /* Escapa valores interpolados en atributos HTML (por ejemplo, la URL de la
+       imagen) para no romper el marcado ni permitir inyección de contenido. */
+    function escapeAttribute(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function getProductThumbHtml(item) {
+        const imageUrl = item && item.imagen_url ? String(item.imagen_url).trim() : '';
+        const safeImageUrl = escapeAttribute(imageUrl);
+
+        if (!imageUrl) {
+            return '<span class="inventory-product-thumb inventory-product-thumb--placeholder" aria-hidden="true">📦</span>';
+        }
+
+        return `
+            <span class="inventory-product-thumb-wrap inventory-product-thumb-wrap--zoomable" data-zoom-src="${safeImageUrl}" tabindex="0" aria-label="Vista previa ampliada de la imagen del producto">
+                <img src="${safeImageUrl}" alt="" class="inventory-product-thumb" loading="lazy" onerror="this.parentElement.classList.add('is-placeholder'); this.parentElement.removeAttribute('data-zoom-src'); this.parentElement.removeAttribute('tabindex'); this.parentElement.removeAttribute('aria-label'); this.remove();">
+                <span class="inventory-product-thumb-fallback" aria-hidden="true">📦</span>
+            </span>`;
+    }
+
+    /* ----------------------------------------------------------------------
+       ZOOM FLOTANTE DE LA MINIATURA DEL PRODUCTO
+       La vista previa se monta fuera de la tabla con position: fixed para que
+       el overflow de .table-responsive no la recorte. Se coloca junto a la
+       miniatura y no ocupa espacio en la fila, por lo que su altura no cambia.
+       ---------------------------------------------------------------------- */
+    const IMAGE_ZOOM_SIZE = 200;
+    const IMAGE_ZOOM_GAP = 12;
+    const IMAGE_ZOOM_MARGIN = 8;
+
+    function getInventoryImageZoom() {
+        return document.getElementById('inventory-image-zoom');
+    }
+
+    function positionInventoryImageZoom(trigger) {
+        const zoom = getInventoryImageZoom();
+        if (!zoom || !trigger) return;
+
+        const rect = trigger.getBoundingClientRect();
+        const width = zoom.offsetWidth || IMAGE_ZOOM_SIZE;
+        const height = zoom.offsetHeight || IMAGE_ZOOM_SIZE;
+        const maxLeft = window.innerWidth - width - IMAGE_ZOOM_MARGIN;
+
+        /* Preferencia: a la derecha de la miniatura; si no cabe, a la izquierda. */
+        let left = rect.right + IMAGE_ZOOM_GAP;
+        if (left > maxLeft) {
+            left = rect.left - width - IMAGE_ZOOM_GAP;
+        }
+        left = Math.max(IMAGE_ZOOM_MARGIN, Math.min(left, maxLeft));
+
+        /* La miniatura queda centrada verticalmente con respecto a la vista previa. */
+        const halfHeight = height / 2;
+        let top = rect.top + rect.height / 2;
+        top = Math.max(halfHeight + IMAGE_ZOOM_MARGIN, Math.min(top, window.innerHeight - halfHeight - IMAGE_ZOOM_MARGIN));
+
+        zoom.style.left = `${left}px`;
+        zoom.style.top = `${top}px`;
+    }
+
+    function showInventoryImageZoom(trigger) {
+        const zoom = getInventoryImageZoom();
+        const image = document.getElementById('inventory-image-zoom-img');
+        const src = trigger && trigger.getAttribute('data-zoom-src');
+        if (!zoom || !image || !src) return;
+
+        if (image.getAttribute('src') !== src) {
+            image.src = src;
+        }
+        zoom.classList.add('is-visible');
+        zoom.setAttribute('aria-hidden', 'false');
+        positionInventoryImageZoom(trigger);
+    }
+
+    function hideInventoryImageZoom() {
+        const zoom = getInventoryImageZoom();
+        if (!zoom) return;
+        zoom.classList.remove('is-visible');
+        zoom.setAttribute('aria-hidden', 'true');
+    }
+
+    function setupInventoryImageZoom(trigger) {
+        if (!trigger) return;
+        trigger.addEventListener('mouseenter', () => showInventoryImageZoom(trigger));
+        trigger.addEventListener('mouseleave', hideInventoryImageZoom);
+        trigger.addEventListener('focus', () => showInventoryImageZoom(trigger));
+        trigger.addEventListener('blur', hideInventoryImageZoom);
+    }
+
+    /* ----------------------------------------------------------------------
+       REDISEÑO UI/UX — TARJETAS DE RESUMEN KPI
+       Actualiza el micro-dashboard con los registros ya cargados. No realiza
+       consultas nuevas ni altera filtros, ordenamiento o paginación.
+       ---------------------------------------------------------------------- */
+    function updateInventoryKpis() {
+        const uniqueProducts = new Set(
+            inventoryData.map(item => item.id_variante || item.variante_sku || item.id_inventario)
+        ).size;
+
+        const lowStock = inventoryData.filter(item => {
+            const actual = Number(item.stock_actual) || 0;
+            const minimo = Number(item.stock_minimo) || 0;
+            return actual > 0 && actual <= minimo;
+        }).length;
+
+        const outOfStock = inventoryData.filter(item => (Number(item.stock_actual) || 0) <= 0).length;
+        const totalUnits = inventoryData.reduce((sum, item) => sum + (Number(item.stock_actual) || 0), 0);
+
+        setKpiValue('kpi-inv-total', uniqueProducts);
+        setKpiValue('kpi-inv-low', lowStock);
+        setKpiValue('kpi-inv-out', outOfStock);
+        setKpiValue('kpi-inv-units', totalUnits);
+    }
+
+    function setKpiValue(elementId, value) {
+        const el = document.getElementById(elementId);
+        if (el) el.textContent = Number(value).toLocaleString('es-GT');
+    }
+
     function renderTable() {
         if (!DOM.tableBody) return;
+        hideInventoryImageZoom();
         DOM.tableBody.innerHTML = '';
         
         if (filteredData.length === 0) {
@@ -265,24 +467,33 @@
 
         pageData.forEach(item => {
             const tr = document.createElement('tr');
-            
-            const isLowStock = item.stock_actual <= item.stock_minimo;
-            const stockBadgeClass = isLowStock ? 'bg-danger' : 'bg-success';
 
+            // Theme global: soft badge unificado con el estado "Activo" de Usuarios.
+            const stockMeta = getStockBadgeMeta(item.stock_actual, item.stock_minimo);
+
+            // Rediseño: miniatura del producto, badge semántico y acción fantasma.
             tr.innerHTML = `
                 <td>${item.id_inventario}</td>
-                <td>${item.producto_nombre || 'N/A'}</td>
+                <td>
+                    <div class="d-flex align-items-center gap-2 inventory-product-cell">
+                        ${getProductThumbHtml(item)}
+                        <span class="fw-semibold inventory-product-name">${item.producto_nombre || 'N/A'}</span>
+                    </div>
+                </td>
                 <td class="font-monospace">${item.variante_sku || 'N/A'}</td>
                 <td>${item.sucursal_nombre || 'N/A'}</td>
-                <td><span class="badge ${stockBadgeClass} fs-6">${item.stock_actual}</span></td>
+                <td>
+                    <span class="stock-badge ${stockMeta.className}" title="${stockMeta.label}">${item.stock_actual}</span>
+                </td>
                 <td>${item.stock_minimo}</td>
                 <td class="text-end">
-                    <button class="btn btn-sm btn-outline-teal" onclick="window.openInventoryModal(${item.id_inventario})" title="Ajustar Stock">
-                        <i class="bi bi-sliders"></i> Ajustar
+                    <button class="btn btn-sm inventory-action-btn" onclick="window.openInventoryModal(${item.id_inventario})" title="Ajustar stock" aria-label="Ajustar stock">
+                        <i class="bi bi-sliders"></i>
                     </button>
                 </td>
             `;
             DOM.tableBody.appendChild(tr);
+            setupInventoryImageZoom(tr.querySelector('.inventory-product-thumb-wrap[data-zoom-src]'));
         });
     }
 

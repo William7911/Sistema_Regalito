@@ -2,18 +2,23 @@ import io
 import csv
 import openpyxl
 from fastapi import HTTPException
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import List, Optional
 from decimal import Decimal
 
 from app.schemas.reportes_schema import (
+    GraficaResponse,
+    KPITotalesDTO,
     ReporteConsolidadoResponse,
+    TotalesConsolidadoDTO,
     ReporteExportadoDTO,
     VentaReporteDTO,
     MermaReporteDTO,
     CompraReporteDTO,
     UsuarioReporteDTO,
     ClienteReporteDTO,
+    RankingItemDTO,
+    RankingResponse,
 )
 from app.core.permissions import check_user_permission
 
@@ -54,11 +59,93 @@ class ReportesService:
         mermas_db = await self.uow.reportes.get_mermas_by_date(fecha_inicio, fecha_fin)
         compras_db = await self.uow.reportes.get_compras_by_date(fecha_inicio, fecha_fin)
 
-        ventas = [VentaReporteDTO.model_validate(v) for v in ventas_db]
-        mermas = [MermaReporteDTO.model_validate(m) for m in mermas_db]
-        compras = [CompraReporteDTO.model_validate(c) for c in compras_db]
+        ventas: List[VentaReporteDTO] = []
+        total_ventas = Decimal("0.00")
+        for v in ventas_db:
+            vendedor = "Desconocido"
+            if getattr(v, "usuario", None):
+                vendedor = v.usuario.nombre_completo or v.usuario.username
+            elif getattr(v, "id_usuario", None):
+                vendedor = f"Usuario #{v.id_usuario}"
 
-        return ReporteConsolidadoResponse(ventas=ventas, mermas=mermas, compras=compras)
+            dt = v.fecha_venta
+            if dt and dt.tzinfo is None:
+                dt_aware = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt_aware = dt
+
+            subtotal = Decimal(str(v.subtotal or Decimal("0.00")))
+            descuento = Decimal(str(v.descuento_total or Decimal("0.00")))
+            total = Decimal(str(v.total_venta or Decimal("0.00")))
+            total_ventas += total
+
+            ventas.append(
+                VentaReporteDTO(
+                    id_venta=v.id_venta,
+                    fecha=dt_aware,
+                    fecha_venta=dt_aware,
+                    estado=v.estado or "Completada",
+                    vendedor=vendedor,
+                    subtotal=subtotal,
+                    descuento=descuento,
+                    total=total,
+                    total_venta=total,
+                )
+            )
+
+        mermas: List[MermaReporteDTO] = []
+        total_mermas = Decimal("0.00")
+        for m in mermas_db:
+            dt = m.fecha_merma
+            if dt and dt.tzinfo is None:
+                dt_aware = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt_aware = dt
+
+            costo_merma = Decimal("0.00")
+            if getattr(m, "detalles", None):
+                for d in m.detalles:
+                    if getattr(d, "costo_perdida", None) is not None:
+                        costo_merma += Decimal(str(d.costo_perdida))
+            total_mermas += costo_merma
+
+            mermas.append(
+                MermaReporteDTO(
+                    id_merma=m.id_merma,
+                    fecha=dt_aware,
+                    fecha_merma=dt_aware,
+                    observaciones=m.observaciones,
+                    total=costo_merma,
+                )
+            )
+
+        compras: List[CompraReporteDTO] = []
+        total_compras = Decimal("0.00")
+        for c in compras_db:
+            monto_compra = Decimal(str(c.total_compra or Decimal("0.00")))
+            total_compras += monto_compra
+            compras.append(
+                CompraReporteDTO(
+                    id_compra=c.id_compra,
+                    fecha=c.fecha_ingreso,
+                    fecha_ingreso=c.fecha_ingreso,
+                    total=monto_compra,
+                    total_compra=monto_compra,
+                )
+            )
+
+        totales = TotalesConsolidadoDTO(
+            ventas=total_ventas,
+            mermas=total_mermas,
+            compras=total_compras,
+        )
+
+        return ReporteConsolidadoResponse(
+            totales=totales,
+            ventas=ventas,
+            mermas=mermas,
+            compras=compras,
+        )
 
     async def exportar_reporte(self, fecha_inicio: date, fecha_fin: date, formato: str, user_id: int) -> ReporteExportadoDTO:
         consolidado = await self.obtener_consolidado(fecha_inicio, fecha_fin, user_id)
@@ -127,6 +214,103 @@ class ReportesService:
             )
         else:
             raise HTTPException(status_code=400, detail="Formato de exportación no soportado")
+
+    # ---------------------------------------------------------------------------
+    # Estadísticas del Dashboard de Reportes (KPI / Gráficas / Rankings)
+    # ---------------------------------------------------------------------------
+
+    async def obtener_kpi(self, fecha_inicio: date, fecha_fin: date, user_id: int) -> KPITotalesDTO:
+        """Ensambla los totales agregados (SUM) del período seleccionado."""
+        await self._check_permission(user_id)
+        kpi = await self.uow.reportes.get_kpi_totales(fecha_inicio, fecha_fin)
+        return KPITotalesDTO(**kpi)
+
+    async def obtener_grafica(
+        self,
+        tipo: str,
+        fecha_inicio: date,
+        fecha_fin: date,
+        user_id: int,
+    ) -> GraficaResponse:
+        """Devuelve los datos listos para Chart.js según la pestaña activa.
+
+        - 'tendencia' -> línea: totales agrupados por día (o mes si el rango
+          abarca más de 31 días).
+        - 'categoria' -> dona: ingresos por categoría.
+        - 'hora'      -> barras: nº de transacciones por franja horaria.
+        """
+        await self._check_permission(user_id)
+
+        if tipo == "tendencia":
+            puntos = await self.uow.reportes.get_tendencia_ventas(fecha_inicio, fecha_fin)
+            # Si el rango es largo, se agrupa por mes "YYYY-MM" para no saturar
+            # el eje X con decenas de puntos diarios.
+            agrupar_mes = (fecha_fin - fecha_inicio).days > 31
+            acum: dict = {}
+            for dia, total in puntos:
+                clave = f"{dia.year:04d}-{dia.month:02d}" if agrupar_mes else dia.isoformat()
+                acum[clave] = acum.get(clave, Decimal("0.00")) + total
+            return GraficaResponse(
+                tipo=tipo,
+                etiquetas=list(acum.keys()),
+                valores=list(acum.values()),
+            )
+
+        if tipo == "categoria":
+            por_categoria = await self.uow.reportes.get_ventas_por_categoria(fecha_inicio, fecha_fin)
+            return GraficaResponse(
+                tipo=tipo,
+                etiquetas=[nombre for nombre, _ in por_categoria],
+                valores=[total for _, total in por_categoria],
+            )
+
+        if tipo == "hora":
+            por_hora = await self.uow.reportes.get_ventas_por_hora(fecha_inicio, fecha_fin)
+            return GraficaResponse(
+                tipo=tipo,
+                etiquetas=[f"{hora:02d}:00" for hora, _ in por_hora],
+                valores=[Decimal(str(total)) for _, total in por_hora],
+            )
+
+        raise HTTPException(status_code=400, detail="Tipo de gráfica no válido")
+
+    async def obtener_ranking(
+        self,
+        tipo_reporte: str,
+        fecha_inicio: date,
+        fecha_fin: date,
+        limite: int,
+        user_id: int,
+    ) -> RankingResponse:
+        """Widget de rankings (Top Productos / Clientes / Estancados).
+
+        Consulta la base con ORDER BY total DESC LIMIT X y devuelve las filas
+        listas para inyectar en el <ul> del frontend.
+        """
+        await self._check_permission(user_id)
+
+        if tipo_reporte == "productos":
+            filas = await self.uow.reportes.get_ranking_productos(fecha_inicio, fecha_fin, limite)
+            items = [
+                RankingItemDTO(nombre=nombre, valor=valor, cantidad=cantidad)
+                for nombre, valor, cantidad in filas
+            ]
+        elif tipo_reporte == "clientes":
+            filas = await self.uow.reportes.get_ranking_clientes(fecha_inicio, fecha_fin, limite)
+            items = [
+                RankingItemDTO(nombre=nombre, valor=valor, cantidad=cantidad)
+                for nombre, valor, cantidad in filas
+            ]
+        elif tipo_reporte == "estancados":
+            filas = await self.uow.reportes.get_ranking_estancados(fecha_inicio, fecha_fin, limite)
+            items = [
+                RankingItemDTO(nombre=nombre, valor=valor, cantidad=cantidad)
+                for nombre, valor, cantidad in filas
+            ]
+        else:
+            raise HTTPException(status_code=400, detail="Tipo de reporte no válido")
+
+        return RankingResponse(tipo=tipo_reporte, items=items)
 
     # ---------------------------------------------------------------------------
     # Reporte de Usuarios

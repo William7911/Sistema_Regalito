@@ -4,40 +4,113 @@ from typing import List, Optional
 from decimal import Decimal
 
 
+class TotalesConsolidadoDTO(BaseModel):
+    ventas: Decimal = Decimal("0.00")
+    mermas: Decimal = Decimal("0.00")
+    compras: Decimal = Decimal("0.00")
+
+
 class VentaReporteDTO(BaseModel):
     id_venta: int
+    fecha: datetime
     fecha_venta: datetime
-    total_venta: Decimal
+    estado: str = "Completada"
+    vendedor: str = ""
+    subtotal: Decimal = Decimal("0.00")
+    descuento: Decimal = Decimal("0.00")
+    total: Decimal = Decimal("0.00")
+    total_venta: Decimal = Decimal("0.00")
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class MermaReporteDTO(BaseModel):
     id_merma: int
+    fecha: datetime
     fecha_merma: datetime
     observaciones: Optional[str] = None
+    total: Decimal = Decimal("0.00")
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class CompraReporteDTO(BaseModel):
     id_compra: int
+    fecha: date
     fecha_ingreso: date
-    total_compra: Decimal
+    total: Decimal = Decimal("0.00")
+    total_compra: Decimal = Decimal("0.00")
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ReporteConsolidadoResponse(BaseModel):
-    ventas: List[VentaReporteDTO]
-    mermas: List[MermaReporteDTO]
-    compras: List[CompraReporteDTO]
+    totales: TotalesConsolidadoDTO = TotalesConsolidadoDTO()
+    ventas: List[VentaReporteDTO] = []
+    mermas: List[MermaReporteDTO] = []
+    compras: List[CompraReporteDTO] = []
 
 
 class ReporteExportadoDTO(BaseModel):
     filename: str
     content: bytes
     media_type: str
+
+
+# ---------------------------------------------------------------------------
+# Estadísticas del Dashboard de Reportes (KPI / Términos del rango de fecha)
+# ---------------------------------------------------------------------------
+
+class KPITotalesDTO(BaseModel):
+    """Totales agregados (SUM) dentro del rango de fechas seleccionado.
+
+    ventas      -> Ingresos por ventas netas (total_venta) de ventas Completadas.
+    mermas      -> Suma del costo de los DetalleMerma asociados a las mermas
+                   registradas en el periodo (costo de la pérdida).
+    compras     -> Gasto en mercadería (total_compra de las compras ingresadas).
+    count_*     -> Número de registros de cada tipo dentro del rango.
+    """
+
+    ventas: Decimal = Decimal("0.00")
+    count_ventas: int = 0
+    mermas: Decimal = Decimal("0.00")
+    count_mermas: int = 0
+    compras: Decimal = Decimal("0.00")
+    count_compras: int = 0
+
+
+class GraficaResponse(BaseModel):
+    """Respuesta unificada para las tres gráficas del panel.
+
+    `tipo`     -> 'tendencia' | 'categoria' | 'hora'
+    `etiquetas`-> Eje X (día/mes, categoría o franja horaria).
+    `valores`  -> Serie numérica a dibujar (totales en Q o conteos).
+    """
+
+    tipo: str
+    etiquetas: List[str] = []
+    valores: List[Decimal] = []
+
+
+class RankingItemDTO(BaseModel):
+    """Fila de un ranking (Top Productos / Clientes / Estancados).
+
+    nombre      -> Nombre a mostrar (producto, variante o cliente).
+    valor       -> Monto en Q (ventas, compras del cliente o valor de inventario
+                   estancado según el tipo de ranking).
+    cantidad    -> Opcional: unidades vendidas o unidades en stock.
+    """
+
+    nombre: str
+    valor: Decimal = Decimal("0.00")
+    cantidad: Optional[int] = None
+
+
+class RankingResponse(BaseModel):
+    """Respuesta completa del widget de rankings."""
+
+    tipo: str
+    items: List[RankingItemDTO] = []
 
 
 # ---------------------------------------------------------------------------

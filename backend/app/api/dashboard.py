@@ -13,6 +13,7 @@ async def get_dashboard_resumen(
     service: DashboardService = Depends(get_dashboard_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Devuelve las métricas operativas en tiempo real (ventas del día,
-    stock crítico, compras del mes y turnos de caja activos)."""
-    return await service.get_resumen()
+    """Devuelve las métricas operativas del Panel Principal: estado de caja,
+    ventas del día (por método de pago, últimos 7 días, top productos),
+    mermas, stock crítico, pendientes y últimas ventas."""
+    return await service.get_resumen(current_user.id_usuario)

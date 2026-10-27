@@ -393,6 +393,10 @@ function renderView(viewKey) {
     const target = document.querySelector(`[data-main-view="${viewKey}"]`);
     if (target) target.classList.remove('d-none');
     setActiveNav(viewKey);
+    if (typeof window.closeMobileSidebar === 'function') {
+        window.closeMobileSidebar();
+    }
+    window.dispatchEvent(new CustomEvent('viewChanged', { detail: { view: viewKey } }));
 
     if (viewKey === 'dashboard' && typeof window.showDashboardModule === 'function') {
         window.showDashboardModule();
@@ -760,3 +764,120 @@ if (btnLogout) {
         showLogin();
     });
 }
+
+/* ===== Control de Navegación: Sidebar Colapsable (Desktop) y Off-Canvas Móvil (< 1024px) ===== */
+(function () {
+    var KEY = 'sidebarCollapsed';
+    var MOBILE_BREAKPOINT = 1024;
+
+    function isMobile() {
+        return window.innerWidth < MOBILE_BREAKPOINT;
+    }
+
+    function applySidebarDesktop(collapsed) {
+        var m = document.getElementById('system-module');
+        if (!m) return;
+        if (isMobile()) {
+            m.classList.remove('sidebar-collapsed');
+            return;
+        }
+        m.classList.toggle('sidebar-collapsed', collapsed);
+        document.querySelectorAll('.sidebar .sidebar-link').forEach(function (a) {
+            if (collapsed) a.setAttribute('title', a.textContent.trim());
+            else a.removeAttribute('title');
+        });
+    }
+
+    function openMobileSidebar() {
+        var m = document.getElementById('system-module');
+        if (!m) return;
+        m.classList.add('mobile-sidebar-open');
+    }
+
+    function closeMobileSidebar() {
+        var m = document.getElementById('system-module');
+        if (!m) return;
+        m.classList.remove('mobile-sidebar-open');
+    }
+
+    function toggleMobileSidebar() {
+        var m = document.getElementById('system-module');
+        if (!m) return;
+        m.classList.toggle('mobile-sidebar-open');
+    }
+
+    // Exponer globalmente para cierre al navegar
+    window.openMobileSidebar = openMobileSidebar;
+    window.closeMobileSidebar = closeMobileSidebar;
+    window.toggleMobileSidebar = toggleMobileSidebar;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var collapsed = false;
+        try { collapsed = localStorage.getItem(KEY) === '1'; } catch (e) {}
+        if (!isMobile()) {
+            applySidebarDesktop(collapsed);
+        }
+
+        // Botón hamburguesa (☰) en la cabecera
+        var btnToggle = document.getElementById('btn-sidebar-toggle');
+        if (btnToggle) {
+            btnToggle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (isMobile()) {
+                    toggleMobileSidebar();
+                } else {
+                    var m = document.getElementById('system-module');
+                    var now = !m.classList.contains('sidebar-collapsed');
+                    applySidebarDesktop(now);
+                    try { localStorage.setItem(KEY, now ? '1' : '0'); } catch (err) {}
+                }
+            });
+        }
+
+        // Botón cerrar (X) dentro del menú off-canvas móvil
+        var btnClose = document.getElementById('btn-sidebar-close');
+        if (btnClose) {
+            btnClose.addEventListener('click', function (e) {
+                e.preventDefault();
+                closeMobileSidebar();
+            });
+        }
+
+        // Clic en el backdrop exterior semi-transparente
+        var backdrop = document.getElementById('sidebar-mobile-backdrop');
+        if (backdrop) {
+            backdrop.addEventListener('click', function () {
+                closeMobileSidebar();
+            });
+        }
+
+        // Clic en cualquier enlace del menú lateral cierra el menú en móviles
+        document.querySelectorAll('.sidebar .sidebar-link').forEach(function (link) {
+            link.addEventListener('click', function () {
+                if (isMobile()) {
+                    closeMobileSidebar();
+                }
+            });
+        });
+
+        // Tecla Escape para accesibilidad
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeMobileSidebar();
+            }
+        });
+
+        // Sincronización al redimensionar pantalla
+        window.addEventListener('resize', function () {
+            if (!isMobile()) {
+                closeMobileSidebar();
+                var saved = false;
+                try { saved = localStorage.getItem(KEY) === '1'; } catch (e) {}
+                applySidebarDesktop(saved);
+            } else {
+                var m = document.getElementById('system-module');
+                if (m) m.classList.remove('sidebar-collapsed');
+            }
+        });
+    });
+})();

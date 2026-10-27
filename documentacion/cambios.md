@@ -3,6 +3,456 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-26] Corrección Estructural de Anidamiento DOM en Vistas Principales (Bitácora, Inventario, Mermas, etc.)
+
+### Causa Raíz
+- Al restaurar el módulo de Reportes en el HTML, quedó una etiqueta de cierre `</div>` sobrante justo al final de la vista de Caja (`#cash-view`).
+- Esta etiqueta extra cerraba prematuramente el elemento principal `<main>` del sistema.
+- En consecuencia, todas las vistas declaradas posteriormente en el archivo ([`#reportes-view`](../frontend/index.html#L1971), [`#inventory-view`](../frontend/index.html#L2268), [`#traslados-view`](../frontend/index.html#L2419), [`#visitas-view`](../frontend/index.html#L2494), [`#mermas-view`](../frontend/index.html#L2769), [`#compras-view`](../frontend/index.html#L2904), [`#configuracion-view`](../frontend/index.html#L3070), [`#roles-view`](../frontend/index.html#L3115), [`#bitacora-view`](../frontend/index.html#L3152) y [`#historial-view`](../frontend/index.html#L3235)) quedaban expulsadas fuera del contenedor flex `<main>` y fuera de la estructura de visualización.
+- Al hacer clic en el menú lateral sobre cualquiera de estos módulos (como "Bitácora"), el sistema ocultaba las demás vistas y mostraba el contenedor correspondiente, pero dado que estaba fuera de `<main>`, la pantalla central permanecía completamente en blanco.
+
+### Solución Implementada
+1. **Depuración y Validación Estructural del DOM**:
+   - [`frontend/index.html`](../frontend/index.html): Se eliminó la etiqueta de cierre `</div>` huérfana en la línea de transición entre Caja y Reportes.
+   - Se validó el balance completo de etiquetas `<div>` y `<main>` a lo largo de las 5,330 líneas del archivo, comprobando que:
+     - El balance de profundidad (`depth`) permanece en `1` para cada una de las 16 vistas dentro de `<main>`.
+     - El cierre de `</main>` se produce en la posición correcta (después de Historial).
+     - El conteo de errores de etiquetas huérfanas se redujo a `0`.
+2. **Actualización de Versiones**:
+   - Se incrementaron las etiquetas de control de caché a `style.css?v=5.1` y `app.js?v=3.1` para forzar la recarga limpia en el navegador del usuario.
+   - Se reinició el contenedor `regalito_frontend_prod` en Docker.
+
+### Verificación
+- Verificación automatizada de anidamiento: Las 16 vistas principales se encuentran al 100% dentro de `<main>`.
+- Consulta HTTP en `http://localhost:9090/`: Respuesta `200 OK` con los recursos actualizados.
+- Bitácora, Inventario, Roles, Mermas, Compras y Reportes vuelven a renderizarse correctamente dentro del panel principal.
+
+## [2026-10-25] Rediseño Responsivo Global (Móviles y Tablets) y Protección de Tablas
+
+### Causa Raíz / Requerimiento
+1. **Deformación en Pantallas Pequeñas (< 1024px)**:
+   - El sistema presentaba desbordamientos y roturas de diseño en dispositivos móviles y tabletas:
+   - La barra de navegación lateral izquierda (`.sidebar`) forzaba un ancho fijo o se apilaba estáticamente encima de la interfaz empujando todo el panel hacia abajo.
+   - Las tablas operativas (Inventario, Clientes, Mermas, Caja, Usuarios, Catálogos, etc.) no tenían protección contra reducción de pantalla, lo que comprimía y aplastaba las columnas de datos.
+   - Las tarjetas de resumen financiero (KPIs) y los bloques del Dashboard/Reportes mantenían alineaciones multi-columna forzadas (`col-6`, `col-md-4`, etc.), generando tarjetas excesivamente estrechas e ilegibles en smartphones.
+   - Las ventanas emergentes (Modales) se desbordaban fuera del viewport o mantenían márgenes que reducían drásticamente el espacio táctil útil para el operador.
+
+### Solución Implementada (100% Frontend - CSS/HTML/JS)
+1. **Navegación Móvil (Menú Hamburguesa & Off-Canvas)**:
+   - [`frontend/index.html`](../frontend/index.html):
+     - Se añadió el elemento `#sidebar-mobile-backdrop` para oscurecer y desenfocar el fondo (`backdrop-filter: blur(3px)`) al abrir el menú lateral.
+     - Se añadió el botón de cierre táctil `#btn-sidebar-close` (`bi-x-lg`) en la cabecera del sidebar (`.sidebar-brand`), visible únicamente en móviles (`d-lg-none`).
+     - Se vinculó el botón hamburguesa existente en el encabezado (`#btn-sidebar-toggle`) para controlar el despliegue off-canvas en pantallas menores a 1024px.
+   - [`frontend/css/style.css`](../frontend/css/style.css):
+     - Se eliminó la regla obsoleta que apilaba el sidebar estáticamente arriba del contenido.
+     - Para pantallas `@media (max-width: 1023.98px)`: El sidebar se posiciona de forma fija (`position: fixed; left: 0; top: 0; bottom: 0; z-index: 1055;`) desplazado fuera de la pantalla con aceleración por hardware (`transform: translateX(-100%)`). Al activarse `.mobile-sidebar-open` en `#system-module`, se desliza suavemente (`transform: translateX(0)`) con sombreado de elevación (`box-shadow: 0 10px 40px rgba(0,0,0,0.5)`).
+   - [`frontend/js/app.js`](../frontend/js/app.js):
+     - Módulo de control dual: En pantallas grandes (>= 1024px) conserva el colapso a mini-sidebar (`sidebar-collapsed`). En pantallas táctiles (< 1024px) conmuta la clase `mobile-sidebar-open`.
+     - Cierre automático al seleccionar cualquier enlace de navegación (`.sidebar-link`), al tocar el backdrop oscuro, al pulsar el botón `X`, al presionar la tecla `Escape`, o al redimensionar la ventana hacia escritorio.
+     - Integración con `renderView()` para asegurar el cierre automático al navegar a cualquier módulo.
+
+2. **Protección Global de Tablas (Scroll Horizontal)**:
+   - [`frontend/index.html`](../frontend/index.html): Se verificaron las 34 tablas de la plataforma y se envolvió la tabla restante (`#compras-cart-table`) en un contenedor con clase `.table-responsive`.
+   - [`frontend/css/style.css`](../frontend/css/style.css):
+     - Reglas universales `.table-responsive, .overflow-x-auto` con desplazamiento táctil acelerado (`-webkit-overflow-scrolling: touch`).
+     - Definición de ancho mínimo de seguridad (`min-width: 680px` en tablas generales y `min-width: 760px` en tablas densas como Inventario, Clientes, Mermas, Caja, Usuarios, Bitácora y Reportes). Las columnas conservan su tipografía, alineación e información íntegra; el usuario simplemente desliza la tabla horizontalmente de forma natural.
+     - Scrollbar horizontal estilizado, sutil y accesible (`height: 6px; border-radius: 4px; background: rgba(11,96,99,0.25)`).
+
+3. **Apilamiento de Tarjetas (Stacking al 100%)**:
+   - [`frontend/css/style.css`](../frontend/css/style.css):
+     - Para `@media (max-width: 767.98px)`: Todas las tarjetas KPI (`#dashboard-kpis`, `#inventory-kpis`, `#mermas-kpi-row`, `#reportes-kpis`, `#reportes-summary-cards`, `.inventory-kpi-card`, `.merma-kpi-card`, `.reportes-kpi-card`, `.dashboard-kpi-card`, `[data-dashblock^="kpi-"]`) dejan de compartir fila y pasan a ocupar `width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important;` apilándose en una sola columna vertical.
+     - Los bloques de gráficas, listas de rankings, alertas de stock y turnos pendientes del Dashboard y Reportes (`[data-dashblock="grafico-ventas"]`, `[data-dashblock="top-productos"]`, `#reportes-grafica-container`, `#reportes-rankings-card`, etc.) se apilan verticalmente ocupando el ancho completo de la pantalla móvil.
+     - Ajuste ergonómico de espaciados (`padding: 0.85rem 0.65rem`) en el contenedor principal y cabecera para maximizar el área visible útil en smartphones.
+
+4. **Modales y Formularios Táctiles**:
+   - [`frontend/css/style.css`](../frontend/css/style.css):
+     - En dispositivos móviles (`@media (max-width: 767.98px)`), las ventanas modales (`.modal-dialog`) se expanden dinámicamente al 95% del ancho de la pantalla (`width: 95vw !important; max-width: 95vw !important; margin: 0.5rem auto !important;`).
+     - Bordes redondeados modernos (`border-radius: 14px`) y sombreado suave de profundidad.
+     - Optimización de márgenes internos (`.modal-body` con padding reducido a `1rem 0.85rem` y scroll interno táctil `max-height: calc(100vh - 135px)`).
+     - Botones de acción del pie del modal (`.modal-footer .btn`) distribuidos al 50% de ancho con área táctil cómoda.
+     - Ergonomía táctil para inputs, selects y botones en modales: altura mínima de 44px (`min-height: 44px`) conforme al estándar de accesibilidad táctil (WCAG 2.1 / Apple HIG) y tamaño de fuente `16px` para prevenir el zoom automático no deseado en navegadores iOS Safari.
+
+5. **Restauración y Sincronización del Módulo de Reportes**:
+   - [`frontend/index.html`](../frontend/index.html): Se restauró la estructura completa del contenedor `#reportes-view` (`data-main-view="reportes"`) y su Tab 1 (Consolidado Operativo, selector de rango inteligente, KPIs financieros, tarjetas de gráficas y leaderboard de rankings) que se encontraba truncada en el archivo HTML, alineándolo 1:1 con la interfaz documentada y Chart.js.
+
+### Verificación
+- **Pruebas de Menú Hamburguesa & Off-Canvas**:
+  - En anchos `< 1024px`, el sidebar queda oculto por defecto.
+  - Al pulsar `#btn-sidebar-toggle` (☰), el menú se desliza suavemente sobre la pantalla y activa el fondo oscuro `#sidebar-mobile-backdrop`.
+  - Al pulsar el botón `X`, hacer clic en el backdrop, hacer clic en cualquier opción de menú o pulsar `Escape`, el sidebar se oculta inmediatamente.
+  - En resoluciones `>= 1024px`, el sidebar regresa a su posición lateral estándar con soporte de colapso mini (`sidebar-collapsed`).
+- **Pruebas de Tablas Responsivas**:
+  - En pantallas de 375px a 768px, las 34 tablas del sistema cuentan con scroll horizontal táctil sin truncar contenido ni aplastar encabezados.
+- **Pruebas de Apilamiento (Stacking)**:
+  - Las tarjetas KPI de Dashboard, Inventario, Mermas y Reportes ocupan el 100% de la pantalla en vista móvil apiladas en una sola columna.
+- **Pruebas de Modales Táctiles**:
+  - Los formularios modales abarcan el 95% de la pantalla, con botones e inputs de 44px de altura mínima.
+- **Reinicio y Servicio en Producción**:
+  - Contenedor Nginx (`regalito_frontend_prod`) reiniciado exitosamente.
+  - Servido en `http://localhost:9090` con versiones `style.css?v=5.0` y `app.js?v=3.0`.
+
+## [2026-10-25] Módulo de Caja: Theme Sync, Control Operativo de Flujo de Efectivo y Filtros Compactos
+
+### Causa Raíz / Requerimiento
+1. **Inconsistencias Visuales (Theme Sync)**:
+   - El botón de acción crítica "Cerrar Turno" (`#btn-close-cash`) utilizaba un color rosa (`btn-rosado`), restándole la seriedad que requiere una operación crítica de cierre financiero.
+   - El botón "Filtrar" en el historial de turnos utilizaba un color azul celeste (`btn-celeste`), fuera del verde esmeralda corporativo (`var(--color-teal)`).
+   - El encabezado de la tabla "Historial de Turnos" presentaba líneas divisorias y degradados desincronizados del estándar esmeralda sólido (`var(--color-teal-dark)`) de Inventario y Usuarios.
+2. **Mejoras Operativas en Tarjeta de Caja Activa (UX Operativo)**:
+   - La cuadrícula de detalles de la caja abierta carecía de visibilidad sobre los ingresos en efectivo del turno y el arqueo esperado. Se requería añadir:
+     - "Ventas en Efectivo" (placeholder `Q 0.00`).
+     - "Efectivo Esperado" (destacado en verde oscuro).
+   - Necesidad de un control para registrar gastos menores de la tienda (artículos de limpieza, encomiendas, entradas para cambio) mediante un botón secundario discreto ("± Registrar Movimiento").
+3. **Limpieza de Filtros y Ordenamiento (1:1 con Inventario)**:
+   - Los campos de fecha "Desde" y "Hasta" estaban separados visualmente; se requería agruparlos en un input compacto unificado con ícono de calendario.
+   - Los encabezados de tabla debían heredar la experiencia táctil de Inventario con íconos de ordenamiento `⇕` (inactivo), `↑` / `↓` (activo) y subrayado hover.
+
+### Solución Implementada
+1. **Estructura HTML y Theme Sync**:
+   - [`frontend/index.html`](../frontend/index.html):
+     - Sustitución de `btn-rosado` por `btn btn-outline-danger fw-semibold px-3` en `#btn-close-cash` y `btn-danger` en el modal de confirmación de cierre.
+     - Botón "Filtrar" actualizado a `btn-teal` con bordes redondeados consistentes.
+     - Tarjeta de caja activa enriquecida con columnas para "Ventas en Efectivo" (`#cash-active-ventas`) y "Efectivo Esperado" (`#cash-active-esperado`) en verde esmeralda oscuro (`#065F46`), y botón secundario `#btn-cash-movement` ("± Registrar Movimiento").
+     - Rango de fechas compacto agrupado `.cash-date-range-group` con ícono de calendario.
+     - Tabla actualizada a `<thead class="thead-users">` con clase `.cash-table`.
+     - Nuevo modal `#cash-movement-modal` para registro rápido de gastos menores y entradas de cambio.
+     - Versiones incrementadas a `style.css?v=4.7` y `cash_register.js?v=2.4`.
+2. **Estilos CSS**:
+   - [`frontend/css/style.css`](../frontend/css/style.css):
+     - Estilo crítico para `#btn-close-cash` (borde rojo `#DC2626`, texto rojo, fondo transparente en reposo y sólido en hover).
+     - Botón ghost/secundario `.cash-movement-btn` para la tarjeta de caja.
+     - Rango de fechas compacto `.cash-date-range-group` de 38 px con bordes unificados.
+     - Encabezado sólido `var(--color-teal-dark)` con texto blanco sin líneas divisorias verticales y esquinas redondeadas.
+     - Efecto hover con subrayado (`text-decoration: underline; text-underline-offset: 3px;`) y cursor `pointer` en cabeceras ordenables.
+3. **Lógica Frontend (Vanilla JS)**:
+   - [`frontend/js/cash_register.js`](../frontend/js/cash_register.js):
+     - `renderCashStatusCard()` actualizado para computar y mostrar "Ventas en Efectivo" y "Efectivo Esperado" (monto inicial + ventas), y alternar visibilidad del botón de movimientos.
+     - Funciones `openCashMovementModal()` y `handleCashMovementSubmit()` para gestionar el registro de gastos/entradas y actualizar inmediatamente el monto de efectivo esperado en pantalla.
+     - `updateCashSortIndicators()` actualizado para inyectar íconos vectoriales `bi bi-arrow-down-up text-white-50` en inactivos y `bi-arrow-up`/`bi-arrow-down text-white` en la columna activa.
+
+### Verificación
+- **Validación de Sintaxis**: Ejecución de `node --check frontend/js/cash_register.js` sin errores.
+- **Pruebas de Despliegue**: Verificación de assets servidos correctamente por Nginx y FastAPI en puerto 9090.
+- **Regla estricta**: Cero alteraciones en backend o base de datos.
+
+## [2026-10-25] Menú Lateral Izquierdo: Limpieza Visual para Operación de Una Sola Tienda
+
+### Causa Raíz / Requerimiento
+1. **Reducción de carga visual en navegación**:
+   - Para la fase operativa actual de una sola tienda física, no son requeridas las funciones de traslado entre sucursales ni visitas de campo externas, ni la visualización recurrente del histórico de variaciones de precios desde el menú principal.
+   - Se requería limpiar la barra lateral izquierda comentando u ocultando visualmente dichos accesos para simplificar la interfaz al usuario final sin alterar la arquitectura subyacente.
+2. **Reglas estrictas**:
+   - Cambios 100% en el frontend (HTML/UI).
+   - No eliminar archivos, controladores, rutas API ni esquemas de base de datos.
+   - Ocultar en **Operación Diaria**: "Traslados" (`#nav-traslados`) y "Visitas de Seguimiento" (`#nav-visitas`).
+   - Ocultar en **Administración**: "Historial de Precios" (`#nav-historial`).
+   - Conservar intactos, visibles y plenamente funcionales en su ubicación original: "Roles y Permisos" (`#nav-roles`) y "Bitácora" (`#nav-bitacora`).
+
+### Solución Implementada
+1. **Frontend HTML**:
+   - [`frontend/index.html`](../frontend/index.html):
+     - Se comentaron los elementos `<li>` de "Traslados" (`data-module-item="traslados"`) y "Visitas de Seguimiento" (`data-module-item="visitas"`) en la sección de "Operación diaria", añadiendo comentarios explicativos para su fácil reactivación si la tienda se expande a múltiples sucursales en el futuro.
+     - Se comentó el elemento `<li>` de "Historial de Precios" (`data-module-item="historial"`) en la sección de "Administración".
+     - Se mantuvieron inalterados los enlaces de "Roles y Permisos" (`data-module-item="roles"`) y "Bitácora" (`data-module-item="bitacora"`).
+     - Se preservaron todos los archivos fuente de controladores (`traslados.js`, `visitas.js`, `historial.js`), vistas HTML internas y endpoints backend para garantizar reactivación inmediata cuando sea requerido.
+
+### Verificación
+- **Pruebas visuales**:
+  - En la barra lateral ya no se muestran "Traslados", "Visitas de Seguimiento" ni "Historial de Precios".
+  - "Roles y Permisos" y "Bitácora" permanecen completamente visibles y accesibles para tareas de auditoría y gestión de seguridad.
+  - La sección "Operación diaria" y la sección "Administración" conservan sus encabezados y el resto de módulos (POS, Inventario, Compras, Caja, Mermas, Usuarios, Clientes, Catálogos, Reportes, Configuración).
+- **Integridad**:
+  - 0 archivos eliminados; 0 cambios en el backend o en la base de datos.
+
+## [2026-10-25] Módulo de Clientes: Rediseño UI/UX Directorio Rápido, Theme Sync y Búsqueda en Caja
+
+### Causa Raíz / Requerimiento
+1. **Unificación de Paleta de Colores (Theme Sync)**:
+   - El encabezado de la tabla de clientes presentaba un fondo gris claro (`table-light`) con bordes grises predeterminados de Bootstrap, desentonando con el verde esmeralda oscuro corporativo (`var(--color-teal-dark)`) de Usuarios, Inventario y Mermas.
+   - En la columna "Nombre" aparecía erróneamente incrustada la etiqueta o texto "Comercial" ("Nombre Comercial"), redundante con la razón social.
+   - Las pestañas superiores utilizaban `nav-pills` estándar con fondo azulado; se requería modernizarlas con texto gris neutro para enlaces inactivos y verde esmeralda con borde inferior destacado para la pestaña activa ("Directorio de Clientes").
+2. **Optimización de Búsqueda Rápida en Caja (POS Friendly)**:
+   - Los filtros de calendario "Desde" y "Hasta" no resultaban prácticos para ubicar clientes en el mostrador del POS en tiempo real y sobrecargaban la barra de herramientas.
+   - Los campos de "Buscar por nombre..." y "NIT" requerían mayor amplitud y jerarquía, y se precisaba un tercer campo de búsqueda directa por "Teléfono", estándar esencial para la fidelización rápida en caja.
+   - Cada campo de texto requería un botón "X" integrado (estilo Shopify/Google) para limpiar el input con un solo clic, eliminando el botón "X" externo.
+3. **Evolución de Datos y Componentes Visuales**:
+   - Reemplazo de la columna "Ubicación" por una métrica comercial estratégica ("Total Comprado"), con formato monetario `Q 0.00` en tipografía monospace font-semibold.
+   - Soft Badges semánticos para "Tipo Cliente" sin contornos grises, con fondos pastel translúcidos y texto legible más oscuro (azul suave para "Mayorista", gris neutro para "Consumidor Final", esmeralda para tipos minoristas/generales y púrpura para preferenciales).
+   - Sustitución de botones cuadrados con bordes rígidos en "Acciones" por botones Ghost limpios (`.client-action-btn`), con fondo transparente en reposo y micro-resaltes al hacer `:hover` (azul para ver, ámbar para editar, rojo para desactivar y verde para activar).
+4. **Interactividad de Ordenamiento (Heredada de Inventario)**:
+   - Encabezados ordenables con íconos de ordenamiento 1:1 con Inventario: `⇕` (`bi bi-arrow-down-up text-white-50`) en reposo y flechas sólidas `↑` / `↓` (`text-white`) en la columna activa.
+   - Efecto `:hover` con texto subrayado (`text-decoration: underline; text-underline-offset: 3px`) y cursor en `pointer`.
+
+### Solución Implementada
+1. **Theme Sync y Estructura HTML**:
+   - [`frontend/index.html`](../frontend/index.html):
+     - Sustitución de `nav-pills` por `nav nav-tabs clients-main-tabs mb-4` en `#clients-nav-tabs`.
+     - Reestructuración de la barra de filtros con contenedores `.client-search-field` para Nombre (`flex-grow-1`), NIT y Teléfono con íconos vectoriales y botón `.client-clear-btn` incorporado.
+     - Preservación oculta (`d-none`) de inputs de fecha y reset para garantizar compatibilidad retroactiva con cualquier flujo existente.
+     - Actualización del encabezado de la tabla a `<thead class="thead-users">` y clase `.clients-table` en la tabla.
+     - Renombrado de columna a "Nombre" (eliminando "Comercial") y sustitución de "Ubicación" por "Total Comprado" ordenable.
+     - Actualización de versiones a `style.css?v=4.6` y `clients.js?v=2.0`.
+2. **Estilos CSS Modernos y Semánticos**:
+   - [`frontend/css/style.css`](../frontend/css/style.css):
+     - Reglas `#clients-view .clients-main-tabs`: pestañas sin bordes perimetrales, enlace activo con `border-bottom: 3px solid var(--color-teal)` y color corporativo.
+     - Buscadores `.client-search-field` y botón integrado `.client-clear-btn` con clase dinámica `.is-visible`, transiciones suaves y foco accesible.
+     - Encabezado `#clients-view .clients-table > thead > tr > th` con fondo sólido `var(--color-teal-dark)`, texto blanco `font-weight: 600`, sin líneas divisorias verticales y esquinas exteriores redondeadas (`0.5rem`).
+     - Clases semánticas `.badge-soft-blue`, `.badge-soft-slate` y `.badge-soft-emerald` sin bordes para tipos de cliente.
+     - Botones Ghost `#clients-view .client-action-btn` (32×32 px, sin marcos, esquinas redondeadas y estados `:hover` específicos por tipo de acción).
+     - Hover en cabeceras ordenables: subrayado sutil, cursor `pointer` e incremento de brillo.
+3. **Lógica Frontend (Vanilla JS)**:
+   - [`frontend/js/clients.js`](../frontend/js/clients.js):
+     - Registro de `filterPhone` en `initDOM()`.
+     - Helpers `escapeHtml`, `getClientTypeBadge` y `syncClearBtn`.
+     - Eventos de input para alternar visibilidad de `.client-clear-btn` y ejecución de búsqueda con tecla `Enter`.
+     - Manejadores de clic en `.client-clear-btn` para vaciar el input respectivo, reenfocar y refrescar el listado.
+     - `updateSortIcons()` adaptado para cabeceras con fondo oscuro: íconos blancos `bi-arrow-up` / `bi-arrow-down` o `bi-arrow-down-up text-white-50`.
+     - Búsqueda en memoria por número de teléfono sobre los contactos del cliente (`phoneTerm`).
+     - Renderizado de filas con formato monetario para "Total Comprado", soft badges por categoría de cliente y botones Ghost en acciones con tooltip y accesibilidad.
+
+### Verificación
+- **Validación de Sintaxis**: Ejecución de `node --check frontend/js/clients.js` sin errores.
+- **Pruebas de Despliegue**: Verificación de assets servidos correctamente por Nginx y FastAPI.
+- **Regla estricta respetada**: Cero alteraciones en backend ni base de datos (100% UI/UX frontend con placeholders numéricos estratégicos).
+
+## [2026-10-25] Módulo de Mermas: Ordenamiento de Columnas (Sort 1:1 con Inventario) y Rediseño UI/UX
+
+### Causa Raíz / Requerimiento
+1. **Ordenamiento de Columnas (Sort) idéntico a Inventario**:
+   - En el módulo de Mermas (`#mermas-view`), los encabezados eran estáticos y no permitían ordenar los registros en memoria.
+   - Se requería replicar exactamente la UI y funcionalidad de ordenamiento de Inventario en 5 columnas específicas: `# ID`, `Fecha / Hora`, `Producto / Detalle`, `Cantidad` y `Costo Pérdida`.
+   - **Reglas visuales estrictas**:
+     - Íconos inactivos: ícono ⇕ (doble flecha contorno, `bi bi-arrow-down-up text-white-50`) a la derecha del texto.
+     - Estado activo: flecha sólida (↓ o ↑, `bi bi-arrow-down`/`bi bi-arrow-up text-white`).
+     - Efecto Hover: texto subrayado (`text-decoration: underline; text-underline-offset: 3px`) y cursor en `pointer`.
+     - Funcionalidad: alternancia ASC/DESC vinculada al renderizado de mermas.
+2. **Falta de visibilidad financiera en Mermas**:
+   - Se requería una fila de 3 tarjetas (Cards) estilo dashboard que informen de un vistazo: "Total Pérdida (Q)" (texto en rojo sutil), "Artículos Descartados" y "Motivo más frecuente".
+3. **Inconsistencia de Theme en el Encabezado de la Tabla**:
+   - Se requería aplicar el fondo verde esmeralda sólido corporativo (`var(--color-teal-dark)`) con texto blanco y bordes redondeados, idéntico al módulo de Usuarios e Inventario, sin líneas divisorias verticales.
+4. **Modernización de Columnas y Estado Vacío**:
+   - Miniatura de producto de 40×40 px con avatar o ícono 📦.
+   - Soft Badges según gravedad (rojo, ámbar, morado, neutro).
+   - Costo pérdida en rojo oscuro financiero (`#991B1B`, semibold).
+   - Estado vacío amigable con ícono de portapapeles limpio con check (`bi bi-clipboard-check`).
+   - Rango de fechas compacto unificado con ícono de calendario.
+
+### Solución Implementada
+1. **UI y Encabezados Ordenables**:
+   - [`frontend/index.html`](../frontend/index.html): Se asignaron clases `sortable`, atributos `data-sort` y nodos `<span class="sort-icon"></span>` en las 5 columnas requeridas:
+     - `# ID`: `data-sort="id_merma"`
+     - `Fecha / Hora`: `data-sort="fecha_merma"`
+     - `Producto / Detalle`: `data-sort="producto_nombre"`
+     - `Cantidad`: `data-sort="cantidad"`
+     - `Costo Pérdida`: `data-sort="costo_perdida"`
+2. **Estilos de Hover e Íconos (1:1 con Inventario)**:
+   - [`frontend/css/style.css`](../frontend/css/style.css): Reglas `#mermas-view th.sortable` con `cursor: pointer !important;`, `:hover` con `text-decoration: underline !important; text-underline-offset: 3px;` y transición de opacidad.
+3. **Lógica de Ordenamiento Dinámico**:
+   - [`frontend/js/mermas.js`](../frontend/js/mermas.js):
+     - `setupSorting()`: Vincula el clic en `th.sortable`, alternando `sortAsc` o seleccionando nueva columna.
+     - `updateSortIcons()`: Muestra `bi bi-arrow-down-up` en columnas inactivas y `bi bi-arrow-up` o `bi bi-arrow-down` en la columna activa.
+     - `getSortValue(item, col)`: Extrae y tipa valores numéricos (ID, timestamp de fecha, total unidades, costo acumulado) o cadenas normalizadas para `localeCompare` (nombre de producto).
+     - `applySortAndRender()`: Ordena `state.mermas` en memoria y dispara `renderTable()`.
+4. **Theme Sync, Tarjetas KPI y Filtros**:
+   - 3 Tarjetas KPI (`Total Pérdida`, `Artículos Descartados`, `Motivo más frecuente`) alimentadas por `updateMermasKPIs()`.
+   - Encabezado sólido `var(--color-teal-dark)` sin bordes verticales.
+   - Miniatura 40×40 px con soporte para foto de catálogo o `📦`.
+   - Soft badges de motivos por severidad y costo en `#991B1B`.
+   - Empty state amigable y rango de fechas compacto.
+
+### Verificación
+- **Pruebas visuales y de interacción**:
+  - Encabezados `# ID`, `Fecha / Hora`, `Producto / Detalle`, `Cantidad` y `Costo Pérdida` muestran `⇕` en gris claro/semitransparente.
+  - Al hacer clic en un encabezado, cambia inmediatamente a `↑` o `↓` en blanco sólido y la tabla se reordena al instante.
+  - Hover muestra subrayado con offset y cursor `pointer`.
+- **Compatibilidad**: 0 cambios en el backend; `node --check frontend/js/mermas.js` válido; suite `pytest` completa en verde.
+- **Cache-busting**: `index.html` actualizado con `mermas.js?v=2.1` y `style.css?v=4.5`.
+
+## [2026-10-25] Catálogo (Hover Zoom Idéntico a Inventario) y Resolución de Error 404 en Reportes Docker
+
+### Causa Raíz / Requerimiento
+1. **Ampliación de imagen (Hover Zoom) en Catálogo**:
+   - En el módulo de Catálogo (`#catalog-view`), al pasar el cursor sobre la miniatura de un producto no se desplegaba la imagen ampliada.
+   - En el módulo de Inventario (`#inventory-view`) existía esta funcionalidad implementada con cálculo dinámico de posición relativa a la miniatura, popover flotante `.inventory-image-zoom`, eventos de mouse/foco y sanitización de URL.
+   - Se solicitó replicar idénticamente dicha funcionalidad en el Catálogo para unificar la experiencia de usuario.
+2. **Error 404 en Dashboard de Reportes y Estadísticas**:
+   - Al consultar el rango de fechas en `#reportes-view`, las gráficas, tarjetas de KPI y rankings quedaban vacíos o en estado de carga indefinido.
+   - En la pestaña de Network de DevTools, las peticiones hacia `/api/reportes/kpi`, `/api/reportes/grafica` y `/api/reportes/ranking` fallaban con `404 Not Found`, mientras que `/api/reportes/` devolvía `200 OK`.
+   - Causa raíz: En producción Docker (`docker-compose.prod.yml`), el contenedor `regalito_backend_prod` compila el código del backend con `COPY . .` dentro de la imagen. La imagen en ejecución se había creado antes de la incorporación de los nuevos endpoints analíticos en FastAPI.
+
+### Solución Implementada
+1. **Hover Zoom de Imágenes en Catálogo**:
+   - [`frontend/index.html`](../frontend/index.html): Se agregó el nodo flotante `#catalog-image-zoom` con clases `.inventory-image-zoom.catalog-image-zoom` para el portal de previsualización.
+   - [`frontend/css/style.css`](../frontend/css/style.css): Se unificaron las reglas de estilo de `.catalog-image-zoom` con `.inventory-image-zoom` (dimensiones `180px × 180px`, `border-radius: 12px`, sombreado elevado `box-shadow`, `pointer-events: none`, `z-index: 1080`) y los estilos de miniatura interactiva `.catalog-product-thumb` con indicador hover y foco accesible.
+   - [`frontend/js/catalog.js`](../frontend/js/catalog.js): Se replicó la lógica de `inventory.js`: funciones `getCatalogImageZoom()`, `positionCatalogImageZoom(thumb)`, `showCatalogImageZoom(thumb, url, alt)`, `hideCatalogImageZoom()` y `setupCatalogImageZoom()`.
+   - Se vincularon eventos `mouseenter`, `mousemove`, `mouseleave`, `focusin`, `focusout`, cancelación con tecla `Escape` y reposicionamiento en `resize` y `scroll`.
+2. **Corrección del Despliegue de Reportes en Docker**:
+   - Se recompiló la imagen del backend con los nuevos endpoints mediante `docker compose -f docker-compose.prod.yml build backend`.
+   - Se recreó el servicio `backend` (`docker compose -f docker-compose.prod.yml up -d backend`) y se reinició el proxy inverso `frontend_nginx`.
+   - Se verificó que las rutas `/api/reportes/kpi`, `/api/reportes/grafica` y `/api/reportes/ranking` estén registradas en el OpenAPI del contenedor y respondan con `HTTP 200` y datos reales en `http://localhost:9090`.
+   - [`frontend/index.html`](../frontend/index.html): Se incrementó la versión a `js/reportes.js?v=3.2` para asegurar la recarga inmediata de scripts en navegadores cliente.
+
+### Verificación
+- **Pruebas de Catálogo**:
+  - Miniaturas con clase `.catalog-product-thumb` con cursor `zoom-in`.
+  - Despliegue de `#catalog-image-zoom` con posicionamiento flotante automático a la derecha/izquierda de la miniatura sin salirse de la ventana.
+  - Ocultamiento en `mouseleave`, pérdida de foco o tecla `Escape`.
+- **Pruebas de API y Contenedor en Vivo**:
+  - `GET /api/reportes/kpi` → `200 OK` (Ventas netas: Q 1,085.00, conteo: 4).
+  - `GET /api/reportes/grafica?tipo=tendencia` → `200 OK` (Puntos de fecha ordenados).
+  - `GET /api/reportes/grafica?tipo=categoria` → `200 OK` (Desglose por categoría).
+  - `GET /api/reportes/grafica?tipo=hora` → `200 OK` (24 franjas horarias con conteo).
+  - `GET /api/reportes/ranking?tipo_reporte=productos` → `200 OK` (Top de productos ordenados por valor descendente).
+  - `GET /api/reportes/ranking?tipo_reporte=clientes` y `estancados` → `200 OK`.
+- **Suite completa de pruebas backend**:
+  - Ejecución de `python -m pytest backend/tests/` → **289 passed (100% exitosas)**.
+
+## [2026-10-25] Módulo de Reportes y Estadísticas: Backend + Frontend funcional
+
+### Causa Raíz / Requerimiento
+1. El nuevo módulo "Reportes y Estadísticas" tenía la UI completamente maquetada (grid de tarjetas KPI, tarjeta de gráfica con píldoras/tabs y widget de rankings con selects) pero **sin lógica**: todo era placeholder estático y el botón "Consultar" solo cargaba el consolidado.
+2. Se requería un **motor central de fechas** que, al presionar "Consultar", disparara en paralelo (AJAX sin recarga) la actualización de KPIs, gráficas y rankings.
+3. Las tarjetas debían calcular totales agregados con `SUM` estrictamente dentro del rango (ventas netas, costo de mermas, gastos de compras) en formato moneda local (Q).
+4. La gráfica debía dejar de ser un placeholder gris: inicializar Chart.js según 3 pestañas (Tendencia de ventas/línea, Ventas por Categoría/dona, Ventas por Hora/barras) usando `destroy()` antes de cambiar de gráfico.
+5. El widget de rankings debía consultar un endpoint con `tipo_reporte` (productos/clientes/estancados), `limite` (5/10/20) y rango de fechas, con Event Listeners en los selects.
+6. Se exigía documentación exhaustiva de las funciones asíncronas JS y de las consultas SQL (construcción de fechas y ciclo de vida de las gráficas).
+
+### Solución Implementada
+1. **Backend – Consultas agregadas SQL** ([`backend/app/repositories/reporte_repository.py`](../backend/app/repositories/reporte_repository.py)):
+   - `get_kpi_totales()`: ventas netas `SUM(total_venta)` (solo estado `Completada`), mermas `SUM(costo_perdida)` desde detalle con `COUNT(DISTINCT id_merma)`, compras `SUM(total_compra)`.
+   - `get_tendencia_ventas()`: agrupa por día calendario de Guatemala restando `UTC-6` en Python (portable entre PostgreSQL y SQLite de pruebas).
+   - `get_ventas_por_categoria()`: ingresos por categoría vía `detalle_venta -> venta -> variante -> producto -> subcategoria -> categoria`.
+   - `get_ventas_por_hora()`: conteo de transacciones en las 24 franjas horarias locales.
+   - Rankings `get_ranking_productos()`, `get_ranking_clientes()`, `get_ranking_estancados()` (productos sin ventas del rango, valorando el stock parado `stock_actual * costo_promedio`), todos con `ORDER BY total DESC LIMIT X`.
+2. **Backend – Servicio** ([`backend/app/services/reporte_service.py`](../backend/app/services/reporte_service.py)): `obtener_kpi()`, `obtener_grafica()` (agrupa por mes si el rango supera 31 días) y `obtener_ranking()`.
+3. **Backend – Endpoints** ([`backend/app/api/reportes.py`](../backend/app/api/reportes.py)): `GET /api/reportes/kpi`, `GET /api/reportes/grafica?tipo=...`, `GET /api/reportes/ranking?tipo_reporte=...&limite=...`, todos protegidos con `REPORTE_VER`.
+4. **Backend – Schemas** ([`backend/app/schemas/reportes_schema.py`](../backend/app/schemas/reportes_schema.py)): `KPITotalesDTO`, `GraficaResponse`, `RankingItemDTO` y `RankingResponse`.
+5. **Frontend** ([`frontend/js/reportes.js`](../frontend/js/reportes.js)):
+   - `loadReportesPreview()` (botón "Consultar") dispara con `Promise.all` las 4 peticiones en paralelo (KPI, consolidado/tabla, gráfica activa y ranking).
+   - `renderKPIs()` inyecta los totales con `formatoQuetzal` (Intl `es-GT`).
+   - Ciclo de vida de gráficas: `graficaPlaceholder()` -> `renderGrafica()` -> `construirConfiguracionGrafica()`; **siempre se llama `.destroy()`** sobre la instancia previa antes de crear una nueva y se usa un token anti-carrera.
+   - Píldoras de gráfica y selects de ranking con Event Listeners que re-consultan usando el último rango (`reportesRangoActual`).
+
+### Verificación
+- **8 pruebas nuevas** ([`backend/tests/test_reportes_estadisticas.py`](../backend/tests/test_reportes_estadisticas.py)): KPI con SUM y filtrado del rango (incluye venta anulada y compra/merma fuera del rango), tendencia con offset UTC-6 (ventas nocturnas), categoría, franjas horarias, rankings (productos/clientes/estancados con límite) y contrato JSON de los 3 endpoints vía API.
+- Suite de reportes completa en verde: `test_reportes_estadisticas.py`, `test_reportes_consolidado_tz.py`, `test_reportes_service.py`, `test_reportes_especificos_service.py`, `test_reportes_api.py`, `test_user_report_service.py` → **31 pruebas pasan**.
+
+### Notas
+- `frontend/index.html`: `js/reportes.js` pasó de `?v=2.3` a `?v=3.0` (cache-busting). Chart.js ya está cargado desde el CDN en el `<head>`.
+- Las gráficas y rankings heredan el rango de fechas del filtro superior; si falta rango o las fechas están invertidas, `obtenerRangoReportes()` aborta con un toast.
+
+## [2026-10-25] Rediseño del POS (Checkout), Pantalla Cliente con QR y Shell de Scroll Independiente
+
+### Causa Raíz / Requerimiento
+1. **Rediseño del módulo de ventas (POS/Checkout)**:
+   - Se requería una operación tipo Square/Shopify POS, sin fricción: búsqueda unificada (texto + lector láser), categorías visibles, tarjetas de producto con stock, carrito dominante y cobro en una sola pantalla.
+   - El cliente debía capturarse en una línea compacta, el pago priorizar efectivo con montos rápidos, la transferencia quedar colapsada y el total/cambio ser los elementos más visibles.
+2. **Atajos y flujo de cobro**:
+   - Se necesitaban atajos de teclado para operar sin mouse: `F2` búsqueda, `F4` historial y `F12` cobrar (con `Ctrl+Enter` como respaldo).
+   - El historial de ventas del turno debía salir de la vista principal y abrirse en un modal para no restar espacio al carrito.
+3. **Pantalla para el cliente**:
+   - Se requería una pantalla secundaria con el detalle de la compra, total a pagar, ahorro por mayoreo, estado del turno y un QR fijo de pago.
+   - La pantalla debía actualizarse en vivo desde el POS, sin recargar y sin depender del foco de la ventana.
+4. **Ticket térmico**:
+   - Se necesitaba impresión estable en 80 mm y 58 mm, con `@page` sin márgenes, formato persistido en `localStorage` y un área de impresión aislada para no imprimir el resto de la interfaz.
+5. **Regresión de layout del shell**:
+   - El sidebar era un ítem flex con `flex-shrink: 1`; al entrar al POS, el ancho de su contenido lo comprimía de 272 px a ~168 px.
+   - El contenido de los módulos no tenía `min-height: 0`; al fijar el shell a `100vh`, algunas vistas no podían desplazarse y el contenido quedaba recortado en lugar de hacer scroll interno.
+6. **QR que abortaba la pantalla cliente**:
+   - El payload anterior incluía acentos y el carácter `·`; `qrcodejs` lanzaba `code length overflow (788>512)`, la excepción se propagaba antes de inicializar el resto de la pantalla y esta quedaba en “Conectando...”.
+
+### Solución Implementada
+1. **Interfaz del POS** ([`frontend/index.html`](../frontend/index.html), [`frontend/css/style.css`](../frontend/css/style.css)):
+   - Encabezado compacto con acceso a Historial (`F4`), Pantalla Cliente y Panel; se eliminó el subtítulo que consumía altura.
+   - Omnibox único `#pos-search` con limpiar (`#btn-pos-search-clear`) y tecla `F2`, píldoras de categoría y grid de productos con badges de stock (incluido estado “Quedan 2”).
+   - Panel derecho con cliente en una línea (`CF / Consumidor Final` por defecto), carrito con scroll propio, miniaturas de 40×40 y total/cambio destacados.
+   - Pago consolidado: efectivo por defecto, chips de monto exacto/Q50/Q100/Q200, transferencia colapsable y botón `COBRAR F12`.
+   - Historial movido a `#pos-history-modal`, sin tabla inferior permanente.
+2. **Lógica del POS** ([`frontend/js/pos.js`](../frontend/js/pos.js)):
+   - Detección de lector láser por intervalo entre teclas, búsqueda por código exacto y por coincidencia única.
+   - Atajos `F2`, `F4`, `F12` y `/`, con protección para no cobrar con un modal abierto.
+   - Cálculo automático de mayoreo, descuento y cambio; el monto exacto descuenta la transferencia cuando está visible.
+   - Ticket con folio, cajero, cliente/NIT, columnas de cantidad × precio, etiquetas `* MAYOREO`, desglose de pago y cambio.
+   - Limpieza de carrito, transferencia y cliente después de cobrar; el botón “Vaciar” se oculta con el carrito vacío.
+3. **Pantalla del cliente** ([`frontend/cliente.html`](../frontend/cliente.html)):
+   - Nueva vista con lista de artículos, ahorro mayoreo, total, estado del turno y QR.
+   - Sincronización por `BroadcastChannel`, `postMessage` y `localStorage` (`regalito_pos_customer_state`), con solicitud de estado inicial a la caja.
+   - `QR_PAYLOAD` corto y ASCII (`PAGO-REGALITO-CAJA-1`) y generación protegida con `try/catch` para que un fallo del QR nunca aborte la pantalla.
+4. **Ticket térmico** ([`frontend/js/pos.js`](../frontend/js/pos.js), [`frontend/css/style.css`](../frontend/css/style.css)):
+   - Vista previa y área de impresión dedicada (`#pos-ticket-print-area`), formatos `ticket--80` / `ticket--58` y estilo `@page` dinámico con margen 0.
+   - Persistencia del formato en `regalito_pos_ticket_format` y caché de tickets para reimpresión desde historial.
+5. **Shell con scroll independiente** ([`frontend/css/style.css`](../frontend/css/style.css)):
+   - En desktop (≥768 px): `#system-module` fijado a `100vh` con `overflow: hidden`; sidebar con `flex: 0 0 272px` (76 px colapsado) para que no cambie de ancho al navegar.
+   - `main` y cada `[data-main-view]` reciben `min-width: 0` y `min-height: 0`; cada módulo conserva su `overflow-y: auto`, por lo que solo se desplaza el panel que necesita hacerlo.
+   - El sidebar mantiene su propio `overflow-y: auto`; desplazarlo no mueve el contenido ni la página.
+   - En el POS (≥1200 px): `#pos-workspace` y `.pos-workspace-row` usan flex para llenar exactamente la altura disponible; las columnas y tarjetas quedan acotadas con scroll interno del catálogo y carrito.
+6. **Ajustes de densidad del checkout**:
+   - Se compactaron paddings, gaps, línea de cliente y botón de cobro para que el carrito ocupe al menos 60% de la columna sin sacrificar la visibilidad del total, cambio y `COBRAR F12`.
+
+### Verificación
+- **Navegador real (Chrome headless, 1440×1000; viewport 1422×904)** con login `admin` / `admin123` y respuestas API controladas:
+  - Sidebar con ancho constante de **272 px** en POS, Panel Principal, Clientes y de nuevo POS.
+  - Scroll independiente comprobado: Clientes desplazado 420 px sin mover la página; sidebar desplazado 181 px sin mover el contenido; `document.scrollingElement.scrollTop` permaneció en 0.
+  - POS sin scroll de página: `scrollHeight` del documento = `clientHeight` = 904 px; vista POS = 823/823 px.
+  - Carrito de **446 px sobre una columna de 734 px (61%)**, con total/cambio visibles y sin scroll de página.
+  - Atajos `F2`, `F4` y `F12` verificados; transferencia visible/oculta y monto exacto verificados.
+  - Pantalla cliente sincronizada con 2 artículos, total `Q 152.50`, ahorro `Q 30.00` y QR generado.
+  - Ticket alternando 80/58 mm, con `@page { size: 58mm auto; margin: 0; }` persistido en `regalito_pos_ticket_format`.
+  - `node --check` sin errores en `frontend/js/pos.js` y en el script inline de `frontend/cliente.html`.
+- **Sin cambios de backend**: se conservaron los endpoints existentes de caja, productos y ventas, así como el descargo de inventario y el cálculo de mayoreo.
+
+---
+
+## [2026-10-23] Corrección de Causa Raíz en Reportes Consolidado Operativo (Error 500, Desalineación de Zona Horaria UTC vs America/Guatemala y Frontend Defensivo)
+
+### Causa Raíz / Requerimiento
+1. **Error HTTP 500 y MissingGreenlet en Backend**:
+   - En entornos asíncronos con SQLAlchemy 2, acceder a relaciones no cargadas ansiosamente (Venta.usuario para el nombre del vendedor o Merma.detalles para sumar el costo de pérdida) sin selectinload disparaba excepciones MissingGreenlet (greenlet_spawn has not been called; can't call await_only() here), provocando que el backend respondiera con HTTP 500.
+2. **Desalineación de Zona Horaria UTC vs America/Guatemala (UTC-6)**:
+   - Los registros de ventas y mermas persisten timestamps en UTC (contenedor Docker en UTC donde datetime.now() devuelve hora UTC).
+   - Dos ventas registradas en la noche del 23/10/2026 (20:39 y 20:40 hora Guatemala) quedaron almacenadas en base de datos como 2026-10-24 02:39:24 y 2026-10-24 02:40:12 UTC.
+   - El filtro previo combinaba datetime.combine(fin, time.max) (23:59:59.999999), por lo que al consultar el rango 01/10/2026 a 23/10/2026 las ventas nocturnas quedaban excluidas de la consulta SQL.
+3. **Discrepancia de Contrato de Datos (DTO vs Frontend)**:
+   - ReporteConsolidadoResponse únicamente devolvía ventas, mermas y compras, omitiendo por completo el objeto totales (ventas, mermas, compras).
+   - VentaReporteDTO solo exponía id_venta, fecha_venta y total_venta, mientras que el frontend requería fecha, estado, vendedor, subtotal, descuento y total.
+4. **Excepción No Capturada en Frontend (reportes.js:171)**:
+   - Al invocar renderReportesPreview(data), la función accedía directamente a data.totales.ventas.toFixed(2). Al ser data.totales indefinido (o al fallar la petición con 500), se lanzaba la excepción Cannot read properties of undefined (reading 'ventas').
+
+### Solución Implementada
+1. **Esquemas Pydantic** (backend/app/schemas/reportes_schema.py):
+   - Se definió TotalesConsolidadoDTO con montos ventas, mermas y compras de tipo Decimal.
+   - Se enriqueció VentaReporteDTO con fecha, fecha_venta, estado, vendedor, subtotal, descuento, total y total_venta con valores predeterminados y tipado estricto.
+   - Se actualizó MermaReporteDTO con fecha, fecha_merma, observaciones y total.
+   - Se actualizó CompraReporteDTO con fecha, fecha_ingreso, total y total_compra.
+   - ReporteConsolidadoResponse ahora incluye totales: TotalesConsolidadoDTO = TotalesConsolidadoDTO().
+2. **Repositorio con Eager Loading y Compensación de Zona Horaria** (backend/app/repositories/reporte_repository.py):
+   - Se definió GUATEMALA_OFFSET = timedelta(hours=6) (Guatemala es UTC-6 sin horario de verano).
+   - En get_ventas_by_date y get_mermas_by_date, los límites dt_inicio y dt_fin se ajustan sumando GUATEMALA_OFFSET, alineando las fechas calendario ingresadas por el usuario con los timestamps UTC almacenados en PostgreSQL.
+   - Se agregaron opciones de carga ansiosa explícitas: options(selectinload(Venta.usuario)) en ventas, options(selectinload(Merma.detalles), selectinload(Merma.usuario)) en mermas, y options(selectinload(Compra.proveedor), selectinload(Compra.usuario)) en compras, erradicando cualquier posibilidad de MissingGreenlet.
+3. **Servicio DERCAS** (backend/app/services/reporte_service.py):
+   - En obtener_consolidado: cálculo de totales de ventas, mermas (sumatoria de costo_perdida de sus detalles) y compras.
+   - Normalización de fechas con timezone.utc para serialización ISO estándar con terminación Z, permitiendo que el navegador del cliente las interprete y muestre automáticamente en la hora local correcta del usuario.
+   - Se mantuvo la arquitectura DERCAS intacta (el controlador app/api/reportes.py permanece delgado, sin bloques try/except).
+4. **Frontend Defensivo** (frontend/js/reportes.js):
+   - renderReportesPreview ahora valida defensivamente if (!data || typeof data !== 'object') y limpia/restaura el estado de la vista con ceros y mensaje descriptivo de vacío sin arrojar excepciones.
+   - Se protegió la lectura de propiedades (data.totales || {}, data.ventas || [], data.mermas || [], data.compras || []).
+   - Se garantizó la conversión numérica segura con fallbacks (Number(totales.ventas ?? 0) || 0, v.subtotal ?? (v.total ?? 0)).
+   - En loadReportesPreview, tanto errores de respuesta HTTP (!response.ok) como excepciones capturadas en catch invocan renderReportesPreview(null).
+5. **Pruebas Automatizadas Pytest** (backend/tests/test_reportes_consolidado_tz.py):
+   - test_consolidado_tz_guatemala_ventas_nocturnas_y_totales: comprueba que ventas nocturnas generadas en UTC se recuperen al filtrar por la fecha local de Guatemala, verificando cálculos de totales y mapeo de datos sin MissingGreenlet.
+   - test_consolidado_mermas_detalles_sin_missing_greenlet: comprueba la sumatoria de costos de pérdida en detalles de mermas y la navegación segura de relaciones.
+   - test_api_reportes_vista_previa_status_200_con_totales: prueba de integración vía httpx.AsyncClient sobre /api/reportes/, validando HTTP 200 OK y la presencia de la estructura esperada por el frontend.
+
+### Verificación
+- **Prueba en Vivo sobre API**:
+  - GET /api/reportes/?fecha_inicio=2026-10-01&fecha_fin=2026-10-23 responde HTTP 200 OK.
+  - Se obtienen las 2 ventas registradas de la noche del 23/10/2026 (Q290.00 y Q340.00).
+  - Total de ventas consolidado: Q 630.00.
+- **Suite Completa de Pytest**:
+  - 279 pruebas aprobadas, 0 fallidas (suite completa ejecutada limpiamente).
+
+---
+
 ## [2026-10-23] Despliegue de Producción con un Solo Comando (Docker Compose, Auto-Migraciones, Dependencias Fijas y Paridad de Base de Datos)
 
 ### Causa Raíz / Requerimiento
@@ -2890,3 +3340,42 @@ Se desarrolló el módulo de **Productos** y el mantenimiento de **Categorías**
 
 ### Nota
 - `reportes-view`, `inventory-view` y `configuracion-view` ya no quedan anidados entre sí; el enrutamiento SPA de `app.js` funciona sin cambios adicionales.
+---
+
+## [2026-10-25] Rediseño del Panel Principal (Dashboard) con métricas operativas y una sola petición agregada
+
+### Causa Raíz / Requerimiento
+1. **Panel Principal con información útil**: el dashboard anterior era una maqueta con 4 KPIs genéricos (ventas, stock crítico, compras del mes, turnos activos), la tarjeta "Módulos del Sistema" y la tarjeta "Turnos de caja activos", sin gráficos, top productos, pendientes ni accesos rápidos.
+2. **Zona horaria**: los timestamps se guardan en UTC (contenedor Docker) y los días "hoy/ayer/semana" deben calcularse en America/Guatemala (UTC-6), no en UTC ni en la zona horaria del servidor.
+3. **Rendimiento y robustez**: cargar el panel con una sola petición agregada, con estados de carga (skeleton), estados vacíos con acción y manejo defensivo si una petición falla.
+4. **RBAC**: mostrar solo los bloques permitidos por rol/permisos reutilizando `canAccessView` de `frontend/js/app.js`.
+
+### Solución Implementada
+1. **Backend (DERCAS, sin try/except en controlador)**:
+   - `backend/app/schemas/dashboard_schema.py`: nuevos DTOs `TurnoDashboard`, `VentasMetodoPago`, `VentaDiaria`, `TopProducto`, `StockCritico`, `OrdenPendiente`, `TrasladoPendiente`, `VentaReciente`; `MetricasVentas` ampliado con `ticket_promedio`, `variacion_ayer` y `total_ayer`. Se conservan los campos `compras_mes` y `turnos_activos` para compatibilidad.
+   - `backend/app/repositories/dashboard_repository.py`: fecha "hoy" calculada con `GUATEMALA_OFFSET = timedelta(hours=6)` (`guatemala_today()`), límites UTC por día calendario local (`_utc_bounds`) y mes (`_month_bounds`). Nuevas consultas: turno actual del usuario, ventas por método de pago del día (neto recibido-vuelto), mermas del mes, ventas por día de los últimos 7 días, top 5 productos de la semana, stock crítico (lista, máximo 5), órdenes "Emitida" por recibir, traslados "En tránsito" y últimas 5 ventas. Todas las relaciones serializadas se cargan con `selectinload` (incluida la cadena `TurnoCaja.caja -> Caja.sucursal`) para evitar MissingGreenlet.
+   - `backend/app/services/dashboard_service.py`: ensambla el `DashboardResumenResponse` completo en una sola llamada `get_resumen(user_id)`; normaliza fechas a UTC conscientes (`timezone.utc`) para que el navegador muestre la hora local de Guatemala; calcula ticket promedio y variación % vs ayer (`None` si no hay línea base).
+   - `backend/app/api/dashboard.py`: controlador delgado (sin try/except) que delega en `service.get_resumen(current_user.id_usuario)`.
+   - `backend/app/interfaces/repositories.py` y `backend/app/interfaces/services.py`: contratos `DashboardRepository` y `DashboardService` actualizados al nuevo conjunto de métodos.
+   - `backend/tests/test_dashboard_service.py`: seeds deterministas en zona Guatemala (independientes de la TZ de la máquina), nuevos casos `test_dashboard_resumen_sin_datos` (0 datos) y `test_dashboard_resumen_dos_ventas_q630` (2 ventas, Q630, métodos de pago, top productos, stock, pendientes y últimas ventas).
+2. **Frontend**:
+   - `frontend/index.html` (solo `#dashboard-content`): se eliminan "Módulos del Sistema" y "Turnos de caja activos". Nuevo contenido: barra superior de estado de caja (abierto/cerrado, cajero, hora de apertura, fondo/efectivo esperado) con botones "Ir al POS" / "Abrir caja" / "Cerrar caja"; KPIs (ventas de hoy con tickets, ticket promedio y % vs ayer con flecha verde/roja; ventas por método de pago hoy; mermas del mes); gráfico de barras de los últimos 7 días con Chart.js UMD 4.4.1 pinneado desde cdn.jsdelivr.net; top 5 productos de la semana; stock crítico (máx 5) con enlace a Inventario; pendientes (órdenes "Emitida" y traslados "En tránsito") con enlaces; últimas 5 ventas (folio, hora, total, vendedor); 4 accesos rápidos (Nueva venta, Abrir/Cerrar caja, Registrar merma, Nueva compra). Cada bloque lleva `data-dashblock` para el filtrado por rol.
+   - `frontend/js/dashboard.js`: reescrito para consumir la sola petición `GET /api/dashboard/resumen`, con `toggleDashboardBlocks()` (RBAC por `canAccessView`), skeletons de carga, estados vacíos con acción, render defensivo y fallback ante error HTTP/excepción sin romper el resto del panel, e integración con Chart.js (destruye/recrea la instancia al re-navegar).
+   - `frontend/css/style.css`: sección nueva al final con skeletons shimmer, listas del panel, tendencia vs ayer (verde/rojo/gris), píldora de estado de caja y tarjetas de accesos rápidos. No se modifican los colores base.
+
+### Verificación
+- **Suite pytest completa (backend)**: `python -m pytest -q` → **281 passed, 0 failed** (incluye los 7 casos del dashboard).
+- **`node --check`**: `frontend/js/dashboard.js` válido (sin errores de sintaxis).
+- **Escenario 0 datos**: `test_dashboard_resumen_sin_datos` → total Q 0.00, 0 ventas, listas vacías, 7 días en ceros, turno `None`, sin excepciones.
+- **Escenario 2 ventas (Q630)**: `test_dashboard_resumen_dos_ventas_q630` → ventas hoy Q630.00, 2 tickets, ticket promedio Q315.00; efectivo Q290 / transferencia Q340; top productos Galleta Soda y Aceite 1L; stock crítico 1; 1 orden "Emitida"; 1 traslado "En tránsito"; últimas 2 ventas con vendedor.
+- **Módulos del menú**: la navegación del sidebar (`navigateTo`/`openModule` en `app.js`) es independiente del contenido del panel; se eliminaron los `onclick` inline del antiguo dashboard pero no se tocó ninguna ID usada por otros JS.
+- **Zona horaria**: la fecha de hoy/ayer/semana se calcula en el backend con el offset de Guatemala; el frontend solo formatea (las horas de ventas/turno llegan como UTC conscientes y se muestran en hora local).
+
+### Corrección (2026-10-25): gráfico de 7 días en blanco
+- **Síntoma**: el gráfico de "Ventas de los últimos 7 días" aparecía vacío (canvas 0×0) aunque la API devolvía datos.
+- **Causa**: Chart.js 4.4.1 no se recupera si se instancia mientras un ancestro está oculto (`display:none`); queda con `width/height = 0` incluso al mostrarse después. Ocurría cuando el resumen se cargaba desde `initDashboard()` con una vista distinta a la del panel activa (p. ej. hash `#pos` guardado), y además duplicaba la petición inicial.
+- **Solución**:
+  - `renderChart()` ahora difiere la creación con `setTimeout` hasta que `#dash-chart-wrap` esté visible y con tamaño real (`offsetParent`, `clientWidth/Height`), con token de generación para cancelar intentos previos.
+  - `initDashboard()` ya no dispara la carga; solo enlaza acciones. La carga la hace `renderView('dashboard') -> showDashboardModule()` cuando el contenedor ya está visible (elimina la doble petición).
+  - Se subieron versiones de caché en `index.html`: `dashboard.js?v=1.1` y `style.css?v=2.8`.
+- **Verificación**: reproducido y validado en Chrome headless contra `http://localhost:9090` (contenedor `regalito_frontend_prod` + `regalito_backend_prod`): con token y hash `#dashboard` el canvas queda 607×260 y dibuja la barra de Q630; con hash `#pos` no se crea instancia 0×0 y al navegar a `#dashboard` se dibuja correctamente.

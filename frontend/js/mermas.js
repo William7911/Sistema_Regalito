@@ -11,6 +11,8 @@
     };
 
     let bsModal = null;
+    let sortCol = 'id_merma';
+    let sortAsc = false;
 
     function getAuthHeaders() {
         const token = localStorage.getItem('jwt_token') || '';
@@ -100,6 +102,9 @@
                 actualizarCostoEstimado();
             });
         }
+
+        setupSorting();
+        updateSortIcons();
     }
 
     window.showMermasModule = async function() {
@@ -180,6 +185,7 @@
                         codigo_barras: v.codigo_barras || '',
                         costo_promedio: Number(v.costo_promedio || 0),
                         inventarios: v.inventarios || [],
+                        imagen_url: p.imagen_url || v.imagen_url || '',
                     });
                 });
             });
@@ -376,18 +382,164 @@
             state.mermas = (data && data.items) ? data.items : [];
             const total = (data && typeof data.total === 'number') ? data.total : state.mermas.length;
 
-            renderTable(state.mermas);
+            applySortAndRender();
+            updateSortIcons();
             if (totalInfo) totalInfo.textContent = `Total: ${total} merma(s) registrada(s)`;
         } catch (err) {
             tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${err.message || 'Error al consultar mermas'}</td></tr>`;
             if (totalInfo) totalInfo.textContent = 'Error al cargar';
+            updateMermasKPIs([]);
         }
+    }
+
+    /**
+     * updateMermasKPIs(items)
+     * ------------------------
+     * Calcula métricas agregadas del período:
+     * 1. Total Pérdida (Q)
+     * 2. Artículos Descartados (total unidades)
+     * 3. Motivo más frecuente (con mayor recurrencia e impacto)
+     */
+    function updateMermasKPIs(items) {
+        const kpiTotalPerdida = document.getElementById('merma-kpi-total-perdida');
+        const kpiTotalArticulos = document.getElementById('merma-kpi-total-articulos');
+        const kpiTotalRegistros = document.getElementById('merma-kpi-total-registros');
+        const kpiMotivoFrecuente = document.getElementById('merma-kpi-motivo-frecuente');
+        const kpiMotivoDetalle = document.getElementById('merma-kpi-motivo-detalle');
+
+        if (!kpiTotalPerdida || !kpiTotalArticulos || !kpiMotivoFrecuente) return;
+
+        if (!items || items.length === 0) {
+            kpiTotalPerdida.textContent = 'Q 0.00';
+            kpiTotalArticulos.textContent = '0 unidades';
+            if (kpiTotalRegistros) kpiTotalRegistros.textContent = '0 registros de merma';
+            kpiMotivoFrecuente.textContent = '—';
+            kpiMotivoFrecuente.title = 'Ninguno';
+            if (kpiMotivoDetalle) kpiMotivoDetalle.textContent = 'Sin incidencias registradas';
+            return;
+        }
+
+        let totalPerdida = 0;
+        let totalArticulos = 0;
+        const motivoContador = {};
+
+        items.forEach(m => {
+            const costoMerma = Number(m.costo_total_perdida || 0);
+            if (m.detalles && m.detalles.length > 0) {
+                m.detalles.forEach(d => {
+                    const costo = Number(d.costo_perdida || 0);
+                    const cant = Number(d.cantidad || 0);
+                    totalPerdida += costo;
+                    totalArticulos += cant;
+
+                    const nombreMotivo = (d.motivo && d.motivo.descripcion) ? d.motivo.descripcion.trim() : (d.id_motivo ? `Motivo #${d.id_motivo}` : 'Sin motivo');
+                    if (!motivoContador[nombreMotivo]) {
+                        motivoContador[nombreMotivo] = { conteo: 0, unidades: 0, costo: 0 };
+                    }
+                    motivoContador[nombreMotivo].conteo += 1;
+                    motivoContador[nombreMotivo].unidades += cant;
+                    motivoContador[nombreMotivo].costo += costo;
+                });
+            } else {
+                totalPerdida += costoMerma;
+            }
+        });
+
+        let topMotivo = '—';
+        let topCount = 0;
+        let topUnidades = 0;
+
+        for (const [motivo, data] of Object.entries(motivoContador)) {
+            if (data.conteo > topCount || (data.conteo === topCount && data.unidades > topUnidades)) {
+                topCount = data.conteo;
+                topMotivo = motivo;
+                topUnidades = data.unidades;
+            }
+        }
+
+        kpiTotalPerdida.textContent = `Q ${totalPerdida.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        kpiTotalArticulos.textContent = `${totalArticulos.toLocaleString('es-GT')} ${totalArticulos === 1 ? 'unidad' : 'unidades'}`;
+        if (kpiTotalRegistros) {
+            kpiTotalRegistros.textContent = `${items.length} ${items.length === 1 ? 'registro' : 'registros'} de merma`;
+        }
+        kpiMotivoFrecuente.textContent = topMotivo;
+        kpiMotivoFrecuente.title = topMotivo;
+        if (kpiMotivoDetalle) {
+            kpiMotivoDetalle.textContent = topCount > 0 ? `${topCount} incidente(s) · ${topUnidades} u.` : 'Sin incidencias';
+        }
+    }
+
+    /**
+     * getMotivoBadge(descripcion)
+     * ---------------------------
+     * Devuelve Soft Badge con colores semánticos según la gravedad:
+     * - Dañado / Roto / Quebrado -> Rojo suave (badge-soft-danger)
+     * - Vencimiento / Caducado  -> Ámbar suave (badge-soft-warning)
+     * - Manchado / Defecto      -> Morado suave (badge-soft-purple)
+     * - Otros                   -> Gris neutro (badge-soft-secondary)
+     */
+    function getMotivoBadge(descripcion) {
+        const desc = descripcion ? escapeHtml(descripcion) : 'Sin motivo';
+        const text = (descripcion || '').toLowerCase();
+
+        if (text.includes('dañ') || text.includes('dan') || text.includes('rot') || text.includes('quebr') || text.includes('deterior')) {
+            return `<span class="badge-soft-danger" title="Severidad Alta: Daño físico"><i class="bi bi-x-circle me-1"></i>${desc}</span>`;
+        }
+        if (text.includes('venc') || text.includes('caduc')) {
+            return `<span class="badge-soft-warning" title="Vencimiento"><i class="bi bi-clock-history me-1"></i>${desc}</span>`;
+        }
+        if (text.includes('manch') || text.includes('defecto') || text.includes('fabric') || text.includes('desperf')) {
+            return `<span class="badge-soft-purple" title="Defecto o Manchado"><i class="bi bi-shield-exclamation me-1"></i>${desc}</span>`;
+        }
+        return `<span class="badge-soft-secondary" title="Motivo de salida"><i class="bi bi-tag me-1"></i>${desc}</span>`;
+    }
+
+    /**
+     * getProductCellHtml(d)
+     * ---------------------
+     * Renderiza contenedor 40x40px para la miniatura/avatar (o ícono 📦)
+     * a la izquierda del nombre del producto para escaneo visual rápido.
+     */
+    function getProductCellHtml(d) {
+        const prodStr = d.nombre_producto ? escapeHtml(d.nombre_producto) : `Variante #${d.id_variante}`;
+        const varInfo = d.variante_info ? `<span class="badge bg-light text-secondary border ms-1" style="font-size: 0.75rem;">${escapeHtml(d.variante_info)}</span>` : '';
+
+        const catVar = state.catalogoVariantes.find(v => v.id_variante === d.id_variante);
+        const imgUrl = (catVar && catVar.imagen_url) || '';
+
+        let thumbHtml = '';
+        if (imgUrl) {
+            const safeImg = escapeHtml(imgUrl);
+            thumbHtml = `
+                <div class="merma-product-thumb" title="${prodStr}">
+                    <img src="${safeImg}" alt="" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'merma-thumb-icon\'>📦</span>';">
+                </div>
+            `;
+        } else {
+            thumbHtml = `
+                <div class="merma-product-thumb" title="${prodStr}">
+                    <span class="merma-thumb-icon">📦</span>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="d-flex align-items-center gap-2">
+                ${thumbHtml}
+                <div class="min-w-0">
+                    <div class="fw-semibold text-dark text-truncate" style="max-width: 260px;" title="${prodStr}">${prodStr}</div>
+                    ${varInfo ? `<div class="mt-1">${varInfo}</div>` : ''}
+                </div>
+            </div>
+        `;
     }
 
     function renderTable(items) {
         const tbody = document.getElementById('mermas-table-body');
         const emptyState = document.getElementById('mermas-empty');
         if (!tbody) return;
+
+        updateMermasKPIs(items);
 
         if (!items || items.length === 0) {
             tbody.innerHTML = '';
@@ -406,38 +558,126 @@
             const costoTotal = Number(m.costo_total_perdida || 0);
 
             if (m.detalles && m.detalles.length > 0) {
-                m.detalles.forEach((d, idx) => {
-                    const motivoStr = d.motivo ? escapeHtml(d.motivo.descripcion) : `Motivo #${d.id_motivo}`;
-                    const prodStr = d.nombre_producto ? escapeHtml(d.nombre_producto) : `Variante #${d.id_variante}`;
-                    const varInfo = d.variante_info ? `<span class="badge bg-light text-dark border ms-1">${escapeHtml(d.variante_info)}</span>` : '';
+                m.detalles.forEach((d) => {
+                    const prodCell = getProductCellHtml(d);
+                    const motivoBadge = getMotivoBadge(d.motivo ? d.motivo.descripcion : '');
                     const costoDet = Number(d.costo_perdida || 0);
 
                     html += `<tr>
-                        <td><span class="badge bg-secondary">#${m.id_merma}</span></td>
+                        <td><span class="badge bg-secondary-subtle text-secondary border">#${m.id_merma}</span></td>
                         <td><small class="fw-semibold text-dark">${fechaStr}</small></td>
-                        <td>${escapeHtml(sucursalStr)}</td>
+                        <td><span class="badge bg-light text-dark border">${escapeHtml(sucursalStr)}</span></td>
                         <td><small class="text-muted"><i class="bi bi-person me-1"></i>${escapeHtml(usuarioStr)}</small></td>
-                        <td><strong>${prodStr}</strong>${varInfo}</td>
-                        <td><span class="badge bg-danger-subtle text-danger border border-danger-subtle">${motivoStr}</span></td>
-                        <td class="text-center fw-bold">${d.cantidad}</td>
-                        <td class="text-end fw-semibold text-danger">Q ${costoDet.toFixed(2)}</td>
-                        <td><small>${obsStr}</small></td>
+                        <td>${prodCell}</td>
+                        <td>${motivoBadge}</td>
+                        <td class="text-center fw-bold text-dark">${d.cantidad}</td>
+                        <td class="text-end merma-costo-perdida">Q ${costoDet.toFixed(2)}</td>
+                        <td><small class="text-muted">${obsStr}</small></td>
                     </tr>`;
                 });
             } else {
                 html += `<tr>
-                    <td><span class="badge bg-secondary">#${m.id_merma}</span></td>
+                    <td><span class="badge bg-secondary-subtle text-secondary border">#${m.id_merma}</span></td>
                     <td><small class="fw-semibold text-dark">${fechaStr}</small></td>
-                    <td>${escapeHtml(sucursalStr)}</td>
+                    <td><span class="badge bg-light text-dark border">${escapeHtml(sucursalStr)}</span></td>
                     <td><small class="text-muted">${escapeHtml(usuarioStr)}</small></td>
                     <td colspan="3" class="text-muted fst-italic">Sin detalles</td>
-                    <td class="text-end fw-semibold text-danger">Q ${costoTotal.toFixed(2)}</td>
-                    <td><small>${obsStr}</small></td>
+                    <td class="text-end merma-costo-perdida">Q ${costoTotal.toFixed(2)}</td>
+                    <td><small class="text-muted">${obsStr}</small></td>
                 </tr>`;
             }
         });
 
         tbody.innerHTML = html;
+    }
+
+
+    /* =======================================================================
+       ORDENAMIENTO DE COLUMNAS (SORT) - REPLICADO 1:1 DE INVENTARIO
+       ======================================================================= */
+
+    function setupSorting() {
+        document.querySelectorAll('#mermas-view th.sortable').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = th.getAttribute('data-sort');
+                if (sortCol === col) {
+                    sortAsc = !sortAsc;
+                } else {
+                    sortCol = col;
+                    sortAsc = true;
+                }
+                updateSortIcons();
+                applySortAndRender();
+            });
+        });
+    }
+
+    function updateSortIcons() {
+        document.querySelectorAll('#mermas-view th.sortable').forEach(th => {
+            const icon = th.querySelector('.sort-icon');
+            if (!icon) return;
+
+            const col = th.getAttribute('data-sort');
+            if (col === sortCol) {
+                // Estado Activo: flecha sólida (↑ o ↓)
+                icon.className = `sort-icon bi bi-arrow-${sortAsc ? 'up' : 'down'} text-white ms-1`;
+            } else {
+                // Íconos inactivos: ⇕ (doble flecha contorno)
+                icon.className = 'sort-icon bi bi-arrow-down-up text-white-50 ms-1';
+            }
+        });
+    }
+
+    function getSortValue(item, col) {
+        if (!item) return '';
+
+        if (col === 'id_merma') {
+            return Number(item.id_merma || 0);
+        }
+        if (col === 'fecha_merma') {
+            return item.fecha_merma ? new Date(item.fecha_merma).getTime() : 0;
+        }
+        if (col === 'producto_nombre') {
+            if (item.detalles && item.detalles.length > 0) {
+                return String(item.detalles[0].nombre_producto || '').toLowerCase();
+            }
+            return '';
+        }
+        if (col === 'cantidad') {
+            if (item.detalles && item.detalles.length > 0) {
+                return item.detalles.reduce((acc, d) => acc + (Number(d.cantidad) || 0), 0);
+            }
+            return 0;
+        }
+        if (col === 'costo_perdida') {
+            if (item.costo_total_perdida != null) {
+                return Number(item.costo_total_perdida || 0);
+            }
+            if (item.detalles && item.detalles.length > 0) {
+                return item.detalles.reduce((acc, d) => acc + (Number(d.costo_perdida) || 0), 0);
+            }
+            return 0;
+        }
+        return '';
+    }
+
+    function applySortAndRender() {
+        if (!state.mermas || state.mermas.length === 0) {
+            renderTable([]);
+            return;
+        }
+
+        state.mermas.sort((a, b) => {
+            const valA = getSortValue(a, sortCol);
+            const valB = getSortValue(b, sortCol);
+
+            if (typeof valA === 'string' && typeof valB === 'string') {
+                return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+            return sortAsc ? (valA - valB) : (valB - valA);
+        });
+
+        renderTable(state.mermas);
     }
 
     function escapeHtml(text) {

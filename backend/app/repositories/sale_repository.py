@@ -65,7 +65,9 @@ class SaleRepositoryImpl:
         stmt = (
             select(Venta)
             .options(
-                selectinload(Venta.detalles).selectinload(DetalleVenta.variante),
+                selectinload(Venta.detalles)
+                .selectinload(DetalleVenta.variante)
+                .selectinload(VarianteProducto.producto),
                 selectinload(Venta.pagos),
                 selectinload(Venta.cliente),
                 selectinload(Venta.usuario),
@@ -111,7 +113,9 @@ class SaleRepositoryImpl:
         stmt = (
             select(Venta)
             .options(
-                selectinload(Venta.detalles),
+                selectinload(Venta.detalles)
+                .selectinload(DetalleVenta.variante)
+                .selectinload(VarianteProducto.producto),
                 selectinload(Venta.pagos),
             )
             .order_by(Venta.fecha_venta.desc())

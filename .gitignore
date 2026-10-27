@@ -17,6 +17,9 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
+# Archivos subidos por usuarios
+backend/uploads/
+
 # Archivos del sistema
 .DS_Store
 Thumbs.db

@@ -418,19 +418,28 @@ async function loadUsers() {
                 const rol = u.rol ? u.rol.nombre : '-';
                 const activo = u.estado === 'Activo';
                 const fecha = u.fecha_creacion ? formatDate(u.fecha_creacion) : '-';
+                // Mejora visual (solo estética): se conservan los datos y el condicional
+                // de estado original. Los colores finales viven en css/style.css.
                 return `
                 <tr>
                     <td>${u.id_usuario}</td>
                     <td>${u.nombre_completo}</td>
                     <td>${u.username}</td>
                     <td>${rol}</td>
-                    <td><span class="badge ${activo ? 'bg-success' : 'bg-secondary'}">${activo ? 'Activo' : 'Inactivo'}</span></td>
+                    <!-- Corrección 3 (Badge "Activo"): se retira bg-success (verde sólido)
+                         y se usan clases Soft Badge: fondo #DCFCE7 y texto #166534. -->
+                    <td><span class="badge users-status-badge ${activo ? 'users-status-badge--active' : 'users-status-badge--inactive'}">${activo ? 'Activo' : 'Inactivo'}</span></td>
                     <td>${fecha}</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-info" onclick="viewUserDetail(${u.id_usuario})" title="Ver detalle"><i class="bi bi-eye"></i></button>
-                        <button class="btn btn-sm btn-outline-primary" onclick="editUser(${u.id_usuario})" title="Editar"><i class="bi bi-pencil"></i></button>
-                        ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateUser(${u.id_usuario})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
+                    <!-- Inicio: Corrección 1 y Corrección 2 de la columna de acciones -->
+                    <!-- Corrección 1: botones sin borde (ghost); Corrección 2: ícono de papelera. -->
+                    <!-- Se mantienen exactamente los mismos onclick y condiciones de negocio. -->
+                    <td class="text-end users-actions-cell">
+                        <button class="btn btn-sm users-action-btn users-action-btn--view" onclick="viewUserDetail(${u.id_usuario})" title="Ver detalle" aria-label="Ver detalle"><i class="bi bi-eye"></i></button>
+                        <button class="btn btn-sm users-action-btn users-action-btn--edit" onclick="editUser(${u.id_usuario})" title="Editar" aria-label="Editar"><i class="bi bi-pencil"></i></button>
+                        <!-- Corrección 2: bi-trash3 (papelera) sustituye a bi-x-circle (X roja). -->
+                        ${activo ? `<button class="btn btn-sm users-action-btn users-action-btn--delete" onclick="deactivateUser(${u.id_usuario})" title="Desactivar" aria-label="Desactivar"><i class="bi bi-trash3"></i></button>` : ''}
                     </td>
+                    <!-- Fin: Corrección 1 y Corrección 2 de la columna de acciones -->
                 </tr>
             `;
             }).join('');

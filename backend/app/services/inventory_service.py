@@ -15,14 +15,7 @@ class ConcreteInventoryService:
         items = await self.uow.inventory.get_all(id_sucursal=id_sucursal, low_stock_only=low_stock_only)
         responses = []
         for item in items:
-            resp = InventoryResponse.model_validate(item)
-            if item.variante:
-                resp.variante_sku = item.variante.codigo_barras
-                if item.variante.producto:
-                    resp.producto_nombre = item.variante.producto.nombre
-            if item.sucursal:
-                resp.sucursal_nombre = item.sucursal.nombre
-            responses.append(resp)
+            responses.append(await self._format_response(item))
         return responses
 
     async def update_inventory(self, id_inventario: int, update_data: InventoryUpdate, current_user: Usuario) -> InventoryResponse:
@@ -86,6 +79,7 @@ class ConcreteInventoryService:
             resp.variante_sku = item.variante.codigo_barras
             if item.variante.producto:
                 resp.producto_nombre = item.variante.producto.nombre
+                resp.imagen_url = item.variante.producto.imagen_url
         if item.sucursal:
             resp.sucursal_nombre = item.sucursal.nombre
         return resp

@@ -18,6 +18,11 @@ const CATALOGOS_API = '/api/catalogos';
 let baseSaveTextProduct = 'Guardar';
 let baseSaveTextCategory = 'Guardar';
 
+const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const PRODUCT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+let isProductImageUploading = false;
+let productImageUploadToken = 0;
+
 // Formatea una fecha (ISO/UTC) a DD/MM/YYYY. Definida aquí para que el módulo
 // sea autocontenido (siempre se carga users.js antes, pero se evitan dependencias).
 function formatDate(value) {
@@ -28,6 +33,112 @@ function formatDate(value) {
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const yyyy = d.getFullYear();
     return `${dd}/${mm}/${yyyy}`;
+}
+
+// REDISEÑO UI/UX: escapa valores interpolados en atributos HTML (por ejemplo
+// la URL de la imagen) para no romper el marcado ni permitir inyección.
+function escapeCatalogAttribute(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+// REDISEÑO UI/UX: Soft Badge reutilizable para todos los estados del catálogo.
+// Fondo pastel + texto oscuro + bordes redondeados (mismo lenguaje de Inventario).
+function catalogStatusBadge(estado, extraClasses = '') {
+    const activo = estado === 'Activo';
+    const variant = activo ? 'catalog-status-badge--active' : 'catalog-status-badge--inactive';
+    const label = activo ? 'Activo' : 'Inactivo';
+    const classes = `catalog-status-badge ${variant}${extraClasses ? ` ${extraClasses}` : ''}`;
+    return `<span class="${classes}">${label}</span>`;
+}
+
+/* ----------------------------------------------------------------------
+   REDISEÑO UI/UX — ZOOM FLOTANTE DE MINIATURAS (CATÁLOGO)
+   Muestra una vista previa ampliada en un contenedor fijo fuera de la
+   tabla (#catalog-image-zoom). Se posiciona junto a la miniatura en
+   pantalla para que el overflow horizontal de la tabla (.table-responsive)
+   no la recorte en monitores compactos. No desplaza los elementos de la
+   miniatura y no ocupa espacio en la fila, por lo que su altura no cambia.
+   Idéntico al comportamiento, accesibilidad y diseño de Inventario.
+   ---------------------------------------------------------------------- */
+const CATALOG_IMAGE_ZOOM_SIZE = 200;
+const CATALOG_IMAGE_ZOOM_GAP = 12;
+const CATALOG_IMAGE_ZOOM_MARGIN = 8;
+
+function getCatalogImageZoom() {
+    return document.getElementById('catalog-image-zoom');
+}
+
+function positionCatalogImageZoom(trigger) {
+    const zoom = getCatalogImageZoom();
+    if (!zoom || !trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const width = zoom.offsetWidth || CATALOG_IMAGE_ZOOM_SIZE;
+    const height = zoom.offsetHeight || CATALOG_IMAGE_ZOOM_SIZE;
+    const maxLeft = window.innerWidth - width - CATALOG_IMAGE_ZOOM_MARGIN;
+
+    /* Preferencia: a la derecha de la miniatura; si no cabe, a la izquierda. */
+    let left = rect.right + CATALOG_IMAGE_ZOOM_GAP;
+    if (left > maxLeft) {
+        left = rect.left - width - CATALOG_IMAGE_ZOOM_GAP;
+    }
+    left = Math.max(CATALOG_IMAGE_ZOOM_MARGIN, Math.min(left, maxLeft));
+
+    /* La miniatura queda centrada verticalmente con respecto a la vista previa. */
+    const halfHeight = height / 2;
+    let top = rect.top + rect.height / 2;
+    top = Math.max(halfHeight + CATALOG_IMAGE_ZOOM_MARGIN, Math.min(top, window.innerHeight - halfHeight - CATALOG_IMAGE_ZOOM_MARGIN));
+
+    zoom.style.left = `${left}px`;
+    zoom.style.top = `${top}px`;
+}
+
+function showCatalogImageZoom(trigger) {
+    const zoom = getCatalogImageZoom();
+    const image = document.getElementById('catalog-image-zoom-img');
+    const src = trigger && trigger.getAttribute('data-zoom-src');
+    if (!zoom || !image || !src) return;
+
+    if (image.getAttribute('src') !== src) {
+        image.src = src;
+    }
+    zoom.classList.add('is-visible');
+    zoom.setAttribute('aria-hidden', 'false');
+    positionCatalogImageZoom(trigger);
+}
+
+function hideCatalogImageZoom() {
+    const zoom = getCatalogImageZoom();
+    if (!zoom) return;
+    zoom.classList.remove('is-visible');
+    zoom.setAttribute('aria-hidden', 'true');
+}
+
+function setupCatalogImageZoom(trigger) {
+    if (!trigger) return;
+    trigger.addEventListener('mouseenter', () => showCatalogImageZoom(trigger));
+    trigger.addEventListener('mouseleave', hideCatalogImageZoom);
+    trigger.addEventListener('focus', () => showCatalogImageZoom(trigger));
+    trigger.addEventListener('blur', hideCatalogImageZoom);
+}
+
+// REDISEÑO UI/UX: miniatura 40x40 con placeholder de caja y zoom flotante ampliado (idéntico a Inventario).
+function catalogProductThumb(imagenUrl) {
+    const url = String(imagenUrl || '').trim();
+    if (!url) {
+        return '<span class="catalog-product-thumb catalog-product-thumb--placeholder" aria-hidden="true">📦</span>';
+    }
+    const safeUrl = escapeCatalogAttribute(url);
+    return `
+        <span class="catalog-product-thumb-wrap catalog-product-thumb-wrap--zoomable" data-zoom-src="${safeUrl}" tabindex="0" aria-label="Vista previa ampliada de la imagen del producto">
+            <img src="${safeUrl}" alt="" class="catalog-product-thumb" loading="lazy" onerror="this.parentElement.classList.add('is-placeholder'); this.parentElement.removeAttribute('data-zoom-src'); this.parentElement.removeAttribute('tabindex'); this.parentElement.removeAttribute('aria-label'); this.remove();">
+            <span class="catalog-product-thumb-fallback" aria-hidden="true">📦</span>
+        </span>`;
 }
 
 // Estado de paginación y ordenamiento del listado de productos.
@@ -426,14 +537,15 @@ async function loadCategoriesTable() {
             ? items.filter((c) => (c.nombre || '').toLowerCase().includes(nameFilter.toLowerCase()))
             : items;
         if (filtered.length) {
+            // REDISEÑO UI/UX: estado como Soft Badge y papelera en la acción destructiva.
             tbody.innerHTML = filtered.map((c) => `
                 <tr>
                     <td>${c.nombre}</td>
                     <td>-</td>
-                    <td><span class="badge ${c.estado === 'Activo' ? 'bg-success' : 'bg-secondary'}">${c.estado === 'Activo' ? 'Activo' : 'Inactivo'}</span></td>
+                    <td>${catalogStatusBadge(c.estado)}</td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-rosado" onclick="editCategory(${c.id_categoria})" title="Editar"><i class="bi bi-pencil"></i></button>
-                        ${c.estado === 'Activo' ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateCategory(${c.id_categoria})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
+                        ${c.estado === 'Activo' ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateCategory(${c.id_categoria})" title="Desactivar"><i class="bi bi-trash"></i></button>` : ''}
                     </td>
                 </tr>
             `).join('');
@@ -462,14 +574,12 @@ async function loadProducts() {
     const name = (document.getElementById('filter-product-name')?.value || '').trim();
     const barcode = (document.getElementById('filter-product-barcode')?.value || '').trim();
     const subcat = document.getElementById('filter-product-subcategoria')?.value || '';
-    const from = document.getElementById('filter-product-from')?.value || '';
-    const to = document.getElementById('filter-product-to')?.value || '';
 
     if (name) params.append('name', name);
     if (barcode) params.append('barcode', barcode);
     if (subcat) params.append('subcategoria_id', subcat);
-    if (from) params.append('created_from', from);
-    if (to) params.append('created_to', to);
+    // REDISEÑO UI/UX: se eliminaron los filtros de fecha "Desde/Hasta" del
+    // catálogo, por lo que ya no se envían created_from ni created_to.
 
     const pageSize = parseInt(document.getElementById('products-page-size')?.value || String(productsState.pageSize || 10), 10) || 10;
     productsState.pageSize = pageSize;
@@ -488,6 +598,7 @@ async function loadProducts() {
         }
         const data = await res.json();
         const items = data.items || [];
+        hideCatalogImageZoom();
         if (items.length) {
             tbody.innerHTML = items.map((p) => {
                 const variante = p.variantes && p.variantes[0] ? p.variantes[0] : null;
@@ -501,23 +612,38 @@ async function loadProducts() {
                 const minStock = inventario ? Number(inventario.stock_minimo) : 0;
                 const activo = p.estado === 'Activo';
                 const fecha = p.fecha_creacion ? formatDate(p.fecha_creacion) : '-';
+                // REDISEÑO UI/UX: miniatura 40x40, soft badges, papelera en la
+                // acción destructiva y nombre con tooltip accesible.
+                const thumb = catalogProductThumb(p.imagen_url);
+                const stockBadge = stock <= minStock
+                    ? `<span class="catalog-stock-badge catalog-stock-badge--danger">${stock}</span>`
+                    : `<span class="catalog-stock-badge catalog-stock-badge--ok">${stock}</span>`;
+                const nombreSeguro = escapeCatalogAttribute(p.nombre || '');
                 return `
                 <tr>
                     <td>${p.id_producto}</td>
-                    <td>${p.nombre}</td>
+                    <td>
+                        <div class="catalog-product-cell d-flex align-items-center gap-2">
+                            ${thumb}
+                            <span class="catalog-product-name" title="${nombreSeguro}">${p.nombre}</span>
+                        </div>
+                    </td>
                     <td>${sub}</td>
                     <td>Q ${precio}</td>
-                    <td><span class="badge ${stock <= minStock ? 'bg-danger' : 'bg-success'}">${stock}</span></td>
-                    <td><span class="badge ${activo ? 'bg-success' : 'bg-secondary'}">${activo ? 'Activo' : 'Inactivo'}</span></td>
+                    <td>${stockBadge}</td>
+                    <td>${catalogStatusBadge(p.estado)}</td>
                     <td>${fecha}</td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-info" onclick="viewProductDetail(${p.id_producto})" title="Ver detalle"><i class="bi bi-eye"></i></button>
                         <button class="btn btn-sm btn-outline-rosado" onclick="editProduct(${p.id_producto})" title="Editar"><i class="bi bi-pencil"></i></button>
-                        ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateProduct(${p.id_producto})" title="Desactivar"><i class="bi bi-x-circle"></i></button>` : ''}
+                        ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateProduct(${p.id_producto})" title="Desactivar"><i class="bi bi-trash"></i></button>` : ''}
                     </td>
                 </tr>
             `;
             }).join('');
+            tbody.querySelectorAll('.catalog-product-thumb-wrap[data-zoom-src]').forEach((wrap) => {
+                setupCatalogImageZoom(wrap);
+            });
             tbody.closest('.table-responsive').classList.remove('d-none');
             if (empty) empty.classList.add('d-none');
         } else {
@@ -611,8 +737,9 @@ async function viewProductDetail(productId) {
             ? new Date(p.fecha_creacion).toLocaleString()
             : '-';
         document.getElementById('pdetail-barcode').textContent = variante ? (variante.codigo_barras || '-') : '-';
-        document.getElementById('pdetail-talla').textContent = variante ? (variante.talla || '-') : '-';
-        document.getElementById('pdetail-color').textContent = variante ? (variante.color || '-') : '-';
+        // REDISEÑO UI/UX: el atributo universal combina Talla y Color en una sola línea.
+        const atributoUnificado = [variante?.talla, variante?.color].filter(Boolean).join(' · ');
+        document.getElementById('pdetail-atributo').textContent = atributoUnificado || '-';
         document.getElementById('pdetail-precio-detalle').textContent = variante ? `Q ${Number(variante.precio_detalle).toFixed(2)}` : '-';
         document.getElementById('pdetail-precio-mayoreo').textContent = variante ? `Q ${Number(variante.precio_mayoreo).toFixed(2)}` : '-';
         document.getElementById('pdetail-costo').textContent = variante ? `Q ${Number(variante.costo_promedio).toFixed(2)}` : '-';
@@ -627,16 +754,276 @@ async function viewProductDetail(productId) {
 }
 
 // ---------------------------------------------------------------------------
+// Imagen opcional de producto
+// ---------------------------------------------------------------------------
+
+function setProductImagePreview(url) {
+    const img = document.getElementById('imagen_preview_img');
+    const placeholder = document.getElementById('imagen_preview_placeholder');
+    const removeBtn = document.getElementById('btn-remove-imagen');
+    if (!img || !placeholder) return;
+
+    const value = (url || '').trim();
+    if (value) {
+        img.src = value;
+        img.classList.remove('d-none');
+        placeholder.classList.add('d-none');
+        if (removeBtn) removeBtn.classList.remove('d-none');
+    } else {
+        img.removeAttribute('src');
+        img.classList.add('d-none');
+        placeholder.classList.remove('d-none');
+        if (removeBtn) removeBtn.classList.add('d-none');
+    }
+}
+
+function setProductImageUploading(uploading) {
+    isProductImageUploading = uploading;
+    // REDISEÑO UI/UX: la dropzone reemplaza al botón "Subir imagen" y muestra
+    // un overlay de progreso mientras se carga el archivo.
+    const dropzone = document.getElementById('product-image-dropzone');
+    const uploadingState = document.getElementById('product-image-uploading');
+    const removeBtn = document.getElementById('btn-remove-imagen');
+    const fileInput = document.getElementById('imagen_file');
+    if (dropzone) {
+        dropzone.classList.toggle('is-uploading', uploading);
+        dropzone.setAttribute('aria-busy', uploading ? 'true' : 'false');
+    }
+    if (uploadingState) uploadingState.classList.toggle('d-none', !uploading);
+    if (removeBtn) removeBtn.disabled = uploading;
+    if (fileInput) fileInput.disabled = uploading;
+}
+
+async function uploadProductImage(file) {
+    if (!file) return;
+    const fileInput = document.getElementById('imagen_file');
+    if (!PRODUCT_IMAGE_TYPES.has(file.type)) {
+        if (fileInput) fileInput.value = '';
+        showToast('Formato no permitido. Usa JPG, PNG, WEBP o GIF.', 'warning');
+        return;
+    }
+    if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+        if (fileInput) fileInput.value = '';
+        showToast('La imagen supera el límite de 5 MB.', 'warning');
+        return;
+    }
+
+    const token = ++productImageUploadToken;
+    setProductImageUploading(true);
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(`${PRODUCTS_API}/upload-imagen`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${localStorage.getItem('jwt_token')}` },
+            body: formData,
+        });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => null);
+            throw new Error((errData && errData.detail) || 'No se pudo subir la imagen');
+        }
+        const data = await res.json();
+        if (token !== productImageUploadToken) return;
+
+        const input = inputFor('product-form', 'imagen_url');
+        if (input) input.value = data.imagen_url || '';
+        setProductImagePreview(data.imagen_url);
+        showToast('Imagen subida correctamente.', 'success');
+    } catch (err) {
+        if (token === productImageUploadToken) {
+            showToast(err.message, 'danger');
+        }
+    } finally {
+        if (fileInput) fileInput.value = '';
+        if (token === productImageUploadToken) setProductImageUploading(false);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Atributo universal (combobox de captura rápida)
+// Campo optimizado para inventarios mixtos: un único input de texto libre que
+// sugiere valores ingresados previamente (persistidos en localStorage). Nunca
+// bloquea la entrada: se puede escribir cualquier valor nuevo sin elegir de la
+// lista. Sustituye a los campos rígidos de Talla y Color.
+// ---------------------------------------------------------------------------
+
+const ATRIBUTO_SUGERENCIAS_KEY = 'regalito_atributos_sugeridos';
+const ATRIBUTO_SUGERENCIAS_MAX = 20;
+let atributoActiveIndex = -1;
+let atributoSeededFromBackend = false;
+
+// Rellena el pool de sugerencias con los atributos (Talla/Color) ya existentes
+// en el catálogo, para que el combobox muestre opciones útiles desde el primer
+// uso. Se ejecuta una sola vez por sesión y falla en silencio.
+async function seedAtributoSugerenciasFromBackend() {
+    if (atributoSeededFromBackend) return;
+    atributoSeededFromBackend = true;
+    try {
+        const res = await fetch(`${PRODUCTS_API}?limit=500&sort_by=nombre&sort_dir=asc`, { headers: authHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        (data.items || []).forEach((p) => {
+            (p.variantes || []).forEach((v) => {
+                [v.talla, v.color].forEach((val) => registerAtributoSugerido(val));
+            });
+        });
+        const input = document.getElementById('atributo_variante');
+        if (input && input.matches(':focus')) showAtributoSugerencias(input.value);
+    } catch {
+        // Sin conexión o sin sesión: el combobox sigue útil como input libre.
+    }
+}
+
+function getAtributoSugerencias() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(ATRIBUTO_SUGERENCIAS_KEY) || '[]');
+        return Array.isArray(raw) ? raw.filter((v) => typeof v === 'string' && v.trim()) : [];
+    } catch {
+        return [];
+    }
+}
+
+function registerAtributoSugerido(value) {
+    const v = String(value || '').trim();
+    if (!v) return;
+    const list = getAtributoSugerencias().filter((s) => s.toLowerCase() !== v.toLowerCase());
+    list.unshift(v);
+    try {
+        localStorage.setItem(ATRIBUTO_SUGERENCIAS_KEY, JSON.stringify(list.slice(0, ATRIBUTO_SUGERENCIAS_MAX)));
+    } catch {
+        // Almacenamiento no disponible (modo privado/incógnito): el campo
+        // sigue funcionando como input libre, simplemente sin memoria.
+    }
+}
+
+function buildAtributoSugerencias(filterText) {
+    const term = String(filterText || '').trim().toLowerCase();
+    return getAtributoSugerencias()
+        .filter((s) => !term || s.toLowerCase().includes(term))
+        .slice(0, 8);
+}
+
+function hideAtributoSugerencias() {
+    const list = document.getElementById('atributo_variante_sugerencias');
+    const input = document.getElementById('atributo_variante');
+    if (list) list.classList.add('d-none');
+    if (input) input.setAttribute('aria-expanded', 'false');
+    atributoActiveIndex = -1;
+}
+
+function showAtributoSugerencias(filterText) {
+    const list = document.getElementById('atributo_variante_sugerencias');
+    const input = document.getElementById('atributo_variante');
+    if (!list || !input) return;
+    const options = buildAtributoSugerencias(filterText);
+    if (!options.length) {
+        list.innerHTML = '<div class="product-attribute-suggestions-empty">Sin sugerencias, escriba el valor libremente.</div>';
+    } else {
+        list.innerHTML = options.map((option) =>
+            `<div class="product-attribute-option" role="option">${escapeCatalogAttribute(option)}</div>`
+        ).join('');
+    }
+    list.classList.remove('d-none');
+    input.setAttribute('aria-expanded', 'true');
+    atributoActiveIndex = -1;
+}
+
+function selectAtributoOption(optionEl) {
+    const input = document.getElementById('atributo_variante');
+    if (!input) return;
+    input.value = optionEl.textContent;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    hideAtributoSugerencias();
+}
+
+function initAtributoCombobox() {
+    const input = document.getElementById('atributo_variante');
+    const list = document.getElementById('atributo_variante_sugerencias');
+    if (!input || !list) return;
+
+    input.addEventListener('focus', () => {
+        showAtributoSugerencias(input.value);
+        seedAtributoSugerenciasFromBackend();
+    });
+    input.addEventListener('input', () => showAtributoSugerencias(input.value));
+    input.addEventListener('click', () => {
+        showAtributoSugerencias(input.value);
+        seedAtributoSugerenciasFromBackend();
+    });
+
+    input.addEventListener('keydown', (event) => {
+        const options = Array.from(list.querySelectorAll('.product-attribute-option'));
+        if (event.key === 'Escape') {
+            hideAtributoSugerencias();
+            return;
+        }
+        if (!options.length) return;
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            atributoActiveIndex = (atributoActiveIndex + 1) % options.length;
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            atributoActiveIndex = (atributoActiveIndex - 1 + options.length) % options.length;
+        } else if (event.key === 'Enter' && atributoActiveIndex >= 0) {
+            event.preventDefault();
+            selectAtributoOption(options[atributoActiveIndex]);
+            return;
+        } else {
+            return;
+        }
+        options.forEach((option, index) => {
+            option.classList.toggle('is-active', index === atributoActiveIndex);
+        });
+        if (options[atributoActiveIndex]) {
+            options[atributoActiveIndex].scrollIntoView({ block: 'nearest' });
+        }
+    });
+
+    // mousedown (y no click) para seleccionar antes de que el input pierda el foco.
+    list.addEventListener('mousedown', (event) => {
+        const option = event.target.closest('.product-attribute-option');
+        if (option) {
+            event.preventDefault();
+            selectAtributoOption(option);
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        if (event.target.closest && !event.target.closest('.product-attribute-combobox')) {
+            hideAtributoSugerencias();
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Formulario / Modal de Producto
 // ---------------------------------------------------------------------------
 
 async function resetProductForm() {
+    productImageUploadToken += 1;
+    isProductImageUploading = false;
+    hideAtributoSugerencias();
     clearCatalogErrors('product-form');
     const form = document.getElementById('product-form');
     if (form) form.reset();
     inputFor('product-form', 'product-id').value = '';
     inputFor('product-form', 'variante-id').value = '';
     inputFor('product-form', 'inventario-id').value = '';
+    const fileInput = document.getElementById('imagen_file');
+    if (fileInput) fileInput.value = '';
+    setProductImageUploading(false);
+    setProductImagePreview('');
+    // REDISEÑO UI/UX: el campo de URL vuelve a estar plegado al reabrir el modal.
+    const urlWrapper = document.getElementById('imagen-url-wrapper');
+    const urlToggle = document.getElementById('toggle-imagen-url');
+    if (urlWrapper) urlWrapper.classList.add('d-none');
+    if (urlToggle) {
+        urlToggle.textContent = 'o ingresar desde URL';
+        urlToggle.setAttribute('aria-expanded', 'false');
+    }
+    const dropzone = document.getElementById('product-image-dropzone');
+    if (dropzone) dropzone.classList.remove('is-dragover');
     document.getElementById('product-modal-title').textContent = 'Nuevo Producto';
     baseSaveTextProduct = 'Guardar';
     const text = document.getElementById('btn-save-product-text');
@@ -677,9 +1064,17 @@ async function editProduct(productId) {
         inputFor('product-form', 'inventario-id').value = inventario ? inventario.id_inventario : '';
         inputFor('product-form', 'nombre').value = p.nombre;
         inputFor('product-form', 'descripcion').value = p.descripcion || '';
+        inputFor('product-form', 'imagen_url').value = p.imagen_url || '';
+        productImageUploadToken += 1;
+        setProductImageUploading(false);
+        const imagenFileInput = document.getElementById('imagen_file');
+        if (imagenFileInput) imagenFileInput.value = '';
+        setProductImagePreview(p.imagen_url || '');
         inputFor('product-form', 'codigo_barras').value = variante ? (variante.codigo_barras || '') : '';
-        inputFor('product-form', 'talla').value = variante ? (variante.talla || '') : '';
-        inputFor('product-form', 'color').value = variante ? (variante.color || '') : '';
+        // REDISEÑO UI/UX: al editar se precarga el atributo universal combinando
+        // Talla + Color (campo de captura rápida para inventarios mixtos).
+        const atributoUnificado = [variante?.talla, variante?.color].filter(Boolean).join(' · ');
+        inputFor('product-form', 'atributo_variante').value = atributoUnificado;
         inputFor('product-form', 'precio_detalle').value = variante ? variante.precio_detalle : '';
         inputFor('product-form', 'precio_mayoreo').value = variante ? variante.precio_mayoreo : '';
         inputFor('product-form', 'costo_promedio').value = variante ? variante.costo_promedio : '';
@@ -721,6 +1116,10 @@ async function saveProduct(event) {
     event.preventDefault();
     isCatalogFormSubmittingOrClosing = false;
     clearCatalogErrors('product-form');
+    if (isProductImageUploading) {
+        showToast('Espera a que termine la subida de la imagen.', 'warning');
+        return;
+    }
 
     const formId = 'product-form';
     let hasClientErrors = false;
@@ -828,10 +1227,13 @@ async function saveProduct(event) {
         id_unidad: parseInt(rawUnidad, 10),
         nombre: rawNombre,
         descripcion: inputFor(formId, 'descripcion')?.value?.trim() || null,
+        imagen_url: inputFor(formId, 'imagen_url')?.value?.trim() || '',
         variante: {
             codigo_barras: inputFor(formId, 'codigo_barras')?.value?.trim() || null,
-            talla: inputFor(formId, 'talla')?.value?.trim() || null,
-            color: inputFor(formId, 'color')?.value?.trim() || null,
+            // REDISEÑO UI/UX: el atributo universal reemplaza a Talla/Color.
+            // Se guarda en "color" (String(30)) para admitir valores largos.
+            talla: null,
+            color: inputFor(formId, 'atributo_variante')?.value?.trim() || null,
             precio_detalle: numPrecioDetalle,
             precio_mayoreo: numPrecioMayoreo,
             costo_promedio: numCosto,
@@ -856,6 +1258,9 @@ async function saveProduct(event) {
         }
         const modal = getModal('product-modal');
         if (modal) modal.hide();
+        // REDISEÑO UI/UX: cada valor nuevo se suma a las sugerencias del combobox
+        // de atributo universal para agilizar la captura en inventarios mixtos.
+        registerAtributoSugerido(inputFor(formId, 'atributo_variante')?.value?.trim() || '');
         showToast(id ? 'Producto actualizado correctamente.' : 'Producto creado correctamente.', 'success');
         await loadProducts();
     } catch (err) {
@@ -1034,6 +1439,87 @@ document.addEventListener('DOMContentLoaded', () => {
         productForm.addEventListener('submit', saveProduct);
         initCatalogRealtimeValidation('product-form');
     }
+    initAtributoCombobox();
+
+    const dropzone = document.getElementById('product-image-dropzone');
+    const imageFileInput = document.getElementById('imagen_file');
+    const removeImageBtn = document.getElementById('btn-remove-imagen');
+    const imageUrlInput = document.getElementById('imagen_url');
+    const urlToggle = document.getElementById('toggle-imagen-url');
+    const urlWrapper = document.getElementById('imagen-url-wrapper');
+    const previewImg = document.getElementById('imagen_preview_img');
+    const previewPlaceholder = document.getElementById('imagen_preview_placeholder');
+
+    if (imageFileInput) {
+        imageFileInput.addEventListener('change', () => {
+            const file = imageFileInput.files && imageFileInput.files[0];
+            if (file) uploadProductImage(file);
+        });
+    }
+    // REDISEÑO UI/UX: dropzone con clic, teclado y arrastrar y soltar.
+    // Reutiliza la misma función de carga y validación existente.
+    if (dropzone && imageFileInput) {
+        const openFilePicker = () => {
+            if (!isProductImageUploading) imageFileInput.click();
+        };
+        dropzone.addEventListener('click', (event) => {
+            if (event.target === imageFileInput) return;
+            openFilePicker();
+        });
+        dropzone.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openFilePicker();
+            }
+        });
+        ['dragenter', 'dragover'].forEach((eventName) => {
+            dropzone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                if (isProductImageUploading) return;
+                dropzone.classList.add('is-dragover');
+            });
+        });
+        ['dragleave', 'dragend'].forEach((eventName) => {
+            dropzone.addEventListener(eventName, () => dropzone.classList.remove('is-dragover'));
+        });
+        dropzone.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropzone.classList.remove('is-dragover');
+            if (isProductImageUploading) return;
+            const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+            if (file) uploadProductImage(file);
+        });
+    }
+    if (removeImageBtn && imageUrlInput) {
+        removeImageBtn.addEventListener('click', () => {
+            imageUrlInput.value = '';
+            if (imageFileInput) imageFileInput.value = '';
+            setProductImagePreview('');
+            clearCatalogFieldError('product-form', imageUrlInput);
+        });
+    }
+    if (imageUrlInput) {
+        imageUrlInput.addEventListener('input', () => {
+            setProductImagePreview(imageUrlInput.value);
+        });
+    }
+    // REDISEÑO UI/UX: el campo para pegar una URL queda plegado tras un enlace.
+    if (urlToggle && urlWrapper) {
+        urlToggle.addEventListener('click', () => {
+            const expanded = urlToggle.getAttribute('aria-expanded') === 'true';
+            const nextExpanded = !expanded;
+            urlWrapper.classList.toggle('d-none', !nextExpanded);
+            urlToggle.setAttribute('aria-expanded', String(nextExpanded));
+            urlToggle.textContent = nextExpanded ? 'Ocultar campo de URL' : 'o ingresar desde URL';
+            if (nextExpanded && imageUrlInput) imageUrlInput.focus();
+        });
+    }
+    if (previewImg && previewPlaceholder) {
+        previewImg.addEventListener('error', () => {
+            previewImg.classList.add('d-none');
+            previewPlaceholder.classList.remove('d-none');
+        });
+    }
     const categoryForm = document.getElementById('category-form');
     if (categoryForm) {
         categoryForm.addEventListener('submit', saveCategory);
@@ -1073,6 +1559,75 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnFilterCategories = document.getElementById('btn-filter-categories');
     if (btnFilterCategories) btnFilterCategories.addEventListener('click', loadCategoriesTable);
 
+    // REDISEÑO UI/UX: pestañas principales + menú "Configuraciones Adicionales".
+    // Sincroniza las clases activas y muestra únicamente el panel seleccionado.
+    const catalogView = document.getElementById('catalog-view');
+    const catalogMainTabs = document.getElementById('catalog-main-tabs');
+    const extraMenu = document.getElementById('catalog-extra-menu');
+    const extraToggle = document.getElementById('catalog-extra-toggle');
+
+    const syncCatalogTabChrome = (targetSelector) => {
+        hideCatalogImageZoom();
+        if (!catalogView || !targetSelector) return;
+
+        catalogView.querySelectorAll('.tab-content .tab-pane').forEach((pane) => {
+            const isTarget = pane.id && `#${pane.id}` === targetSelector;
+            pane.classList.toggle('show', isTarget);
+            pane.classList.toggle('active', isTarget);
+        });
+
+        catalogMainTabs?.querySelectorAll('.nav-link').forEach((link) => {
+            const isActive = link.getAttribute('data-bs-target') === targetSelector;
+            link.classList.toggle('active', isActive);
+            link.setAttribute('aria-selected', String(isActive));
+        });
+
+        let extraActive = false;
+        extraMenu?.querySelectorAll('[data-catalog-target]').forEach((item) => {
+            const isActive = item.getAttribute('data-catalog-target') === targetSelector;
+            item.classList.toggle('active', isActive);
+            if (isActive) extraActive = true;
+        });
+        extraToggle?.classList.toggle('active', extraActive);
+    };
+
+    // Los tabs principales siguen usando Bootstrap; solo sincronizamos el chrome.
+    document.addEventListener('show.bs.tab', (event) => {
+        if (!event.target.closest('#catalog-view')) return;
+        syncCatalogTabChrome(event.target.getAttribute('data-bs-target'));
+    });
+
+    // Los enlaces del dropdown se controlan manualmente para no romper el menú.
+    extraMenu?.querySelectorAll('[data-catalog-target]').forEach((item) => {
+        item.addEventListener('click', (event) => {
+            event.preventDefault();
+            const targetSelector = item.getAttribute('data-catalog-target');
+            if (!targetSelector) return;
+            syncCatalogTabChrome(targetSelector);
+            if (extraToggle && window.bootstrap?.Dropdown) {
+                bootstrap.Dropdown.getOrCreateInstance(extraToggle).hide();
+            }
+        });
+    });
+
+    // REDISEÑO UI/UX: botón "X" para limpiar los buscadores de productos.
+    catalogView?.querySelectorAll('.catalog-search-field').forEach((field) => {
+        const input = field.querySelector('.catalog-search-input');
+        const clearBtn = field.querySelector('.catalog-clear-btn');
+        if (!input || !clearBtn) return;
+
+        const syncClearVisibility = () => field.classList.toggle('has-value', input.value.trim().length > 0);
+        input.addEventListener('input', syncClearVisibility);
+        clearBtn.addEventListener('click', () => {
+            input.value = '';
+            syncClearVisibility();
+            input.focus();
+            productsState.page = 1;
+            loadProducts();
+        });
+        syncClearVisibility();
+    });
+
     // Paginación de productos
     const pageSize = document.getElementById('products-page-size');
     if (pageSize) pageSize.addEventListener('change', () => {
@@ -1088,7 +1643,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#tab-products th.sortable').forEach((th) => {
         th.addEventListener('click', () => toggleProductSort(th.getAttribute('data-sort')));
     });
+
+    /* Ocultar el zoom si la imagen ampliada falla, al desplazarse o al
+       redimensionar. Así nunca queda una vista previa flotante huérfana (idéntico a Inventario). */
+    const catalogZoomImage = document.getElementById('catalog-image-zoom-img');
+    if (catalogZoomImage) {
+        catalogZoomImage.addEventListener('error', hideCatalogImageZoom);
+    }
+    window.addEventListener('scroll', hideCatalogImageZoom, true);
+    window.addEventListener('resize', hideCatalogImageZoom);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') hideCatalogImageZoom();
+    });
 });
+
+window.hideCatalogImageZoom = hideCatalogImageZoom;
 
 // ===========================================================================
 // BLOQUE 2: SUBCATEGORÍAS, UNIDADES, SUCURSALES, ÁREAS DE BODEGA
@@ -1207,9 +1776,8 @@ function renderSubcategoriasTable(items) {
     }
 
     tbody.innerHTML = items.map(s => {
-        const statusBadge = s.estado === 'Activo'
-            ? '<span class="badge bg-success-subtle text-success">Activo</span>'
-            : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+        // REDISEÑO UI/UX: estado unificado como Soft Badge.
+        const statusBadge = catalogStatusBadge(s.estado);
 
         return `
             <tr>
@@ -1305,7 +1873,7 @@ async function openSubcatDetailModal(id) {
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Estado</span>
-                    <span class="badge ${s.estado === 'Activo' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${s.estado}</span>
+                    ${catalogStatusBadge(s.estado)}
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Nombre</span>
@@ -1450,9 +2018,8 @@ function renderUnidadesTable(items) {
     }
 
     tbody.innerHTML = items.map(u => {
-        const statusBadge = u.estado === 'Activo'
-            ? '<span class="badge bg-success-subtle text-success">Activo</span>'
-            : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+        // REDISEÑO UI/UX: estado unificado como Soft Badge.
+        const statusBadge = catalogStatusBadge(u.estado);
 
         return `
             <tr>
@@ -1541,7 +2108,7 @@ async function openUnidadDetailModal(id) {
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Estado</span>
-                    <span class="badge ${u.estado === 'Activo' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${u.estado}</span>
+                    ${catalogStatusBadge(u.estado)}
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Código</span>
@@ -1688,9 +2255,8 @@ function renderSucursalesTable(items) {
     }
 
     tbody.innerHTML = items.map(s => {
-        const statusBadge = s.estado === 'Activo'
-            ? '<span class="badge bg-success-subtle text-success">Activo</span>'
-            : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+        // REDISEÑO UI/UX: estado unificado como Soft Badge.
+        const statusBadge = catalogStatusBadge(s.estado);
 
         return `
             <tr>
@@ -1782,7 +2348,7 @@ async function openSucursalDetailModal(id) {
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Estado</span>
-                    <span class="badge ${s.estado === 'Activo' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${s.estado}</span>
+                    ${catalogStatusBadge(s.estado)}
                 </div>
                 <div class="col-12">
                     <span class="text-muted small d-block">Nombre de la Sucursal</span>
@@ -1964,9 +2530,8 @@ function renderAreasTable(items) {
     }
 
     tbody.innerHTML = items.map(a => {
-        const statusBadge = a.estado === 'Activo'
-            ? '<span class="badge bg-success-subtle text-success">Activo</span>'
-            : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+        // REDISEÑO UI/UX: estado unificado como Soft Badge.
+        const statusBadge = catalogStatusBadge(a.estado);
 
         return `
             <tr>
@@ -2055,7 +2620,7 @@ async function openAreaDetailModal(id) {
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Estado</span>
-                    <span class="badge ${a.estado === 'Activo' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${a.estado}</span>
+                    ${catalogStatusBadge(a.estado)}
                 </div>
                 <div class="col-sm-6">
                     <span class="text-muted small d-block">Nombre del Área</span>
@@ -2383,9 +2948,8 @@ const B3_EXTRA_PARAMS = {
 };
 
 function b3StatusBadge(estado) {
-    return estado === 'Activo'
-        ? '<span class="badge bg-success-subtle text-success">Activo</span>'
-        : '<span class="badge bg-danger-subtle text-danger">Inactivo</span>';
+    // REDISEÑO UI/UX: reutiliza el mismo Soft Badge del resto del catálogo.
+    return catalogStatusBadge(estado);
 }
 
 function b3JsStr(value) {

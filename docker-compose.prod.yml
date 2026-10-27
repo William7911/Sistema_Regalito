@@ -35,6 +35,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - uploads_prod:/app/uploads
     networks:
       - regalito_net
 
@@ -57,6 +59,8 @@ services:
 volumes:
   pgdata_prod:
     name: ${PGDATA_VOLUME:-regalito_pgdata_prod}
+  uploads_prod:
+    name: ${UPLOADS_VOLUME:-regalito_uploads_prod}
 
 networks:
   regalito_net:

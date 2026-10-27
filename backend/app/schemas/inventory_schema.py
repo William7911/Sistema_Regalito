@@ -30,6 +30,8 @@ class InventoryResponse(InventoryBase):
     producto_nombre: Optional[str] = None
     variante_sku: Optional[str] = None
     sucursal_nombre: Optional[str] = None
+    # Imagen del producto: el frontend la usa para la miniatura y el zoom.
+    imagen_url: Optional[str] = None
 
     class Config:
         from_attributes = True
