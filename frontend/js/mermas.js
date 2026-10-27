@@ -374,7 +374,7 @@
         if (fMotivo && fMotivo.value) params.set('id_motivo', fMotivo.value);
         params.set('limit', '100');
 
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Cargando mermas...</td></tr>';
+        tbody.innerHTML = typeof window.renderSkeletonTable === 'function' ? window.renderSkeletonTable(9, 5) : '<tr><td colspan="9" class="text-center py-4 text-muted">Cargando...</td></tr>';
         if (emptyState) emptyState.classList.add('d-none');
 
         try {

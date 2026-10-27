@@ -444,7 +444,7 @@ async function loadReporteUsuarios() {
     }
 
     const tbody = document.getElementById('reportes-usuarios-tbody');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando usuarios...</td></tr>';
+    tbody.innerHTML = typeof window.renderSkeletonTable === 'function' ? window.renderSkeletonTable(7, 5) : '<tr><td colspan="7" class="text-center text-muted py-4">Cargando usuarios...</td></tr>';
 
     try {
         const token = getAuthToken();
@@ -607,7 +607,7 @@ async function loadReporteClientes() {
     }
 
     const tbody = document.getElementById('reportes-clientes-tbody');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando clientes...</td></tr>';
+    tbody.innerHTML = typeof window.renderSkeletonTable === 'function' ? window.renderSkeletonTable(7, 5) : '<tr><td colspan="7" class="text-center text-muted py-4">Cargando clientes...</td></tr>';
 
     try {
         const token = getAuthToken();
@@ -1031,7 +1031,7 @@ function cargarGraficaActual() {
 function setRankingLoading() {
     const ul = document.querySelector('.reportes-rank-list');
     if (ul) {
-        ul.innerHTML = '<li class="reportes-rank-item"><span class="reportes-rank-name text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Cargando ranking...</span></li>';
+        ul.innerHTML = typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(3) : '<li class="reportes-rank-item text-muted">Cargando...</li>';
     }
 }
 

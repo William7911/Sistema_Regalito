@@ -9,30 +9,96 @@ const mainViews = ['dashboard', 'pos', 'users', 'roles', 'clients', 'bitacora', 
 let currentView = null;
 
 // ---------------------------------------------------------------------------
-// Toast Notification Utility (Defensivo, sin alert())
+// Toast Notification Utility (Toasts minimalistas en esquina superior derecha)
 // ---------------------------------------------------------------------------
 
 window.showToast = function(message, type = 'success') {
     const container = document.getElementById('toast-container');
-    if (!container || !window.bootstrap) return;
-    const colors = {
-        success: 'text-bg-success',
-        danger: 'text-bg-danger',
-        warning: 'text-bg-warning',
-        info: 'text-bg-info',
+    if (!container) return;
+
+    // Normalizar tipos
+    const normType = (type === 'error' || type === 'danger') ? 'danger' : (type === 'warning' ? 'warning' : (type === 'info' ? 'info' : 'success'));
+    
+    const icons = {
+        success: 'bi-check-circle-fill',
+        danger: 'bi-x-circle-fill',
+        warning: 'bi-exclamation-triangle-fill',
+        info: 'bi-info-circle-fill',
     };
+
     const el = document.createElement('div');
-    el.className = `toast align-items-center text-white border-0 ${colors[type] || 'text-bg-info'}`;
+    el.className = `custom-toast toast-${normType} toast border-0 show`;
     el.setAttribute('role', 'alert');
+    el.setAttribute('aria-live', 'assertive');
+    el.setAttribute('aria-atomic', 'true');
     el.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">${message}</div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
-        </div>`;
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+            <i class="bi ${icons[normType] || 'bi-info-circle-fill'} fs-5 toast-icon flex-shrink-0"></i>
+            <div class="toast-msg">${message}</div>
+        </div>
+        <button type="button" class="btn-close-toast ms-2 flex-shrink-0" aria-label="Cerrar">
+            <i class="bi bi-x-lg"></i>
+        </button>`;
+
     container.appendChild(el);
-    const toast = new bootstrap.Toast(el, { delay: 3500 });
-    toast.show();
-    el.addEventListener('hidden.bs.toast', () => el.remove());
+
+    const closeBtn = el.querySelector('.btn-close-toast');
+    let timer = null;
+
+    const removeToast = () => {
+        if (timer) clearTimeout(timer);
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(30px)';
+        setTimeout(() => {
+            if (el.parentNode) el.remove();
+        }, 250);
+    };
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', removeToast);
+    }
+
+    // Desaparece automáticamente en 3 segundos (3000 ms)
+    timer = setTimeout(removeToast, 3000);
+};
+
+// Reemplazar alertas nativas bloqueantes por Toasts minimalistas no intrusivos
+window.alert = function(message) {
+    window.showToast(message, 'warning');
+};
+
+// ---------------------------------------------------------------------------
+// Skeleton Loaders Globales (Simulación de estructura con pulso visual)
+// ---------------------------------------------------------------------------
+
+window.renderSkeletonTable = function(columns = 6, rows = 4) {
+    let html = '';
+    const widths = ['w-50', 'w-75', 'w-100', 'w-60', 'w-40', 'w-90', 'w-75'];
+    for (let r = 0; r < rows; r++) {
+        html += '<tr class="skeleton-table-row">';
+        for (let c = 0; c < columns; c++) {
+            const w = widths[(r + c) % widths.length] || 'w-75';
+            html += `<td><span class="skeleton skeleton-line mb-0 ${w}" style="height: 15px;"></span></td>`;
+        }
+        html += '</tr>';
+    }
+    return html;
+};
+
+window.renderSkeletonCard = function(lines = 3) {
+    let html = '<div class="skeleton-card my-2">';
+    html += '<div class="d-flex align-items-center gap-3 mb-3">' +
+            '<div class="skeleton skeleton-circle"></div>' +
+            '<div class="flex-grow-1">' +
+            '<div class="skeleton skeleton-line w-50 mb-1" style="height: 14px;"></div>' +
+            '<div class="skeleton skeleton-line w-25 mb-0" style="height: 10px;"></div>' +
+            '</div></div>';
+    for (let i = 0; i < lines; i++) {
+        const w = i === lines - 1 ? 'w-50' : (i % 2 === 0 ? 'w-100' : 'w-75');
+        html += `<div class="skeleton skeleton-line ${w} mb-2" style="height: 12px;"></div>`;
+    }
+    html += '</div>';
+    return html;
 };
 
 // ---------------------------------------------------------------------------
@@ -653,7 +719,7 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
 // 3. Recover Password
 document.getElementById('form-recover').addEventListener('submit', (e) => {
     e.preventDefault();
-    alert('Código de verificación enviado a tu correo.');
+    showToast('Código de verificación enviado a tu correo.', 'success');
     switchView('view-verify');
 });
 
@@ -695,7 +761,7 @@ document.getElementById('form-reset').addEventListener('submit', (e) => {
     }
 
     errorDiv.classList.add('d-none');
-    alert('Contraseña actualizada correctamente.');
+    showToast('Contraseña actualizada correctamente.', 'success');
     switchView('view-login');
 });
 
@@ -880,4 +946,81 @@ if (btnLogout) {
             }
         });
     });
+})();
+
+/* ==========================================================================
+   MODO OSCURO / CLARO (THEME SWITCHER)
+   ==========================================================================
+   Permite al usuario alternar entre Modo Claro (Light) y Modo Oscuro (Carbón).
+   - Persiste la preferencia en localStorage ('themePreference').
+   - Modifica los atributos 'data-theme' y 'data-bs-theme' en <html>.
+   - Actualiza de forma interactiva el ícono del botón (Sol / Luna).
+   - Respeta el esquema preferido por el sistema si no hay elección manual.
+   ========================================================================== */
+(function () {
+    var THEME_KEY = 'themePreference';
+
+    function getActiveTheme() {
+        return document.documentElement.getAttribute('data-theme') || 'light';
+    }
+
+    function updateThemeIcon(theme) {
+        var icon = document.getElementById('theme-icon');
+        var btn = document.getElementById('btn-theme-toggle');
+        if (!icon) return;
+
+        if (theme === 'dark') {
+            icon.className = 'bi bi-sun-fill text-warning fs-6';
+            if (btn) btn.setAttribute('title', 'Cambiar a Modo Claro');
+        } else {
+            icon.className = 'bi bi-moon-stars-fill text-secondary fs-6';
+            if (btn) btn.setAttribute('title', 'Cambiar a Modo Oscuro');
+        }
+    }
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-bs-theme', theme);
+        try {
+            localStorage.setItem(THEME_KEY, theme);
+        } catch (e) {
+            console.warn('No se pudo guardar la preferencia de tema en localStorage:', e);
+        }
+        updateThemeIcon(theme);
+    }
+
+    function toggleTheme() {
+        var current = getActiveTheme();
+        var next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+    }
+
+    // Exponer funciones globales para facilitar llamadas o depuración
+    window.toggleTheme = toggleTheme;
+    window.setTheme = applyTheme;
+
+    // Inicializar evento al cargar el DOM
+    document.addEventListener('DOMContentLoaded', function () {
+        var current = getActiveTheme();
+        updateThemeIcon(current);
+
+        var btnToggle = document.getElementById('btn-theme-toggle');
+        if (btnToggle) {
+            btnToggle.addEventListener('click', function (e) {
+                e.preventDefault();
+                toggleTheme();
+            });
+        }
+    });
+
+    // Detectar cambios en las preferencias de color del sistema operativo
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+            try {
+                if (!localStorage.getItem(THEME_KEY)) {
+                    applyTheme(e.matches ? 'dark' : 'light');
+                }
+            } catch (err) {}
+        });
+    }
 })();

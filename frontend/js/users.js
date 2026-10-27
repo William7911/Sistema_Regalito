@@ -404,6 +404,10 @@ async function loadUsers() {
     params.append('limit', pageSize);
     params.append('offset', (page - 1) * pageSize);
 
+    if (tbody && typeof window.renderSkeletonTable === 'function') {
+        tbody.innerHTML = window.renderSkeletonTable(6, Math.min(pageSize, 6));
+    }
+
     try {
         const res = await fetch(`${USERS_API}?${params.toString()}`, { headers: authHeaders() });
         if (!res.ok) {

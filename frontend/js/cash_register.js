@@ -626,6 +626,10 @@ async function loadCashTurnos() {
     params.append('limit', cashHistoryState.pageSize);
     params.append('offset', (cashHistoryState.page - 1) * cashHistoryState.pageSize);
 
+    if (tbody && typeof window.renderSkeletonTable === 'function') {
+        tbody.innerHTML = window.renderSkeletonTable(8, 5);
+    }
+
     try {
         const res = await fetch(`${CASH_API}/turnos?${params.toString()}`, { headers: authHeaders() });
         if (!res.ok) {

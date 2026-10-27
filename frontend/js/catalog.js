@@ -1741,7 +1741,7 @@ async function populateSubcatCategoriesDropdown() {
 async function loadSubcategoriasTable() {
     const tbody = document.getElementById('subcategorias-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando subcategorías...</td></tr>';
+    tbody.innerHTML = typeof window.renderSkeletonTable === 'function' ? window.renderSkeletonTable(5, 4) : '<tr><td colspan="5" class="text-center py-3 text-muted">Cargando...</td></tr>';
 
     const offset = (subcatState.page - 1) * subcatState.limit;
     const params = new URLSearchParams({
@@ -1856,7 +1856,7 @@ async function openEditSubcatModal(id) {
 async function openSubcatDetailModal(id) {
     const body = document.getElementById('subcat-detail-body');
     if (!body) return;
-    body.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>';
+    body.innerHTML = typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>';
     const modalEl = document.getElementById('subcat-detail-modal');
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
     modal.show();
@@ -1984,7 +1984,7 @@ let unidadState = {
 async function loadUnidadesTable() {
     const tbody = document.getElementById('unidades-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando unidades...</td></tr>';
+    tbody.innerHTML = typeof window.renderSkeletonTable === 'function' ? window.renderSkeletonTable(5, 4) : '<tr><td colspan="5" class="text-center py-3 text-muted">Cargando...</td></tr>';
 
     const offset = (unidadState.page - 1) * unidadState.limit;
     const params = new URLSearchParams({
@@ -2092,7 +2092,7 @@ async function openEditUnidadModal(id) {
 async function openUnidadDetailModal(id) {
     const body = document.getElementById('unidad-detail-body');
     if (!body) return;
-    body.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>';
+    body.innerHTML = typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>';
     const modalEl = document.getElementById('unidad-detail-modal');
     bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
 
@@ -2219,7 +2219,7 @@ let sucursalState = {
 async function loadSucursalesTable() {
     const tbody = document.getElementById('sucursales-table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando sucursales...</td></tr>';
+    tbody.innerHTML = typeof window.renderSkeletonTable === 'function' ? window.renderSkeletonTable(7, 4) : '<tr><td colspan="7" class="text-center py-3 text-muted">Cargando...</td></tr>';
 
     const offset = (sucursalState.page - 1) * sucursalState.limit;
     const params = new URLSearchParams({
@@ -2332,7 +2332,7 @@ async function openEditSucursalModal(id) {
 async function openSucursalDetailModal(id) {
     const body = document.getElementById('sucursal-detail-body');
     if (!body) return;
-    body.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>';
+    body.innerHTML = typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>';
     const modalEl = document.getElementById('sucursal-detail-modal');
     bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
 
@@ -2604,7 +2604,7 @@ async function openEditAreaModal(id) {
 async function openAreaDetailModal(id) {
     const body = document.getElementById('area-detail-body');
     if (!body) return;
-    body.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>';
+    body.innerHTML = typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>';
     const modalEl = document.getElementById('area-detail-modal');
     bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false }).show();
 
@@ -2989,7 +2989,7 @@ async function loadB3Table(key, tbodyId, renderFn) {
     const state = B3_STATE[key];
     const tbody = document.getElementById(tbodyId);
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando...</td></tr>';
+    tbody.innerHTML = typeof window.renderSkeletonTable === 'function' ? window.renderSkeletonTable(8, 4) : '<tr><td colspan="8" class="text-center py-3 text-muted">Cargando...</td></tr>';
     const plugin = typeof B3_EXTRA_PARAMS[key] === 'function' ? B3_EXTRA_PARAMS[key](state) : null;
     try {
         const res = await fetch(`${CATALOGOS_API}/${B3_CONFIG[key].plural}/paged?${b3QueryString(state, plugin).toString()}`, { headers: getCatalogAuthHeaders() });
@@ -3245,7 +3245,7 @@ async function handleSaveMotivo(e) {
 }
 
 async function openMotivoDetailModal(id) {
-    loadB3DetailInto('motivo-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    loadB3DetailInto('motivo-detail-body', (typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>'));
     showB3Modal('motivo-detail-modal');
     try {
         const m = await fetchB3One('motivos-merma', id);
@@ -3305,7 +3305,7 @@ async function handleSaveMetodo(e) {
 }
 
 async function openMetodoDetailModal(id) {
-    loadB3DetailInto('metodo-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    loadB3DetailInto('metodo-detail-body', (typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>'));
     showB3Modal('metodo-detail-modal');
     try {
         const m = await fetchB3One('metodos-pago', id);
@@ -3379,7 +3379,7 @@ async function handleSaveProveedor(e) {
 }
 
 async function openProveedorDetailModal(id) {
-    loadB3DetailInto('proveedor-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    loadB3DetailInto('proveedor-detail-body', (typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>'));
     showB3Modal('proveedor-detail-modal');
     try {
         const p = await fetchB3One('proveedores', id);
@@ -3446,7 +3446,7 @@ async function handleSaveDepartamento(e) {
 }
 
 async function openDepartamentoDetailModal(id) {
-    loadB3DetailInto('departamento-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    loadB3DetailInto('departamento-detail-body', (typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>'));
     showB3Modal('departamento-detail-modal');
     try {
         const d = await fetchB3One('departamentos', id);
@@ -3536,7 +3536,7 @@ async function handleSaveMunicipio(e) {
 }
 
 async function openMunicipioDetailModal(id) {
-    loadB3DetailInto('municipio-detail-body', '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando ficha...</div>');
+    loadB3DetailInto('municipio-detail-body', (typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>'));
     showB3Modal('municipio-detail-modal');
     try {
         const m = await fetchB3One('municipios', id);

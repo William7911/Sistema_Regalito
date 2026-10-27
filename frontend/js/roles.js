@@ -185,7 +185,7 @@ async function openRolePermisos(roleId) {
     rolesPermisosEditingId = roleId;
     const body = document.getElementById('role-permisos-body');
     const btn = document.getElementById('btn-save-role-permisos');
-    if (body) body.innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando permisos...</div>';
+    if (body) body.innerHTML = typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(5) : '<div class="text-center text-muted py-4">Cargando permisos...</div>';
     if (btn) btn.disabled = true;
     const modal = rolesGetModal('role-permisos-modal');
     if (modal) modal.show();

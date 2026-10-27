@@ -3,6 +3,179 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-26] Rediseño Moderno de Pantalla de Inicio de Sesión (Login)
+
+### 1. Limpieza del Fondo (Foco en la Conversión)
+- Se eliminó por completo la imagen de fondo del bosque (`https://images.unsplash.com/...`) de la clase `.auth-bg`.
+- Se configuró un fondo sólido y limpio en gris casi blanco (`#F9FAFB`), adaptado en Modo Oscuro a pizarra carbón profundo (`#0F172A`), permitiendo que el formulario sea el centro focal exclusivo de la pantalla sin distracciones fotográficas.
+
+### 2. Branding y Nueva Paleta de Colores
+- **Logo de la Empresa (+30% de Tamaño)**: Se incrementaron las dimensiones de `.logo-circle` de 64x64px a 84x84px (un 31.2% más grande), con un ícono escalado a `2.35rem`, degradado turquesa vibrante y sombra de elevación sutil.
+- **Botón "Ingresar al Sistema"**: Se vistió con el nuevo Turquesa vibrante corporativo (`#0D9488` a `#0D7377`) con altura táctil de 48px, peso `fw-semibold` y sombra difusa.
+- **Enlace "¿Olvidaste tu contraseña?"**: Se aplicó el color Rosa Coral de la marca (`#F43F5E`) con hover a `#E11D48`, estableciéndolo como acento visual secundario armónico.
+
+### 3. Optimización de UX del Formulario
+- **Ergonomía Táctil en Inputs**: Los campos de texto ("Usuario / Email" y "Contraseña") se agruparon en `.auth-input-group`, garantizando una altura de 48px (por encima del umbral ergonómico de 44px) con padding amplio y tipografía nítida.
+- **Anillo de Enfoque Turquesa (Focus Ring)**: Al hacer clic o tabular en un campo, el borde del contenedor completo se ilumina en turquesa principal con un halo difuso exterior (`box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.18)`).
+- **Sombra Difusa Estilo Apple / Stripe**: Se rediseñó `.auth-card` con bordes redondeados amplios (`border-radius: 24px`), borde perimetral sutil (`rgba(226, 232, 240, 0.8)`) y una sombra multicapa ultra-suave y difusa que elimina cualquier apariencia de plantilla genérica.
+
+### 4. Archivos Modificados
+- [`frontend/css/style.css`](../frontend/css/style.css): Reglas completas para `.auth-bg`, `.auth-card`, `.logo-circle`, `.auth-input-group`, `.btn-brand-turquoise` y `.login-forgot-link`.
+- [`frontend/index.html`](../frontend/index.html): Actualización estructural del formulario de Login y versión a `style.css?v=5.8`.
+
+## [2026-10-26] Reversión de Logotipo (Restauración de Ícono Original de Regalo)
+- A solicitud del usuario, se revirtió la sustitución del logotipo circular, retirando el archivo temporal `frontend/img/logo.png`.
+- Se restauró en su totalidad el ícono original de regalo de Bootstrap (`<i class="bi bi-gift-fill fs-3 me-2 text-teal-light"></i>`) en la esquina superior del menú lateral y en el módulo de Login.
+- Se eliminaron las reglas CSS `.sidebar-brand-img` y se actualizó la versión de caché a `style.css?v=5.7`.
+
+## [2026-10-26] Estándares Visuales Modernos (Encabezados Fijos Sticky, Desenfoque de Modales y Tipografía Tabular)
+
+### 1. Encabezados Fijos (`position: sticky` en Tablas)
+- **Persistencia Visual Durante el Desplazamiento**: Se aplicó `position: sticky !important; top: 0 !important; z-index: 10 !important;` a todos los encabezados `<thead>` y `<th>` de las 34 tablas del sistema.
+- **Fondo Sólido y Separación**:
+  - Se blindó el fondo con `--color-teal-dark` y una sombra sutil (`box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08)` en claro, `rgba(0, 0, 0, 0.45)` en oscuro) para evitar cualquier filtrado o transparencia de las filas inferiores al hacer scroll.
+  - Se acondicionaron los contenedores `.table-responsive` con `max-height: calc(100vh - 250px)` (y `52vh` en ventanas modales) para habilitar scroll vertical autónomo con encabezado anclado.
+
+### 2. Desenfoque de Modales (`backdrop-filter: blur`)
+- **Aislamiento Visual de Formularios Emergentes**:
+  - Se configuró `.modal-backdrop.show` con `backdrop-filter: blur(8px) saturate(180%) !important;` y `-webkit-backdrop-filter`.
+  - Se añadió desenfoque complementario sobre `.modal.show` (`blur(6px)`), logrando un efecto de cristal esmerilado que difumina la interfaz de fondo y centra la atención en el formulario activo.
+  - En Modo Oscuro, el fondo oscurece a `rgba(0, 0, 0, 0.75)` con desenfoque de `10px` para una experiencia inmersiva.
+
+### 3. Tipografía Tabular (`font-variant-numeric: tabular-nums`)
+- **Alineación Numérica Matemática**:
+  - Se aplicó `font-variant-numeric: tabular-nums lining-nums !important;` junto con la bandera OpenType `font-feature-settings: "tnum" 1, "lnum" 1 !important;` en celdas de tabla (`th`, `td`), columnas de precios, montos, costos, totales, subtotales, pérdidas de merma, existencias de inventario, cajas de cambio del POS y métricas clave (KPIs).
+  - Al utilizar la fuente nativa *Inter*, los números adquieren un ancho uniforme idéntico, alineando con precisión decimal las cifras monetarias en Quetzales (Q) y facilitando la comparación contable rápida.
+
+### 4. Archivos Modificados
+- [`frontend/css/style.css`](../frontend/css/style.css): Reglas completas para encabezados sticky, backdrop-filter de modales y tipografía tabular.
+- [`frontend/index.html`](../frontend/index.html): Actualización de versión a `style.css?v=5.5`.
+
+## [2026-10-26] Mejoras de Experiencia Visual y Accesibilidad (Toasts, Focus Rings y Skeleton Loaders)
+
+### 1. Notificaciones Flotantes (Toasts Minimalistas)
+- **Ubicación en Esquina Superior Derecha**: Se reubicó `#toast-container` de la parte inferior a la esquina superior derecha (`position-fixed top-0 end-0 p-3`) con capa de z-index elevada (`1100`).
+- **Diseño Minimalista y Semántico**:
+  - Borde verde esmeralda (`border-left: 5px solid #10B981`) con ícono de check para notificaciones de éxito.
+  - Borde rojo (`border-left: 5px solid #EF4444`) con ícono de advertencia para notificaciones de error.
+  - Diseños complementarios para alertas de advertencia (ámbar) e información (celeste).
+  - Integración total con Modo Claro y Modo Oscuro (superficies adaptadas).
+- **Desaparición Automática a los 3 Segundos**: Temporizador de 3000 ms con animación de salida deslizante y soporte para cierre manual inmediato mediante botón "X".
+- **Eliminación de Alertas Bloqueantes**:
+  - Se redefinió `window.alert(...)` globalmente para canalizar cualquier llamada hacia los Toasts minimalistas no bloqueantes.
+  - Se sustituyeron las llamadas nativas de `alert(...)` en formularios de recuperación y cambio de contraseña por `showToast(..., 'success')`.
+
+### 2. Anillos de Enfoque Accesibles (`:focus-visible`)
+- **Navegación Ergonómica con Tecla Tab**: Se implementó una regla `:focus-visible` global para inputs, selects, textareas, botones (`.btn`, `button`), enlaces navegables y fichas del POS.
+- **Anillo Exterior Verde Brillante**:
+  - En modo claro: contorno de `2px solid #10B981` con anillo exterior difuso `rgba(16, 185, 129, 0.35)` y `outline-offset: 2px`.
+  - En modo oscuro: verde esmeralda luminoso `#34D399` con resplandor `rgba(52, 211, 153, 0.45)`.
+  - No ensucia la experiencia de clic convencional con mouse/táctil, activándose exclusivamente al tabular.
+
+### 3. Skeleton Loaders (Animación de Pulso Shimmer)
+- **Sustitución de Íconos Giratorios (Spinners)**:
+  - Se sustituyeron los spinners giratorios (`spinner-border`) en tablas y tarjetas por estructuras grises con animación de pulso/shimmer (`@keyframes skeletonShimmerAnim`).
+  - Creación de helpers globales en [`app.js`](../frontend/js/app.js): `window.renderSkeletonTable(columns, rows)` y `window.renderSkeletonCard(lines)`.
+  - Animación fluida de 1.4s en gradiente suave tanto en Modo Claro como en Modo Oscuro (tonos carbón y pizarra).
+- **Módulos Integrados**:
+  - **Clientes**: Tablas de directorio y tipos de clientes, además de la ficha de detalle táctil.
+  - **Mermas**: Tabla principal de registros de merma y pérdida.
+  - **Catálogos**: Tablas de subcategorías, unidades, sucursales, almacenes y fichas de detalle.
+  - **Reportes**: Tablas de usuarios y clientes filtrados, y ranking de productos.
+  - **Usuarios / Personal**: Tabla de listado de usuarios con simulación de filas.
+  - **Inventario / Bodega**: Tabla de existencias y contenedor de alertas de stock.
+  - **Caja**: Historial de turnos con filas simuladas.
+  - **Roles y Permisos**: Modal de asignación de permisos con tarjeta skeleton.
+  - **Bitácora e Historial**: Tablas de auditoría y precios con carga estructurada.
+
+### 4. Archivos Modificados
+- [`frontend/css/style.css`](../frontend/css/style.css): Reglas completas para `.custom-toast`, `:focus-visible` y `.skeleton`.
+- [`frontend/index.html`](../frontend/index.html): Reposicionamiento del contenedor `#toast-container` a `top-0 end-0`, modal skeleton y actualización de versiones (`style.css?v=5.4`, `app.js?v=3.3`).
+- [`frontend/js/app.js`](../frontend/js/app.js): Reescritura de `showToast`, interceptor `window.alert` y generadores `renderSkeletonTable` y `renderSkeletonCard`.
+- [`frontend/js/clients.js`](../frontend/js/clients.js), [`frontend/js/mermas.js`](../frontend/js/mermas.js), [`frontend/js/catalog.js`](../frontend/js/catalog.js), [`frontend/js/reportes.js`](../frontend/js/reportes.js), [`frontend/js/users.js`](../frontend/js/users.js), [`frontend/js/inventory.js`](../frontend/js/inventory.js), [`frontend/js/cash_register.js`](../frontend/js/cash_register.js), [`frontend/js/roles.js`](../frontend/js/roles.js), [`frontend/js/bitacora.js`](../frontend/js/bitacora.js), [`frontend/js/historial.js`](../frontend/js/historial.js).
+
+## [2026-10-26] Habilitación de Modo Oscuro Nativo con Variables Globales de Diseño (CSS Tokens)
+## [2026-10-26] Habilitación de Modo Oscuro Nativo con Variables Globales de Diseño (CSS Tokens)
+
+### 1.1 Adaptación Integral de Modo Oscuro en Pantalla de Punto de Venta (POS)
+A petición del usuario, se realizó una depuración exhaustiva de la vista de Punto de Venta (`#pos-view`) en Modo Oscuro para eliminar cualquier remanente con fondo blanco o bajo contraste:
+- **Fondo de la Vista POS (`.pos-view`)**: Se reemplazó el color duro claro `#F4F7F6` por `var(--theme-bg-body) !important` (`#0F172A`). Esto eliminó por completo la franja blanca superior detrás del título "Punto de Venta" y de los botones de navegación ("Historial", "Pantalla Cliente", "Panel"), garantizando contraste óptimo en textos y títulos.
+- **Buscador Omnibox y Lector de Barras (`.pos-omnibox`)**: Fondo oscuro (`#0F172A`), bordes en `#334155`, texto claro (`#F8FAFC`) y foco con resalte esmeralda. Teclas de atajo y botón limpiar integrados en paleta oscura.
+- **Píldoras de Categoría (`.pos-category-pill`)**: Fondos en pizarra `#0F172A` con bordes `#334155` y textos `#CBD5E1`; estado activo con verde esmeralda corporativo intacto.
+- **Tarjetas de Producto (`.pos-product-card`)**:
+  - Se eliminó el fondo blanco/menta claro de los contenedores de imagen y placeholders de iniciales (`.pos-product-media`, `.pos-product-placeholder`), sustituyéndolo por un degradado profundo (`#0F172A` a `#1E293B`) con iniciales en celeste de alto contraste (`#38BDF8`).
+  - Etiquetas de categoría (`.pos-category-tag`) con fondo traslúcido carbón y texto nítido.
+  - Precios en celeste brillante (`#38BDF8`) y badges de mayoreo adaptados a contraste suave.
+- **Panel de Carrito y Cobro**:
+  - Buscador de cliente (`.pos-client-line`): Fondo `#0F172A` y bordes `#334155`.
+  - Caja de cambio (`.pos-change-box`): Sustituido el fondo verde menta claro por fondo carbón con borde `#334155` y números en verde esmeralda claro (`#34D399`).
+  - Fichas de efectivo rápido (`.pos-cash-chip` y `.pos-transfer-toggle`): Fondos pizarra oscuros `#0F172A` en lugar de botones blancos reflectantes.
+  - Botón cobrar deshabilitado (`.btn-pos-charge:disabled`): Fondo apagado neutro `#243248` con texto tenue `#64748B` sin resplandor blanco.
+- **Archivos y Versiones**:
+  - [`frontend/css/style.css`](../frontend/css/style.css): Reglas especializadas bajo `[data-theme="dark"]` y `[data-bs-theme="dark"]`.
+  - [`frontend/index.html`](../frontend/index.html): Caché actualizada a `style.css?v=5.3`.
+
+
+### 1. Requerimiento y Arquitectura Visual
+Se implementó un sistema nativo de **Modo Oscuro (Dark Theme)** y **Modo Claro (Light Theme)** 100% frontend (HTML, CSS y JS) basado en tokens de diseño centralizados en variables CSS, con persistencia en el navegador y transición fluida sin recargar ni consultar el backend.
+
+- **Modo Claro**: Fondos de tarjetas blancos (`#FFFFFF`), fondo de página gris claro (`#F4F6F8`), textos oscuros de alta legibilidad (`#1F2937`) y bordes tenues (`#E5E7EB`).
+- **Modo Oscuro**: Fondos de tarjeta y modales en tono carbón / pizarra (`#1E293B`), fondo general profundo (`#0F172A`), textos claros (`#F8FAFC`, `#CBD5E1`) y bordes sutiles (`#334155`) diseñados para eliminar la fatiga visual nocturna.
+- **Color Corporativo Intacto**: El verde esmeralda institucional (`--color-teal: #0D7377`, `--color-teal-dark: #0A5C5E`), el degradado característico de la barra lateral (`linear-gradient(180deg, #0B6063 0%, #084A4C 100%)`), los botones principales de acción (`.btn-teal`) y los encabezados corporativos de todas las tablas de datos permanecen exactamente iguales en ambos modos, salvaguardando la identidad visual de "Tienda el Regalito".
+
+### 2. Cambios Implementados
+
+#### A. Variables Globales y Estilos ([`frontend/css/style.css`](../frontend/css/style.css))
+- **Bloque `:root` (Tokens Modo Claro)**:
+  - `--theme-bg-body: #F4F6F8;`
+  - `--theme-bg-surface: #FFFFFF;`
+  - `--theme-bg-card: #FFFFFF;`
+  - `--theme-bg-header: #FFFFFF;`
+  - `--theme-bg-input: #FFFFFF;`
+  - `--theme-text-main: #1F2937;`
+  - `--theme-text-secondary: #4B5563;`
+  - `--theme-text-muted: #6B7280;`
+  - `--theme-border: #E5E7EB;`
+- **Bloque `[data-theme="dark"], [data-bs-theme="dark"]` (Tokens Modo Oscuro / Carbón)**:
+  - `--theme-bg-body: #0F172A;`
+  - `--theme-bg-surface: #1E293B;`
+  - `--theme-bg-card: #1E293B;`
+  - `--theme-bg-header: #1E293B;`
+  - `--theme-bg-input: #0F172A;`
+  - `--theme-text-main: #F8FAFC;`
+  - `--theme-text-secondary: #CBD5E1;`
+  - `--theme-text-muted: #94A3B8;`
+  - `--theme-border: #334155;`
+- **Reglas de Renderizado y Componentes en Modo Oscuro**:
+  - Mapeo automático de `.bg-white` hacia `--theme-bg-card`.
+  - Mapeo de `.card`, `.modal-content` y `.dropdown-menu` hacia `--theme-bg-card` y `--theme-border`.
+  - Adaptación de inputs (`.form-control`, `.form-select`) con fondo carbón, borde suave y foco corporativo esmeralda.
+  - Inversión cromática del botón de cierre de modales (`.btn-close`).
+  - Filas de tablas semitransparentes con hover sutil (`rgba(255, 255, 255, 0.04)`).
+  - Reglas prioritarias para garantizar que las cabeceras corporativas (`.table thead`, `.thead-users`, `.thead-catalog`, `.thead-cash`) conserven su fondo verde esmeralda y texto blanco puro.
+  - Conservación estricta de la barra de navegación lateral (`.sidebar`).
+
+#### B. Interfaz del Interruptor y Carga Temprana ([`frontend/index.html`](../frontend/index.html))
+- **Inicialización Inmediata en `<head>`**: Se colocó un script ligero que evalúa `localStorage.getItem('themePreference')` o `window.matchMedia('(prefers-color-scheme: dark)')` antes del renderizado del body, evitando cualquier parpadeo de pantalla blanca (FOUC).
+- **Botón Minimalista en Cabecera**:
+  - Insertado en la barra superior junto al botón de copia local y notificaciones: `<button id="btn-theme-toggle" class="btn btn-sm btn-light border rounded-circle ...">`.
+  - Contiene el ícono dinámico `<i class="bi bi-moon-stars-fill text-secondary fs-6" id="theme-icon"></i>` en modo claro y cambia a sol dorado `<i class="bi bi-sun-fill text-warning fs-6"></i>` en modo oscuro.
+- **Control de Caché**: Se incrementaron las referencias a `css/style.css?v=5.2` y `js/app.js?v=3.2`.
+
+#### C. Lógica Interactiva y Persistencia ([`frontend/js/app.js`](../frontend/js/app.js))
+- Se añadió un módulo IIFE para la gestión del tema:
+  - Lectura y escritura de la clave `'themePreference'` en `localStorage`.
+  - Función `applyTheme(theme)` que sincroniza tanto `data-theme` como `data-bs-theme` en `<html>` y actualiza el ícono correspondiente.
+  - Función `toggleTheme()` que alterna entre `'light'` y `'dark'`.
+  - Detección de cambios de preferencias del sistema operativo (`prefers-color-scheme`) en tiempo real cuando el usuario no ha fijado una preferencia manual.
+  - Exposición de funciones en el objeto global `window.toggleTheme` y `window.setTheme`.
+
+### 3. Archivos Modificados
+- [`frontend/css/style.css`](../frontend/css/style.css): Inclusión de tokens dinámicos en `:root` y bloque completo de reglas para `[data-theme="dark"]` y `[data-bs-theme="dark"]`.
+- [`frontend/index.html`](../frontend/index.html): Script anti-FOUC en `<head>`, botón interruptor en cabecera y actualización de versiones de activos (`?v=5.2`, `?v=3.2`).
+- [`frontend/js/app.js`](../frontend/js/app.js): Lógica de cambio de tema, manejo de eventos y sincronización con `localStorage`.
+- [`documentacion/cambios.md`](cambios.md): Registro exhaustivo de la modificación.
+
 ## [2026-10-26] Corrección Estructural de Anidamiento DOM en Vistas Principales (Bitácora, Inventario, Mermas, etc.)
 
 ### Causa Raíz

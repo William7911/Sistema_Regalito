@@ -214,6 +214,9 @@
             const params = new URLSearchParams();
             if (DOM.filterLowStock && DOM.filterLowStock.checked) params.append('low_stock_only', 'true');
             
+            if (DOM.tableBody && typeof window.renderSkeletonTable === 'function') {
+                DOM.tableBody.innerHTML = window.renderSkeletonTable(8, 6);
+            }
             const token = localStorage.getItem('jwt_token');
             const res = await fetch(`/api/inventory/?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -603,7 +606,7 @@
         const container = document.getElementById('inventario-alertas-lista');
         if (!container) return;
 
-        container.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Cargando alertas...</div>';
+        container.innerHTML = typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(3) : '<div class="text-center py-4 text-muted">Cargando alertas...</div>';
 
         const token = localStorage.getItem('jwt_token');
         try {

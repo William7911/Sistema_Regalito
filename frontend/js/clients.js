@@ -451,7 +451,7 @@
     // -----------------------------------------------------------------------
     async function loadClients() {
         if (!DOM.tableBody) return;
-        DOM.tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Cargando clientes...</td></tr>';
+        DOM.tableBody.innerHTML = typeof window.renderSkeletonTable === 'function' ? window.renderSkeletonTable(6, 6) : '<tr><td colspan="7" class="text-center py-4 text-muted">Cargando...</td></tr>';
 
         const params = new URLSearchParams();
         params.append('limit', state.limit);
@@ -794,7 +794,7 @@
     // -----------------------------------------------------------------------
     async function openClientDetailModal(id) {
         if (!DOM.detailBody) return;
-        DOM.detailBody.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Cargando ficha...</div>';
+        DOM.detailBody.innerHTML = typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(4) : '<div class="text-center py-4 text-muted">Cargando...</div>';
         if (detailBsModal) detailBsModal.show();
 
         try {
@@ -1003,7 +1003,7 @@
     // -----------------------------------------------------------------------
     async function loadTiposCliente() {
         if (!DOM.tiposTableBody) return;
-        DOM.tiposTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Cargando tipos de cliente...</td></tr>';
+        DOM.tiposTableBody.innerHTML = typeof window.renderSkeletonTable === 'function' ? window.renderSkeletonTable(4, 4) : '<tr><td colspan="5" class="text-center py-4 text-muted">Cargando...</td></tr>';
 
         try {
             const res = await fetch('/api/tipos-cliente?only_active=false', { headers: getAuthHeaders() });

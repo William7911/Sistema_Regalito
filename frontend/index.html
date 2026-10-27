@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <!-- Inicialización Inmediata de Tema (Previene destello blanco / FOUC) -->
+    <script>
+        (function() {
+            try {
+                var saved = localStorage.getItem('themePreference');
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var theme = saved || (prefersDark ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', theme);
+                document.documentElement.setAttribute('data-bs-theme', theme);
+            } catch (e) {}
+        })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Curiosidades El Regalito - POS</title>
@@ -13,7 +25,7 @@
     <!-- Custom CSS -->
     <!-- Corrección UI: versión incrementada para forzar la recarga de los estilos nuevos -->
     <!-- Rediseño de Catálogos: toolbar con tabs/dropdown, buscadores con clear y miniaturas. -->
-    <link rel="stylesheet" href="css/style.css?v=5.1">
+    <link rel="stylesheet" href="css/style.css?v=5.8">
     <style id="pos-ticket-page-style">@page { size: 80mm auto; margin: 0; }</style>
     <style>
         /* Desactivar de inmediato ícono nativo de contraseña en Edge/Chromium */
@@ -29,29 +41,29 @@
     <div id="auth-module" class="auth-bg d-flex align-items-center justify-content-center min-vh-100">
         
         <!-- Login Form -->
-        <div id="view-login" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in" style="width: 100%; max-width: 450px;">
+        <div id="view-login" class="auth-card animate-fade-in" style="width: 100%; max-width: 440px;">
             <div class="text-center mb-4">
-                <div class="logo-circle bg-teal text-white mx-auto mb-3 d-flex align-items-center justify-content-center fs-2 rounded-circle shadow">
+                <div class="logo-circle text-white mx-auto mb-3 d-flex align-items-center justify-content-center rounded-circle">
                     <i class="bi bi-gift-fill"></i>
                 </div>
-                <h3 class="fw-bold text-dark">El Regalito</h3>
-                <p class="text-muted">Inicia sesión en tu cuenta</p>
+                <h3 class="fw-bold text-dark mb-1">El Regalito</h3>
+                <p class="text-muted small">Inicia sesión en tu cuenta</p>
             </div>
             
             <form id="form-login">
                 <div class="mb-3">
-                    <label class="form-label text-dark fw-medium">Usuario / Email</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-person text-muted"></i></span>
-                        <input type="text" id="login-user" class="form-control border-start-0 ps-0" placeholder="usuario" required>
+                    <label class="form-label text-dark fw-medium small mb-1">Usuario / Email</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text ps-3 pe-2 text-muted"><i class="bi bi-person fs-5"></i></span>
+                        <input type="text" id="login-user" class="form-control" placeholder="usuario" required autocomplete="username">
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label text-dark fw-medium">Contraseña</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-lock text-muted"></i></span>
-                        <input type="password" id="login-pass" class="form-control border-start-0 border-end-0 ps-0" placeholder="••••••••" required autocomplete="current-password">
-                        <button type="button" id="btn-toggle-pass" class="input-group-text bg-white border-start-0 btn-toggle-password" tabindex="-1" title="Mostrar u ocultar contraseña" onclick="toggleLoginPassword(event)">
+                    <label class="form-label text-dark fw-medium small mb-1">Contraseña</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text ps-3 pe-2 text-muted"><i class="bi bi-lock fs-5"></i></span>
+                        <input type="password" id="login-pass" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+                        <button type="button" id="btn-toggle-pass" class="input-group-text pe-3 ps-2 btn-toggle-password" tabindex="-1" title="Mostrar u ocultar contraseña" onclick="toggleLoginPassword(event)">
                             <i class="bi bi-eye-slash text-muted" id="btn-toggle-pass-icon"></i>
                         </button>
                     </div>
@@ -62,14 +74,14 @@
                         <input type="checkbox" class="form-check-input" id="remember-me">
                         <label class="form-check-label text-muted small" for="remember-me">Recordarme</label>
                     </div>
-                    <a href="#" class="text-teal small text-decoration-none fw-medium" onclick="switchView('view-recover')">¿Olvidaste tu contraseña?</a>
+                    <a href="#" class="login-forgot-link small text-decoration-none" onclick="switchView('view-recover')">¿Olvidaste tu contraseña?</a>
                 </div>
                 
                 <div class="alert alert-danger d-none small" id="login-error"></div>
                 
-                <button type="submit" id="btn-login-submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Ingresar al Sistema</button>
+                <button type="submit" id="btn-login-submit" class="btn btn-brand-turquoise w-100 fw-semibold mb-3">Ingresar al Sistema</button>
                 <div class="text-center">
-                    <span class="text-muted small"><i class="bi bi-shield-lock me-1"></i>El acceso es otorgado por el administrador del sistema.</span>
+                    <span class="text-muted small" style="font-size: 0.78rem;"><i class="bi bi-shield-lock me-1"></i>El acceso es otorgado por el administrador del sistema.</span>
                 </div>
             </form>
         </div>
@@ -274,6 +286,10 @@
     </div>
 </div>
                 <div class="d-flex align-items-center gap-3">
+                    <!-- Interruptor Modo Oscuro / Claro -->
+                    <button id="btn-theme-toggle" type="button" class="btn btn-sm btn-light border rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;" title="Alternar Modo Oscuro / Modo Claro" aria-label="Cambiar tema">
+                        <i class="bi bi-moon-stars-fill text-secondary fs-6" id="theme-icon"></i>
+                    </button>
                     <button id="btn-sync-modal" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#sync-modal" title="Estado de Sincronización Offline (SQLite)">
                         <i class="bi bi-cloud-check-fill text-success" id="sync-icon-indicator"></i>
                         <span class="small fw-semibold" id="sync-text-indicator">Copia Local</span>
@@ -4067,7 +4083,7 @@
     <div id="pos-ticket-print-area" class="pos-ticket-print-area" aria-hidden="true"></div>
 
     <!-- Toast Notification Container -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" style="z-index: 1090;"></div>
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toast-container" style="z-index: 1100;"></div>
 
     <!-- Modal: Formulario Rol (crear/editar) -->
     <div class="modal fade" id="role-modal" tabindex="-1" aria-labelledby="role-modal-title" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -4118,8 +4134,10 @@
                     <button type="button" class="btn-close" data-bs-close-modal aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body" id="role-permisos-body" style="max-height: 60vh; overflow-y: auto;">
-                    <div class="text-center text-muted py-4">
-                        <span class="spinner-border spinner-border-sm me-2"></span>Cargando permisos...
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-line w-50 mb-2"></div>
+                        <div class="skeleton skeleton-line w-75 mb-2"></div>
+                        <div class="skeleton skeleton-line w-100"></div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
@@ -4151,7 +4169,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
     <!-- App Logic -->
-    <script src="js/app.js?v=3.1"></script>
+    <script src="js/app.js?v=3.3"></script>
     <script src="js/dashboard.js?v=1.1"></script>
     <script src="js/notificaciones.js?v=1.0"></script>
     <!-- Corrección UI: versión incrementada para forzar la recarga de users.js

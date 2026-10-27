@@ -1,5 +1,11 @@
-/* Design Tokens & Custom Styles para El Regalito */
+/* ==========================================================================
+   DESIGN TOKENS Y SISTEMA DE VARIABLES DE TEMA (MODO CLARO / MODO OSCURO)
+   ==========================================================================
+   Variables de diseño centralizadas para alternar entre Modo Claro y Modo Oscuro
+   (Carbón) conservando intacto el verde esmeralda corporativo (--color-teal).
+*/
 :root {
+    /* Paleta corporativa oficial (RNF24) - CONSTANTES en ambos temas */
     --color-teal-dark: #0A5C5E;
     --color-teal: #0D7377;
     --color-teal-light: rgba(13, 115, 119, 0.1);
@@ -9,7 +15,7 @@
     --color-success: #10B981;
     --color-danger: #EF4444;
 
-    /* Paleta corporativa oficial (RNF24): celeste, rosado y verde */
+    /* Paleta de acentos corporativos oficial (RNF24): celeste, rosado y verde */
     --color-celeste: #38BDF8;
     --color-celeste-dark: #0284C7;
     --color-celeste-light: rgba(56, 189, 248, 0.12);
@@ -19,6 +25,23 @@
     --color-verde: #34D399;
     --color-verde-dark: #059669;
     --color-verde-light: rgba(52, 211, 153, 0.12);
+
+    /* === TOKENS DINÁMICOS: MODO CLARO (LIGHT THEME) === */
+    --theme-bg-body: #F4F6F8;
+    --theme-bg-surface: #FFFFFF;
+    --theme-bg-card: #FFFFFF;
+    --theme-bg-header: #FFFFFF;
+    --theme-bg-input: #FFFFFF;
+    --theme-bg-subtle: #F8FAFC;
+    --theme-text-main: #1F2937;
+    --theme-text-secondary: #4B5563;
+    --theme-text-muted: #6B7280;
+    --theme-text-subtle: #9CA3AF;
+    --theme-border: #E5E7EB;
+    --theme-border-subtle: #F3F4F6;
+    --theme-table-hover: rgba(0, 0, 0, 0.025);
+    --theme-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --theme-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
 }
 
 body {
@@ -266,21 +289,148 @@ table thead:not([class*="thead-"]) th.sortable .sort-icon {
     z-index: 2000;
 }
 
-/* Auth Module - Desert Background */
+/* ==========================================================================
+   MÓDULO DE AUTENTICACIÓN (LOGIN) - REDISEÑO MODERNO Y LIMPIO
+   ========================================================================== */
+
+/* 1. Fondo sólido limpio sin imágenes de distracción */
 .auth-bg {
-    background: linear-gradient(rgba(10, 92, 94, 0.6), rgba(10, 92, 94, 0.8)), url('https://images.unsplash.com/photo-1473448912268-2022ce9509d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center/cover no-repeat fixed;
+    background-color: #F9FAFB !important;
+    background-image: none !important;
 }
 
-/* Glassmorphism */
+[data-theme="dark"] .auth-bg,
+[data-bs-theme="dark"] .auth-bg {
+    background-color: #0F172A !important;
+    background-image: none !important;
+}
+
+/* Tarjeta Central con sombra difusa estilo Apple / Stripe */
+.auth-card,
 .glass-card {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: #FFFFFF !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    border-radius: 24px !important;
+    padding: 3rem 2.5rem !important;
+    box-shadow:
+        0 1px 3px 0 rgba(0, 0, 0, 0.02),
+        0 10px 25px -5px rgba(0, 0, 0, 0.04),
+        0 20px 48px -12px rgba(15, 23, 42, 0.08) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+[data-theme="dark"] .auth-card,
+[data-theme="dark"] .glass-card,
+[data-bs-theme="dark"] .auth-card,
+[data-bs-theme="dark"] .glass-card {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    box-shadow:
+        0 1px 3px 0 rgba(0, 0, 0, 0.2),
+        0 10px 25px -5px rgba(0, 0, 0, 0.35),
+        0 20px 48px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 2. Logo de la empresa ampliado un 30% con Turquesa Vibrante */
 .logo-circle {
-    width: 64px;
-    height: 64px;
+    width: 84px !important;
+    height: 84px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: linear-gradient(135deg, #0D9488, #0D7377) !important;
+    box-shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.35) !important;
+}
+
+.logo-circle i {
+    font-size: 2.35rem !important;
+    color: #FFFFFF !important;
+}
+
+/* 3. Campos de entrada táctiles (mínimo 44px -> 48px) y Anillo de Enfoque Turquesa */
+.auth-input-group {
+    border: 1.5px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+    background: #FFFFFF !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-input-group:focus-within {
+    border-color: #0D9488 !important;
+    box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.18) !important;
+}
+
+.auth-input-group .form-control,
+.auth-input-group .input-group-text {
+    border: none !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    background: transparent !important;
+}
+
+.auth-input-group .form-control {
+    font-size: 0.95rem;
+    color: #1F2937;
+    padding-left: 0.25rem !important;
+}
+
+.auth-input-group .form-control:focus {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+[data-theme="dark"] .auth-input-group,
+[data-bs-theme="dark"] .auth-input-group {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .auth-input-group .form-control,
+[data-bs-theme="dark"] .auth-input-group .form-control {
+    color: #F8FAFC !important;
+}
+
+/* Botón Ingresar al Sistema en Turquesa Vibrante */
+.btn-brand-turquoise,
+#btn-login-submit {
+    background: linear-gradient(135deg, #0D9488, #0D7377) !important;
+    border: none !important;
+    color: #FFFFFF !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    border-radius: 12px !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em;
+    box-shadow: 0 4px 14px rgba(13, 148, 136, 0.28) !important;
+    transition: all 0.2s ease !important;
+}
+
+.btn-brand-turquoise:hover,
+#btn-login-submit:hover {
+    background: linear-gradient(135deg, #0F766E, #0A5C5E) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(13, 148, 136, 0.38) !important;
+    color: #FFFFFF !important;
+}
+
+.btn-brand-turquoise:active,
+#btn-login-submit:active {
+    transform: translateY(0);
+}
+
+/* Enlace '¿Olvidaste tu contraseña?' en Rosa Coral */
+.login-forgot-link {
+    color: #F43F5E !important;
+    font-weight: 600;
+    transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+
+.login-forgot-link:hover {
+    color: #E11D48 !important;
+    text-decoration: underline !important;
 }
 
 .icon-circle {
@@ -577,6 +727,7 @@ input[type="password"]::-ms-clear {
     margin-right: .75rem !important;
 }
 .sidebar-brand span { font-size: 1.15rem !important; letter-spacing: .01em; }
+
 
 /* Opciones */
 .sidebar .nav-link.sidebar-link {
@@ -5204,4 +5355,1238 @@ input[type="password"]::-ms-clear {
     .btn-close {
         padding: 0.75rem !important;
     }
+}
+
+
+/* ==========================================================================
+   MODO OSCURO NATIVO (DARK THEME / CARBÓN)
+   ==========================================================================
+   Variables de diseño adaptativas y reglas de renderizado para evitar la
+   fatiga visual nocturna o en condiciones de baja iluminación.
+   - Fondos: Gris carbón oscuro (#0F172A / #1E293B).
+   - Textos: Grises claros y blancos suaves (#F8FAFC / #CBD5E1).
+   - Paleta corporativa: Verde esmeralda (--color-teal) permanece intacto.
+   ========================================================================== */
+
+[data-theme="dark"],
+[data-bs-theme="dark"] {
+    /* Reemplazo de variables base en modo oscuro */
+    --color-bg-light: #0F172A;
+    --color-text-dark: #F8FAFC;
+    --color-text-muted: #94A3B8;
+
+    /* Superficies de modo oscuro (Carbón) */
+    --theme-bg-body: #0F172A;          /* Fondo general de la plataforma */
+    --theme-bg-surface: #1E293B;       /* Contenedores, tarjetas y paneles */
+    --theme-bg-card: #1E293B;          /* Tarjetas de módulos y KPIs */
+    --theme-bg-header: #1E293B;        /* Barra de navegación superior */
+    --theme-bg-input: #0F172A;         /* Entradas de formulario y buscadores */
+    --theme-bg-subtle: #334155;        /* Fondos secundarios, hovers de ítems */
+    --theme-text-main: #F8FAFC;        /* Texto principal de alto contraste */
+    --theme-text-secondary: #CBD5E1;   /* Texto secundario y descriptivo */
+    --theme-text-muted: #94A3B8;       /* Texto tenue y subtítulos */
+    --theme-text-subtle: #64748B;      /* Placeholders y detalles sutiles */
+    --theme-border: #334155;           /* Bordes de división y tarjetas */
+    --theme-border-subtle: #1E293B;
+    --theme-table-hover: rgba(255, 255, 255, 0.04);
+    --theme-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --theme-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
+}
+
+/* Reglas de superficie y cuerpo */
+[data-theme="dark"] body,
+[data-bs-theme="dark"] body {
+    background-color: var(--theme-bg-body) !important;
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] main,
+[data-bs-theme="dark"] main,
+[data-theme="dark"] .bg-light-gray,
+[data-bs-theme="dark"] .bg-light-gray {
+    background-color: var(--theme-bg-body) !important;
+    color: var(--theme-text-main);
+}
+
+/* Encabezado superior */
+[data-theme="dark"] header.bg-white,
+[data-bs-theme="dark"] header.bg-white {
+    background-color: var(--theme-bg-header) !important;
+    border-color: var(--theme-border) !important;
+}
+
+/* Tarjetas y Contenedores */
+[data-theme="dark"] .card,
+[data-bs-theme="dark"] .card {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+    box-shadow: var(--theme-shadow-sm) !important;
+}
+
+[data-theme="dark"] .bg-white:not(.badge):not(.sidebar-brand-icon),
+[data-bs-theme="dark"] .bg-white:not(.badge):not(.sidebar-brand-icon) {
+    background-color: var(--theme-bg-card) !important;
+}
+
+[data-theme="dark"] .bg-light,
+[data-bs-theme="dark"] .bg-light {
+    background-color: var(--theme-bg-body) !important;
+}
+
+/* Tipografía de contraste */
+[data-theme="dark"] .text-dark,
+[data-bs-theme="dark"] .text-dark {
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] .text-muted,
+[data-bs-theme="dark"] .text-muted {
+    color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .text-secondary,
+[data-bs-theme="dark"] .text-secondary {
+    color: var(--theme-text-secondary) !important;
+}
+
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3,
+[data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6,
+[data-bs-theme="dark"] h1, [data-bs-theme="dark"] h2, [data-bs-theme="dark"] h3,
+[data-bs-theme="dark"] h4, [data-bs-theme="dark"] h5, [data-bs-theme="dark"] h6 {
+    color: var(--theme-text-main) !important;
+}
+
+/* Bordes y líneas divisorias */
+[data-theme="dark"] .border,
+[data-theme="dark"] .border-bottom,
+[data-theme="dark"] .border-top,
+[data-theme="dark"] .border-start,
+[data-theme="dark"] .border-end,
+[data-bs-theme="dark"] .border,
+[data-bs-theme="dark"] .border-bottom,
+[data-bs-theme="dark"] .border-top,
+[data-bs-theme="dark"] .border-start,
+[data-bs-theme="dark"] .border-end {
+    border-color: var(--theme-border) !important;
+}
+
+/* Entradas de Formulario y Búsqueda */
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background-color: var(--theme-bg-input) !important;
+    color: var(--theme-text-main) !important;
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-select:focus,
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    background-color: var(--theme-bg-input) !important;
+    color: var(--theme-text-main) !important;
+    border-color: var(--color-teal) !important;
+    box-shadow: 0 0 0 0.2rem rgba(13, 115, 119, 0.25) !important;
+}
+
+[data-theme="dark"] .form-control::placeholder,
+[data-bs-theme="dark"] .form-control::placeholder {
+    color: var(--theme-text-subtle) !important;
+    opacity: 1;
+}
+
+[data-theme="dark"] .input-group-text,
+[data-bs-theme="dark"] .input-group-text {
+    background-color: var(--theme-bg-card) !important;
+    color: var(--theme-text-muted) !important;
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .form-check-label,
+[data-bs-theme="dark"] .form-check-label {
+    color: var(--theme-text-main) !important;
+}
+
+/* Ventanas Modales */
+[data-theme="dark"] .modal-content,
+[data-bs-theme="dark"] .modal-content {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+    box-shadow: var(--theme-shadow-md) !important;
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer,
+[data-bs-theme="dark"] .modal-header,
+[data-bs-theme="dark"] .modal-footer {
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .btn-close,
+[data-bs-theme="dark"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Menús Desplegables (Dropdowns) */
+[data-theme="dark"] .dropdown-menu,
+[data-bs-theme="dark"] .dropdown-menu {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+    box-shadow: var(--theme-shadow-md) !important;
+}
+
+[data-theme="dark"] .dropdown-header,
+[data-bs-theme="dark"] .dropdown-header {
+    color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .dropdown-item,
+[data-bs-theme="dark"] .dropdown-item {
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] .dropdown-item:hover,
+[data-theme="dark"] .dropdown-item:focus,
+[data-bs-theme="dark"] .dropdown-item:hover,
+[data-bs-theme="dark"] .dropdown-item:focus {
+    background-color: var(--theme-bg-subtle) !important;
+    color: var(--color-celeste) !important;
+}
+
+[data-theme="dark"] .dropdown-divider,
+[data-bs-theme="dark"] .dropdown-divider {
+    border-color: var(--theme-border) !important;
+}
+
+/* Tablas de Datos */
+[data-theme="dark"] .table,
+[data-bs-theme="dark"] .table {
+    color: var(--theme-text-main) !important;
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.02);
+    --bs-table-hover-bg: var(--theme-table-hover);
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .table > :not(caption) > * > *,
+[data-bs-theme="dark"] .table > :not(caption) > * > * {
+    background-color: transparent !important;
+    color: var(--theme-text-main) !important;
+    border-bottom-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .table-hover > tbody > tr:hover > *,
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover > * {
+    background-color: var(--theme-table-hover) !important;
+    color: var(--theme-text-main) !important;
+}
+
+/* PROTECCIÓN DE COLOR CORPORATIVO: Los encabezados verde esmeralda permanecen intactos */
+[data-theme="dark"] .table thead,
+[data-theme="dark"] thead.thead-users,
+[data-theme="dark"] thead.thead-catalog,
+[data-theme="dark"] thead.thead-cash,
+[data-bs-theme="dark"] .table thead,
+[data-bs-theme="dark"] thead.thead-users,
+[data-bs-theme="dark"] thead.thead-catalog,
+[data-bs-theme="dark"] thead.thead-cash {
+    background-color: var(--color-teal-dark) !important;
+    background: linear-gradient(135deg, var(--color-teal), var(--color-teal-dark)) !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] thead th,
+[data-bs-theme="dark"] thead th {
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] thead th a,
+[data-theme="dark"] thead th span,
+[data-theme="dark"] thead th i,
+[data-bs-theme="dark"] thead th a,
+[data-bs-theme="dark"] thead th span,
+[data-bs-theme="dark"] thead th i {
+    color: #FFFFFF !important;
+}
+
+/* Botones Auxiliares */
+[data-theme="dark"] .btn-light,
+[data-bs-theme="dark"] .btn-light {
+    background-color: var(--theme-bg-subtle) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] .btn-light:hover,
+[data-bs-theme="dark"] .btn-light:hover {
+    background-color: var(--theme-border) !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .btn-outline-secondary,
+[data-bs-theme="dark"] .btn-outline-secondary {
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-secondary) !important;
+}
+
+[data-theme="dark"] .btn-outline-secondary:hover,
+[data-bs-theme="dark"] .btn-outline-secondary:hover {
+    background-color: var(--theme-bg-subtle) !important;
+    color: #FFFFFF !important;
+}
+
+/* Pestañas de Navegación */
+[data-theme="dark"] .nav-tabs,
+[data-bs-theme="dark"] .nav-tabs {
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .nav-tabs .nav-link,
+[data-bs-theme="dark"] .nav-tabs .nav-link {
+    color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .nav-tabs .nav-link:hover,
+[data-bs-theme="dark"] .nav-tabs .nav-link:hover {
+    color: var(--theme-text-main) !important;
+    border-color: transparent !important;
+}
+
+[data-theme="dark"] .nav-tabs .nav-link.active,
+[data-bs-theme="dark"] .nav-tabs .nav-link.active {
+    background-color: transparent !important;
+    color: var(--color-celeste) !important;
+    border-color: transparent transparent var(--color-teal) transparent !important;
+}
+
+/* Soft Badges adaptados para modo oscuro */
+[data-theme="dark"] .bg-teal-light,
+[data-bs-theme="dark"] .bg-teal-light {
+    background-color: rgba(13, 115, 119, 0.28) !important;
+    color: #AEE2E4 !important;
+}
+
+[data-theme="dark"] .badge.bg-light,
+[data-bs-theme="dark"] .badge.bg-light {
+    background-color: var(--theme-bg-subtle) !important;
+    color: var(--theme-text-main) !important;
+}
+
+/* List Groups */
+[data-theme="dark"] .list-group-item,
+[data-bs-theme="dark"] .list-group-item {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+}
+
+/* PROTECCIÓN DE SIDEBAR CORPORATIVO */
+[data-theme="dark"] .sidebar,
+[data-bs-theme="dark"] .sidebar {
+    background: linear-gradient(180deg, #0B6063 0%, #084A4C 100%) !important;
+}
+
+[data-theme="dark"] .sidebar .nav-link.sidebar-link,
+[data-bs-theme="dark"] .sidebar .nav-link.sidebar-link {
+    color: rgba(255, 255, 255, 0.78) !important;
+}
+
+[data-theme="dark"] .sidebar .nav-link.sidebar-link:hover,
+[data-bs-theme="dark"] .sidebar .nav-link.sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.09) !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .sidebar .nav-link.sidebar-link.active,
+[data-bs-theme="dark"] .sidebar .nav-link.sidebar-link.active {
+    background: rgba(255, 255, 255, 0.16) !important;
+    color: #FFFFFF !important;
+}
+
+/* Botón Interruptor de Modo Oscuro / Claro en cabecera */
+#btn-theme-toggle {
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+#btn-theme-toggle:hover {
+    transform: scale(1.08);
+}
+
+
+/* ==========================================================================
+   ADAPTACIÓN COMPLETA DE MODO OSCURO PARA EL MÓDULO POS / VENTAS (#pos-view)
+   ==========================================================================
+   Elimina cualquier remanente blanco en el POS durante el modo oscuro:
+   - Contenedor principal y cabecera con fondo carbón (#0F172A / #1E293B).
+   - Omnibox de búsqueda y lector de barras con fondo oscuro.
+   - Píldoras de categoría y atajos en modo carbón.
+   - Medios, placeholders de iniciales y tarjetas de producto oscuros.
+   - Buscador de cliente, carrito, lista de productos y controles de cantidad.
+   - Resumen financiero, caja de cambio, fichas de efectivo rápido y botón de cobro.
+   ========================================================================== */
+
+/* Fondo general de la vista POS */
+[data-theme="dark"] .pos-view,
+[data-bs-theme="dark"] .pos-view {
+    background: var(--theme-bg-body) !important;
+}
+
+/* Cabecera del POS */
+[data-theme="dark"] #pos-view .pos-header h4,
+[data-bs-theme="dark"] #pos-view .pos-header h4 {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] #pos-view .pos-header-btn.btn-outline-secondary,
+[data-bs-theme="dark"] #pos-view .pos-header-btn.btn-outline-secondary {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    color: #E2E8F0 !important;
+}
+
+[data-theme="dark"] #pos-view .pos-header-btn.btn-outline-secondary:hover,
+[data-bs-theme="dark"] #pos-view .pos-header-btn.btn-outline-secondary:hover {
+    background: #334155 !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] #pos-view .pos-header-kbd,
+[data-bs-theme="dark"] #pos-view .pos-header-kbd {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] #pos-view .btn-outline-teal.pos-header-btn,
+[data-bs-theme="dark"] #pos-view .btn-outline-teal.pos-header-btn {
+    background: #1E293B !important;
+    border-color: var(--color-teal) !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] #pos-view .btn-outline-teal.pos-header-btn:hover,
+[data-bs-theme="dark"] #pos-view .btn-outline-teal.pos-header-btn:hover {
+    background: var(--color-teal) !important;
+    color: #FFFFFF !important;
+}
+
+/* Paneles del POS (Catálogo y Carrito/Cobro) */
+[data-theme="dark"] .pos-catalog-panel,
+[data-theme="dark"] .pos-checkout-panel,
+[data-bs-theme="dark"] .pos-catalog-panel,
+[data-bs-theme="dark"] .pos-checkout-panel {
+    background: #1E293B !important;
+    border: 1px solid #334155 !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Omnibox / Buscador y lector de código de barras */
+[data-theme="dark"] .pos-omnibox,
+[data-bs-theme="dark"] .pos-omnibox {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .pos-omnibox:focus-within,
+[data-bs-theme="dark"] .pos-omnibox:focus-within {
+    background: #0F172A !important;
+    border-color: var(--color-teal) !important;
+    box-shadow: 0 0 0 0.25rem rgba(13, 115, 119, 0.25) !important;
+}
+
+[data-theme="dark"] .pos-omnibox-input,
+[data-bs-theme="dark"] .pos-omnibox-input {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-omnibox-input::placeholder,
+[data-bs-theme="dark"] .pos-omnibox-input::placeholder {
+    color: #64748B !important;
+}
+
+[data-theme="dark"] .pos-omnibox-icon,
+[data-bs-theme="dark"] .pos-omnibox-icon {
+    color: var(--color-teal) !important;
+}
+
+[data-theme="dark"] .pos-omnibox-kbd,
+[data-bs-theme="dark"] .pos-omnibox-kbd {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-omnibox-clear,
+[data-bs-theme="dark"] .pos-omnibox-clear {
+    background: #334155 !important;
+    color: #CBD5E1 !important;
+}
+
+[data-theme="dark"] .pos-omnibox-clear:hover,
+[data-bs-theme="dark"] .pos-omnibox-clear:hover {
+    background: #EF4444 !important;
+    color: #FFFFFF !important;
+}
+
+/* Píldoras de categoría */
+[data-theme="dark"] .pos-category-pill,
+[data-bs-theme="dark"] .pos-category-pill {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #CBD5E1 !important;
+}
+
+[data-theme="dark"] .pos-category-pill:hover,
+[data-bs-theme="dark"] .pos-category-pill:hover {
+    border-color: var(--color-teal) !important;
+    color: #38BDF8 !important;
+    background: #1E293B !important;
+}
+
+[data-theme="dark"] .pos-category-pill.active,
+[data-bs-theme="dark"] .pos-category-pill.active {
+    background: var(--color-teal) !important;
+    border-color: var(--color-teal) !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 10px rgba(10, 92, 94, 0.4) !important;
+}
+
+[data-theme="dark"] .pos-shortcut-hint,
+[data-bs-theme="dark"] .pos-shortcut-hint {
+    color: #94A3B8 !important;
+}
+
+/* Tarjetas de Producto en la grilla */
+[data-theme="dark"] .pos-product-card,
+[data-bs-theme="dark"] .pos-product-card {
+    background: #1E293B !important;
+    border: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .pos-product-card:hover,
+[data-bs-theme="dark"] .pos-product-card:hover {
+    border-color: var(--color-teal) !important;
+    box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.45) !important;
+}
+
+[data-theme="dark"] .pos-product-media,
+[data-bs-theme="dark"] .pos-product-media {
+    background: #0F172A !important;
+}
+
+[data-theme="dark"] .pos-product-placeholder,
+[data-bs-theme="dark"] .pos-product-placeholder {
+    background: linear-gradient(135deg, #0F172A, #1E293B) !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-product-initials,
+[data-bs-theme="dark"] .pos-product-initials {
+    color: #38BDF8 !important;
+    opacity: 0.95;
+}
+
+[data-theme="dark"] .pos-product-cat-icon,
+[data-bs-theme="dark"] .pos-product-cat-icon {
+    color: #64748B !important;
+}
+
+[data-theme="dark"] .pos-category-tag,
+[data-bs-theme="dark"] .pos-category-tag {
+    background: rgba(15, 23, 42, 0.88) !important;
+    color: #CBD5E1 !important;
+    border: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .pos-product-name,
+[data-bs-theme="dark"] .pos-product-name {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-product-variant,
+[data-bs-theme="dark"] .pos-product-variant {
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-product-price,
+[data-bs-theme="dark"] .pos-product-price {
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-product-wholesale,
+[data-bs-theme="dark"] .pos-product-wholesale {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    color: #6EE7B7 !important;
+}
+
+/* Paginación del catálogo */
+[data-theme="dark"] #pos-grid-pagination .btn,
+[data-bs-theme="dark"] #pos-grid-pagination .btn {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #CBD5E1 !important;
+}
+
+[data-theme="dark"] #pos-grid-pagination .btn:hover,
+[data-bs-theme="dark"] #pos-grid-pagination .btn:hover {
+    background: #334155 !important;
+    color: #FFFFFF !important;
+}
+
+/* Carrito y Cliente */
+[data-theme="dark"] .pos-cart-head h6,
+[data-bs-theme="dark"] .pos-cart-head h6 {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-clear-link,
+[data-bs-theme="dark"] .pos-clear-link {
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-clear-link:hover,
+[data-bs-theme="dark"] .pos-clear-link:hover {
+    color: #EF4444 !important;
+}
+
+[data-theme="dark"] .pos-client-line,
+[data-bs-theme="dark"] .pos-client-line {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .pos-client-input,
+[data-bs-theme="dark"] .pos-client-input {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-client-input::placeholder,
+[data-bs-theme="dark"] .pos-client-input::placeholder {
+    color: #64748B !important;
+}
+
+[data-theme="dark"] .pos-client-btn,
+[data-bs-theme="dark"] .pos-client-btn {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-client-btn:hover,
+[data-bs-theme="dark"] .pos-client-btn:hover {
+    background: var(--color-teal) !important;
+    color: #FFFFFF !important;
+    border-color: var(--color-teal) !important;
+}
+
+[data-theme="dark"] .pos-client-badge,
+[data-bs-theme="dark"] .pos-client-badge {
+    background: #334155 !important;
+    color: #CBD5E1 !important;
+}
+
+/* Carrito - Ítems y Lista */
+[data-theme="dark"] .pos-cart-empty,
+[data-bs-theme="dark"] .pos-cart-empty {
+    color: #64748B !important;
+}
+
+[data-theme="dark"] .pos-cart-item,
+[data-bs-theme="dark"] .pos-cart-item {
+    border-bottom: 1px dashed #334155 !important;
+}
+
+[data-theme="dark"] .pos-cart-thumb,
+[data-bs-theme="dark"] .pos-cart-thumb {
+    background: #0F172A !important;
+}
+
+[data-theme="dark"] .pos-cart-thumb-fallback,
+[data-bs-theme="dark"] .pos-cart-thumb-fallback {
+    background: #0F172A !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-cart-name,
+[data-bs-theme="dark"] .pos-cart-name {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-cart-meta,
+[data-bs-theme="dark"] .pos-cart-meta {
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-cart-line-total,
+[data-bs-theme="dark"] .pos-cart-line-total {
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-qty,
+[data-bs-theme="dark"] .pos-qty {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] .pos-qty button,
+[data-bs-theme="dark"] .pos-qty button {
+    background: #1E293B !important;
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-qty button:hover,
+[data-bs-theme="dark"] .pos-qty button:hover {
+    background: #334155 !important;
+}
+
+[data-theme="dark"] .pos-qty input,
+[data-bs-theme="dark"] .pos-qty input {
+    background: #0F172A !important;
+    color: #F8FAFC !important;
+}
+
+/* Resumen financiero y Totales */
+[data-theme="dark"] .pos-checkout-footer .pos-summary strong,
+[data-bs-theme="dark"] .pos-checkout-footer .pos-summary strong {
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-checkout-footer .pos-summary-discount strong,
+[data-bs-theme="dark"] .pos-checkout-footer .pos-summary-discount strong {
+    color: #34D399 !important;
+}
+
+/* Caja de Cambio (Vuelto) */
+[data-theme="dark"] .pos-change-box,
+[data-bs-theme="dark"] .pos-change-box {
+    background: #0F172A !important;
+    border: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .pos-change-box .pos-change-label,
+[data-bs-theme="dark"] .pos-change-box .pos-change-label {
+    color: #34D399 !important;
+}
+
+[data-theme="dark"] .pos-change-value,
+[data-bs-theme="dark"] .pos-change-value {
+    color: #34D399 !important;
+}
+
+/* Input de Efectivo Recibido y Botones de Pago */
+[data-theme="dark"] .pos-payment .form-label,
+[data-bs-theme="dark"] .pos-payment .form-label {
+    color: #94A3B8 !important;
+}
+
+[data-theme="dark"] .pos-payment .input-group-text,
+[data-bs-theme="dark"] .pos-payment .input-group-text {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #38BDF8 !important;
+}
+
+[data-theme="dark"] .pos-payment .form-control,
+[data-bs-theme="dark"] .pos-payment .form-control {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #F8FAFC !important;
+}
+
+/* Fichas de Efectivo Rápido (Chips) */
+[data-theme="dark"] .pos-cash-chip,
+[data-bs-theme="dark"] .pos-cash-chip {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-cash-chip:hover,
+[data-bs-theme="dark"] .pos-cash-chip:hover {
+    background: var(--color-teal) !important;
+    border-color: var(--color-teal) !important;
+    color: #FFFFFF !important;
+}
+
+/* Botón Transferencia */
+[data-theme="dark"] .pos-transfer-toggle,
+[data-bs-theme="dark"] .pos-transfer-toggle {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    color: #6EE7B7 !important;
+}
+
+[data-theme="dark"] .pos-transfer-toggle:hover,
+[data-bs-theme="dark"] .pos-transfer-toggle:hover {
+    background: var(--color-teal) !important;
+    border-color: var(--color-teal) !important;
+    color: #FFFFFF !important;
+}
+
+/* Botón Cobrar Deshabilitado */
+[data-theme="dark"] .btn-pos-charge:disabled,
+[data-bs-theme="dark"] .btn-pos-charge:disabled {
+    background: #243248 !important;
+    color: #64748B !important;
+    border: 1px solid #334155 !important;
+    box-shadow: none !important;
+}
+
+[data-theme="dark"] .btn-pos-charge:disabled .pos-charge-kbd,
+[data-bs-theme="dark"] .btn-pos-charge:disabled .pos-charge-kbd {
+    background: #1E293B !important;
+    border-color: #334155 !important;
+    color: #64748B !important;
+}
+
+/* Modal de Historial y Ticket */
+[data-theme="dark"] #pos-history-modal .pos-history-table-wrap,
+[data-bs-theme="dark"] #pos-history-modal .pos-history-table-wrap {
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] #pos-history-modal #pos-history-table,
+[data-bs-theme="dark"] #pos-history-modal #pos-history-table {
+    background: transparent !important;
+    color: #F8FAFC !important;
+}
+
+[data-theme="dark"] .pos-ticket-preview-wrap,
+[data-bs-theme="dark"] .pos-ticket-preview-wrap {
+    background: #0F172A !important;
+    border-color: #334155 !important;
+}
+
+
+/* ==========================================================================
+   1. NOTIFICACIONES FLOTANTES (TOASTS MINIMALISTAS - ESQUINA SUPERIOR DERECHA)
+   ==========================================================================
+   Toasts no bloqueantes en la esquina superior derecha que expiran en 3 segundos.
+   - Borde verde para éxito (#10B981)
+   - Borde rojo para error (#EF4444)
+   - Tipografía nítida, sombras elegantes y soporte para Modo Claro / Oscuro.
+   ========================================================================== */
+
+.toast-container {
+    pointer-events: none;
+    z-index: 1100 !important;
+}
+
+.custom-toast {
+    pointer-events: auto;
+    min-width: 290px;
+    max-width: 420px;
+    background-color: var(--theme-bg-card, #FFFFFF) !important;
+    color: var(--theme-text-main, #1F2937) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+    padding: 0.85rem 1.1rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.85rem !important;
+    margin-bottom: 0.75rem !important;
+    border: 1px solid var(--theme-border, #E5E7EB);
+    border-left: 5px solid #10B981 !important; /* Borde verde default */
+    animation: toastSlideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+@keyframes toastSlideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(40px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+/* Borde verde para éxito */
+.custom-toast.toast-success {
+    border-left-color: #10B981 !important;
+}
+.custom-toast.toast-success .toast-icon {
+    color: #10B981 !important;
+}
+
+/* Borde rojo para error / peligro */
+.custom-toast.toast-danger,
+.custom-toast.toast-error {
+    border-left-color: #EF4444 !important;
+}
+.custom-toast.toast-danger .toast-icon,
+.custom-toast.toast-error .toast-icon {
+    color: #EF4444 !important;
+}
+
+/* Advertencia e Info */
+.custom-toast.toast-warning {
+    border-left-color: #F59E0B !important;
+}
+.custom-toast.toast-warning .toast-icon {
+    color: #F59E0B !important;
+}
+
+.custom-toast.toast-info {
+    border-left-color: #38BDF8 !important;
+}
+.custom-toast.toast-info .toast-icon {
+    color: #38BDF8 !important;
+}
+
+.custom-toast .toast-msg {
+    font-size: 0.88rem;
+    font-weight: 500;
+    line-height: 1.35;
+    flex-grow: 1;
+}
+
+.custom-toast .btn-close-toast {
+    background: transparent;
+    border: none;
+    color: var(--theme-text-muted, #94A3B8);
+    padding: 0.2rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    opacity: 0.65;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+.custom-toast .btn-close-toast:hover {
+    opacity: 1;
+    color: var(--theme-text-main, #1F2937);
+}
+
+/* Toasts en Modo Oscuro */
+[data-theme="dark"] .custom-toast,
+[data-bs-theme="dark"] .custom-toast {
+    background-color: #1E293B !important;
+    color: #F8FAFC !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+    border-top-color: #334155 !important;
+    border-right-color: #334155 !important;
+    border-bottom-color: #334155 !important;
+}
+[data-theme="dark"] .custom-toast .btn-close-toast,
+[data-bs-theme="dark"] .custom-toast .btn-close-toast {
+    color: #94A3B8 !important;
+}
+[data-theme="dark"] .custom-toast .btn-close-toast:hover,
+[data-bs-theme="dark"] .custom-toast .btn-close-toast:hover {
+    color: #FFFFFF !important;
+}
+
+
+/* ==========================================================================
+   2. ANILLOS DE ENFOQUE ACCESIBLE (:focus-visible)
+   ==========================================================================
+   Al navegar con la tecla Tab, los controles interactivos muestran un anillo
+   exterior verde brillante accesible (#10B981 / #34D399) sin ensuciar el clic
+   habitual del ratón.
+   ========================================================================== */
+
+:focus-visible {
+    outline: 2px solid #10B981 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.35) !important;
+    transition: outline-offset 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Campos de formulario */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.pos-omnibox-input:focus-visible,
+.pos-client-input:focus-visible {
+    outline: 2px solid #10B981 !important;
+    outline-offset: 1px !important;
+    border-color: #10B981 !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.35) !important;
+}
+
+/* Botones y controles de acción */
+button:focus-visible,
+.btn:focus-visible,
+[role="button"]:focus-visible,
+a.btn:focus-visible,
+.pos-category-pill:focus-visible,
+.pos-cash-chip:focus-visible,
+.pos-product-card:focus-visible,
+.nav-link:focus-visible,
+.dropdown-item:focus-visible,
+.page-link:focus-visible {
+    outline: 2px solid #10B981 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.45) !important;
+}
+
+/* Resalte optimizado en Modo Oscuro */
+[data-theme="dark"] :focus-visible,
+[data-bs-theme="dark"] :focus-visible {
+    outline-color: #34D399 !important;
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.45) !important;
+}
+
+[data-theme="dark"] input:focus-visible,
+[data-theme="dark"] select:focus-visible,
+[data-theme="dark"] textarea:focus-visible,
+[data-theme="dark"] .form-control:focus-visible,
+[data-theme="dark"] .form-select:focus-visible,
+[data-bs-theme="dark"] input:focus-visible,
+[data-bs-theme="dark"] select:focus-visible,
+[data-bs-theme="dark"] textarea:focus-visible,
+[data-bs-theme="dark"] .form-control:focus-visible,
+[data-bs-theme="dark"] .form-select:focus-visible {
+    outline-color: #34D399 !important;
+    border-color: #34D399 !important;
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.4) !important;
+}
+
+
+/* ==========================================================================
+   3. SKELETON LOADERS (ANIMACIÓN DE PULSO / SHIMMER PARA TABLAS Y TARJETAS)
+   ==========================================================================
+   Reemplaza los íconos giratorios por bloques que simulan la estructura exacta
+   de las filas de tablas y tarjetas mientras se cargan los datos.
+   ========================================================================== */
+
+@keyframes skeletonPulse {
+    0% {
+        opacity: 1;
+        background-color: #E2E8F0;
+    }
+    50% {
+        opacity: 0.45;
+        background-color: #CBD5E1;
+    }
+    100% {
+        opacity: 1;
+        background-color: #E2E8F0;
+    }
+}
+
+@keyframes skeletonShimmerAnim {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.skeleton,
+.skeleton-line,
+.skeleton-circle,
+.skeleton-box {
+    display: inline-block;
+    background: linear-gradient(90deg, #E2E8F0 25%, #F1F5F9 37%, #E2E8F0 63%);
+    background-size: 400% 100%;
+    animation: skeletonShimmerAnim 1.4s ease infinite;
+    border-radius: 6px;
+    vertical-align: middle;
+}
+
+/* Modo oscuro: tonos carbón y pizarra suaves */
+[data-theme="dark"] .skeleton,
+[data-theme="dark"] .skeleton-line,
+[data-theme="dark"] .skeleton-circle,
+[data-theme="dark"] .skeleton-box,
+[data-bs-theme="dark"] .skeleton,
+[data-bs-theme="dark"] .skeleton-line,
+[data-bs-theme="dark"] .skeleton-circle,
+[data-bs-theme="dark"] .skeleton-box {
+    background: linear-gradient(90deg, #1E293B 25%, #334155 37%, #1E293B 63%) !important;
+    background-size: 400% 100% !important;
+}
+
+.skeleton-line {
+    height: 14px;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+.skeleton-line:last-child {
+    margin-bottom: 0;
+}
+.skeleton-line.sm { height: 10px; }
+.skeleton-line.lg { height: 20px; }
+.skeleton-line.w-25 { width: 25%; }
+.skeleton-line.w-40 { width: 40%; }
+.skeleton-line.w-50 { width: 50%; }
+.skeleton-line.w-60 { width: 60%; }
+.skeleton-line.w-75 { width: 75%; }
+.skeleton-line.w-90 { width: 90%; }
+.skeleton-line.w-100 { width: 100%; }
+
+.skeleton-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.skeleton-card {
+    padding: 1.25rem;
+    border-radius: 14px;
+    background-color: var(--theme-bg-card, #FFFFFF);
+    border: 1px solid var(--theme-border, #E5E7EB);
+}
+[data-theme="dark"] .skeleton-card,
+[data-bs-theme="dark"] .skeleton-card {
+    background-color: #1E293B !important;
+    border-color: #334155 !important;
+}
+
+/* Filas simuladas en tablas */
+.skeleton-table-row td {
+    padding: 0.85rem 1rem !important;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--theme-border, #E5E7EB);
+}
+[data-theme="dark"] .skeleton-table-row td,
+[data-bs-theme="dark"] .skeleton-table-row td {
+    border-bottom-color: #334155 !important;
+}
+
+
+/* ==========================================================================
+   ESTÁNDARES VISUALES MODERNOS: ENCABEZADOS FIJOS, DESENFOQUE Y TABULAR-NUMS
+   ========================================================================== */
+
+/* 1. ENCABEZADOS FIJOS (POSITION: STICKY EN TODAS LAS TABLAS)
+   Mantiene el título de las columnas permanentemente visible durante el scroll */
+
+.table-responsive {
+    position: relative;
+    overflow-y: auto;
+    overflow-x: auto;
+    max-height: calc(100vh - 250px);
+    scrollbar-width: thin;
+}
+
+.modal .table-responsive {
+    max-height: 52vh;
+}
+
+.table thead,
+table thead {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+}
+
+.table thead th,
+table thead th,
+.table > thead > tr > th,
+table > thead > tr > th,
+.thead-users th,
+.thead-catalog th,
+.thead-cash th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background-color: var(--color-teal-dark) !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .table thead th,
+[data-theme="dark"] table thead th,
+[data-bs-theme="dark"] .table thead th,
+[data-bs-theme="dark"] table thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    background-color: var(--color-teal-dark) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+
+/* 2. DESENFOQUE DE MODALES (BACKDROP-FILTER: BLUR)
+   Aísla visualmente el formulario del sistema de fondo mediante desenfoque */
+
+.modal-backdrop {
+    background-color: rgba(15, 23, 42, 0.58) !important;
+}
+
+.modal-backdrop.show {
+    opacity: 1 !important;
+    backdrop-filter: blur(8px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(8px) saturate(180%) !important;
+}
+
+.modal.fade.show,
+.modal.show {
+    backdrop-filter: blur(6px) saturate(160%);
+    -webkit-backdrop-filter: blur(6px) saturate(160%);
+}
+
+[data-theme="dark"] .modal-backdrop,
+[data-bs-theme="dark"] .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.75) !important;
+}
+
+[data-theme="dark"] .modal-backdrop.show,
+[data-bs-theme="dark"] .modal-backdrop.show {
+    backdrop-filter: blur(10px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(10px) saturate(190%) !important;
+}
+
+[data-theme="dark"] .modal.fade.show,
+[data-theme="dark"] .modal.show,
+[data-bs-theme="dark"] .modal.fade.show,
+[data-bs-theme="dark"] .modal.show {
+    backdrop-filter: blur(8px) saturate(180%);
+    -webkit-backdrop-filter: blur(8px) saturate(180%);
+}
+
+
+/* 3. TIPOGRAFÍA TABULAR (FONT-VARIANT-NUMERIC: TABULAR-NUMS)
+   Alineación matemática perfecta para dígitos, decimales y cifras monetarias */
+
+.table td,
+.table th,
+table td,
+table th,
+.pos-product-price,
+.pos-product-wholesale,
+.pos-cart-line-total,
+.pos-cart-line-savings,
+.pos-summary-total,
+.pos-summary strong,
+.pos-change-value,
+.pos-total-hero strong,
+.pos-total-hero span,
+.pos-cash-chip,
+.pos-stock-badge,
+.pos-qty input,
+.kpi-value,
+.kpi-number,
+.kpi-card h3,
+.kpi-card h4,
+.kpi-card .display-6,
+.kpi-card strong,
+.badge,
+.card h2,
+.card h3,
+.card h4,
+[class*="price"],
+[class*="precio"],
+[class*="monto"],
+[class*="total"],
+[class*="costo"],
+[class*="perdida"],
+[class*="stock"],
+[class*="cant"],
+[class*="cifra"],
+[class*="valor"],
+.ticket {
+    font-variant-numeric: tabular-nums lining-nums !important;
+    font-feature-settings: "tnum" 1, "lnum" 1 !important;
 }
