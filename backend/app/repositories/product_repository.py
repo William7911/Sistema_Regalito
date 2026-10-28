@@ -40,6 +40,14 @@ class ProductRepositoryImpl(ProductRepository):
         )
         return result.scalar_one_or_none()
 
+    async def get_variantes_without_barcode(self) -> List[VarianteProducto]:
+        result = await self.db.execute(
+            select(VarianteProducto).where(
+                (VarianteProducto.codigo_barras.is_(None)) | (VarianteProducto.codigo_barras == "")
+            )
+        )
+        return list(result.scalars().all())
+
     async def get_variante_by_id(self, variante_id: int) -> Optional[VarianteProducto]:
         result = await self.db.execute(
             select(VarianteProducto).where(VarianteProducto.id_variante == variante_id)

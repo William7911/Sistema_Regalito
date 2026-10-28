@@ -73,6 +73,25 @@ async def get_product_by_barcode(
     return await service.get_by_barcode(barcode)
 
 
+@router.get("/generar-codigo")
+async def generate_new_barcode(
+    service: ConcreteProductService = Depends(get_product_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Genera un código de barras EAN-13 guatemalteco único para el formulario."""
+    code = await service.generate_unique_barcode()
+    return {"codigo_barras": code}
+
+
+@router.post("/generar-codigos-faltantes")
+async def generate_missing_barcodes(
+    service: ConcreteProductService = Depends(get_product_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Asigna códigos EAN-13 válidos a todos los productos y variantes que no tengan uno."""
+    return await service.generate_missing_barcodes()
+
+
 @router.get("/{product_id}", response_model=schemas.ProductoOut)
 async def get_product(
     product_id: int,

@@ -146,6 +146,14 @@ class ProductService(ABC):
         ...
 
     @abstractmethod
+    async def generate_unique_barcode(self) -> str:
+        ...
+
+    @abstractmethod
+    async def generate_missing_barcodes(self) -> dict:
+        ...
+
+    @abstractmethod
     async def create_product(self, data: schemas.ProductoCreate) -> schemas.ProductoOut:
         ...
 

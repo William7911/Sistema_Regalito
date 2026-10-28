@@ -1,3 +1,4 @@
+import random
 from typing import Optional, List
 from fastapi import HTTPException, status
 from datetime import datetime
@@ -6,6 +7,20 @@ from app.interfaces.repositories import ProductRepository
 from app.interfaces.services import ProductService
 from app.schemas import schemas
 from app.services.audit_service import log_action
+
+
+def calculate_ean13_check_digit(digits12: str) -> str:
+    """Calcula el dígito verificador estándar GS1 EAN-13."""
+    total = sum(int(d) * (1 if idx % 2 == 0 else 3) for idx, d in enumerate(digits12))
+    check = (10 - (total % 10)) % 10
+    return str(check)
+
+
+def generate_random_ean13() -> str:
+    """Genera un código EAN-13 guatemalteco válido (prefijo 740 + 9 dígitos + checksum)."""
+    middle = f"{random.randint(100000000, 999999999)}"
+    first12 = f"740{middle}"
+    return first12 + calculate_ean13_check_digit(first12)
 
 
 class ConcreteProductService(ProductService):
@@ -95,12 +110,44 @@ class ConcreteProductService(ProductService):
                 status_code=400, detail="Ya existe un producto con ese código de barras"
             )
 
+    async def generate_unique_barcode(self) -> str:
+        """Genera un código de barras EAN-13 único que no exista en la base de datos."""
+        for _ in range(30):
+            code = generate_random_ean13()
+            existing = await self.products.get_variante_by_barcode(code)
+            if not existing:
+                return code
+        # Fallback con timestamp en caso de colisión persistente
+        unique_tail = f"{int(datetime.utcnow().timestamp() * 1000)}"[-9:]
+        first12 = f"740{unique_tail}"
+        return first12 + calculate_ean13_check_digit(first12)
+
+    async def generate_missing_barcodes(self) -> dict:
+        """Asigna códigos de barras EAN-13 válidos a todas las variantes que no tengan uno."""
+        variantes = await self.products.get_variantes_without_barcode()
+        actualizados = 0
+        items = []
+        for v in variantes:
+            nuevo_codigo = await self.generate_unique_barcode()
+            v.codigo_barras = nuevo_codigo
+            actualizados += 1
+            items.append({"id_variante": v.id_variante, "codigo_barras": nuevo_codigo})
+        if actualizados > 0:
+            await self.products.commit()
+        return {"total_actualizados": actualizados, "items": items}
+
     async def create_product(self, data: schemas.ProductoCreate, actor_id: int = 0) -> schemas.ProductoOut:
         await self._validate_subcategoria(data.id_subcategoria)
         await self._validate_unidad(data.id_unidad)
         await self._validate_sucursal(data.inventario.id_sucursal)
         await self._validate_area(data.inventario.id_area)
-        await self._validate_unique_barcode(data.variante.codigo_barras)
+
+        # Si el producto no tiene código de barras, generamos uno EAN-13 automáticamente
+        codigo_barras = data.variante.codigo_barras.strip() if (data.variante and data.variante.codigo_barras) else None
+        if not codigo_barras:
+            codigo_barras = await self.generate_unique_barcode()
+        else:
+            await self._validate_unique_barcode(codigo_barras)
 
         producto = Producto(
             id_subcategoria=data.id_subcategoria,
@@ -114,7 +161,7 @@ class ConcreteProductService(ProductService):
 
         variante = VarianteProducto(
             id_producto=producto.id_producto,
-            codigo_barras=data.variante.codigo_barras.strip() if data.variante.codigo_barras else None,
+            codigo_barras=codigo_barras,
             talla=data.variante.talla.strip() if data.variante.talla else None,
             color=data.variante.color.strip() if data.variante.color else None,
             precio_detalle=data.variante.precio_detalle,

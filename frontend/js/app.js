@@ -437,6 +437,44 @@ function parseHash() {
 }
 
 // Renderiza la vista correspondiente con validación de RBAC
+
+function updateTopbarHeader(viewKey) {
+    const topbarTitle = document.getElementById('topbar-module-title');
+    const topbarTurnBadge = document.getElementById('pos-turn-badge');
+    const topbarHistoryBtn = document.getElementById('btn-pos-history');
+    if (!topbarTitle) return;
+
+    const titleMap = {
+        dashboard: '<i class="bi bi-speedometer2 text-teal"></i> <span>Panel Principal</span>',
+        pos: '<i class="bi bi-cart3 text-teal"></i> <span>Punto de Venta</span>',
+        inventory: '<i class="bi bi-boxes text-teal"></i> <span>Inventario / Bodega</span>',
+        compras: '<i class="bi bi-bag-plus text-teal"></i> <span>Compras</span>',
+        cash: '<i class="bi bi-cash-coin text-teal"></i> <span>Caja</span>',
+        users: '<i class="bi bi-people text-teal"></i> <span>Usuarios / Personal</span>',
+        roles: '<i class="bi bi-shield-lock text-teal"></i> <span>Roles y Permisos</span>',
+        clients: '<i class="bi bi-person-lines-fill text-teal"></i> <span>Clientes</span>',
+        catalog: '<i class="bi bi-tags text-teal"></i> <span>Catálogos</span>',
+        reportes: '<i class="bi bi-graph-up text-teal"></i> <span>Reportes</span>',
+        configuracion: '<i class="bi bi-gear text-teal"></i> <span>Configuración</span>',
+        bitacora: '<i class="bi bi-journal-text text-teal"></i> <span>Bitácora</span>',
+        historial: '<i class="bi bi-clock-history text-teal"></i> <span>Historial de Precios</span>',
+        mermas: '<i class="bi bi-trash3 text-teal"></i> <span>Mermas</span>',
+        traslados: '<i class="bi bi-arrow-left-right text-teal"></i> <span>Traslados</span>',
+        visitas: '<i class="bi bi-geo-alt text-teal"></i> <span>Visitas de Seguimiento</span>',
+    };
+
+    topbarTitle.innerHTML = titleMap[viewKey] || '<i class="bi bi-grid text-teal"></i> <span>Sistema El Regalito</span>';
+
+    if (viewKey === 'pos') {
+        if (topbarTurnBadge) topbarTurnBadge.classList.remove('d-none');
+        if (topbarHistoryBtn) topbarHistoryBtn.classList.remove('d-none');
+    } else {
+        if (topbarTurnBadge) topbarTurnBadge.classList.add('d-none');
+        if (topbarHistoryBtn) topbarHistoryBtn.classList.add('d-none');
+    }
+}
+window.updateTopbarHeader = updateTopbarHeader;
+
 function renderView(viewKey) {
     if (!mainViews.includes(viewKey)) viewKey = 'dashboard';
 
@@ -459,6 +497,7 @@ function renderView(viewKey) {
     const target = document.querySelector(`[data-main-view="${viewKey}"]`);
     if (target) target.classList.remove('d-none');
     setActiveNav(viewKey);
+    updateTopbarHeader(viewKey);
     if (typeof window.closeMobileSidebar === 'function') {
         window.closeMobileSidebar();
     }

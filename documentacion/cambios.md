@@ -3,6 +3,122 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-28] Implementación de Escaneo y Generación Automática de Códigos de Barras (POS y Catálogo)
+
+### 1. Requerimiento
+1. **Escaneo de Código de Barras en Punto de Venta (POS)**:
+   - El botón/ícono de escaneo (`bi-upc-scan`) en el buscador del POS no realizaba ninguna acción al ser presionado.
+   - Se requería activar esta funcionalidad permitiendo escanear productos con la cámara en tiempo real y soportar lectores láser físicos (pistolas de código de barras USB/Bluetooth).
+2. **Generación Automática de Códigos para Productos Faltantes**:
+   - Para productos sin código de barras, proveer generación automática y bajo demanda de códigos de barra estándar EAN-13 (prefijo de Guatemala `740` + 9 dígitos + dígito verificador GS1 EAN-13).
+   - Generación automática en la creación de productos nuevos cuando no se especifique código.
+   - Endpoint de migración para asignar códigos EAN-13 a cualquier producto existente sin código.
+   - Botón interactivo "Generar" en el formulario de creación/edición de productos.
+
+### 2. Generación de Códigos de Barras (Backend y Frontend)
+- **Algoritmo GS1 EAN-13 Guatemalteco**:
+  - Prefijo nacional `740` (Guatemala) + 9 dígitos únicos + cálculo estricto del dígito verificador ponderado (pesos alternados 1 y 3).
+- **Backend FastAPI**:
+  - [`backend/app/services/product_service.py`](../backend/app/services/product_service.py): Funciones `calculate_ean13_check_digit()` y `generate_random_ean13()`. Métodos `generate_unique_barcode()` y `generate_missing_barcodes()`. Asignación automática de código EAN-13 si `variante.codigo_barras` viene vacío en `create_product()`.
+  - [`backend/app/interfaces/services.py`](../backend/app/interfaces/services.py) y [`backend/app/interfaces/repositories.py`](../backend/app/interfaces/repositories.py): Contratos actualizados.
+  - [`backend/app/repositories/product_repository.py`](../backend/app/repositories/product_repository.py): Método `get_variantes_without_barcode()`.
+  - [`backend/app/api/products.py`](../backend/app/api/products.py): Nuevos endpoints:
+    - `GET /api/productos/generar-codigo`: genera y retorna un código EAN-13 válido único.
+    - `POST /api/productos/generar-codigos-faltantes`: asigna códigos a todas las variantes sin código.
+- **Formulario de Catálogo (Frontend)**:
+  - [`frontend/index.html`](../frontend/index.html): Campo `#codigo_barras` actualizado a `input-group` con botón `#btn-generate-barcode` ("Generar").
+  - [`frontend/js/catalog.js`](../frontend/js/catalog.js): Función `initProductBarcodeGenerator()` que solicita al backend o genera localmente un código EAN-13 válido al hacer clic en "Generar".
+
+### 3. Escaneo en Vivo en POS (Cámara Web y Lectores Físicos)
+- **Botón Omnibox Interactivo**:
+  - [`frontend/index.html`](../frontend/index.html): El ícono `.pos-omnibox-icon` se convirtió en el botón clickeable `#btn-pos-scanner` con tooltip y feedback táctil.
+- **Modal de Cámara con Retícula y Láser (`#pos-scanner-modal`)**:
+  - Visor de cámara con `<video id="pos-scanner-video">`, retícula de encuadre, animación de escaneo láser en rojo brillante (`@keyframes posLaserScan`), badge de estado y controles opcionales para linterna (torch) y cambio de cámara frontal/trasera.
+  - Notificación visual de éxito (`.pos-scanner-reticle.scan-success`) y banner de producto agregado.
+  - Web Audio API integrado: bip sintético agradable de alta frecuencia (1200-1800 Hz) en escaneo exitoso y tono de advertencia (320 Hz) si no se encuentra.
+  - Búsqueda dual: en catálogo en memoria (`state.catalog`) con fallback automático a la API `/api/productos/barcode/{codigo}`.
+  - Incorporación directa del producto al carrito (`addToCart()`) con debounce de 1.3 s para prevenir lecturas duplicadas continuas.
+  - Entrada manual y soporte para disparos de lectores láser USB/Bluetooth tanto en el modal como de forma global en cualquier parte de la pantalla de POS.
+- **Estilos CSS**:
+  - [`frontend/css/style.css`](../frontend/css/style.css): `.pos-omnibox-scan-btn`, `.pos-scanner-viewport-wrapper`, `.pos-scanner-reticle`, `.pos-scanner-laser`, alertas y adaptaciones responsive.
+
+### 4. Verificación
+- Pruebas automatizadas con Playwright Chromium:
+  - Apertura exitosa de `#pos-scanner-modal` al pulsar `#btn-pos-scanner`.
+  - Escaneo manual de producto `7401000000011` ("Juego de Vasos de Cristal") con verificación de banner y adición al carrito.
+  - Generación de código de barras de 13 dígitos con prefijo `740` en `#btn-generate-barcode`.
+  - Cero alteraciones a componentes fuera de la funcionalidad de códigos de barra solicitada.
+
+## [2026-10-27] Ajuste de Layout 100vh para POS (Pie de Cobro Fijo y Compactación de Carrito)
+
+### 1. Limpieza de Botones Superiores Innecesarios
+- **Ocultamiento de Acciones Secundarias**: Se ocultaron visualmente con `d-none` y reglas CSS (`display: none !important`) los botones "Pantalla Cliente" (`#btn-pos-customer-screen`) y "← Panel" (`.pos-header-btn[onclick*="dashboard"]`), dejando únicamente el botón de "Historial" en la esquina superior derecha.
+- **Reducción del Margen Superior**: Se redujo el espaciado y margen del encabezado `.pos-header` a `margin-bottom: 0.35rem`, optimizando el espacio vertical para el área de venta y cobro.
+
+### 2. Estructura Fija en "Venta Actual" (Pie de Cobro Anclado al 100vh)
+- **Ajuste Estricto a la Ventana (Cero Scroll Global)**: Se configuró `#pos-view` y sus contenedores secundarios (`#pos-workspace`, `.pos-workspace-row`, `.pos-checkout-panel`) con `height: 100%; max-height: 100%; overflow: hidden; display: flex; flex-direction: column;`, impidiendo que la página haga scroll vertical hacia abajo.
+- **Zona Superior Fija (`.pos-checkout-top`)**: Título "Venta actual", botón "Vaciar carrito" y línea de selector de cliente / NIT permanecen anclados fijamente arriba con `flex: 0 0 auto`.
+- **Zona Central con Scroll Interno Exclusivo (`#pos-cart-list`)**: Configurado con `flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden;`. Si se agregan múltiples productos, únicamente esta sección se desplaza internamente sin mover el resto de la interfaz.
+- **Zona Inferior Siempre Visible (`.pos-checkout-footer`)**: Anclada al fondo con `flex: 0 0 auto; margin-top: auto;`, garantizando que Subtotal, Ahorro, TOTAL A PAGAR, CAMBIO, campo Efectivo, billetes rápidos y el botón principal COBRAR permanezcan 100% visibles y operativos en todo momento.
+
+### 3. Compactación Horizontal Inteligente del Producto en Carrito
+- **Fila Única Horizontal**: Se reorganizó la estructura del ítem en el carrito para que todos los elementos convivan en una sola línea compacta:
+  - **Izquierda**: Nombre del producto (`.pos-cart-col-info`) con truncado elegante y variante.
+  - **Centro**: Controles de cantidad táctiles `[ - ] 1 [ + ]` (`.pos-cart-col-qty`) con botones ergonómicos de 36x36px.
+  - **Derecha**: Precio de la línea (`.pos-cart-col-price`, ej. `Q 340.00`) en negrita `fw-black` con alineación tabular.
+  - **Extremo derecho**: Botón de eliminación en rojo suave (`.pos-cart-remove`) con ícono de basurero.
+- **Eliminación de Miniaturas**: Se retiraron las imágenes y cajas de iniciales del carrito para economizar espacio vertical (~46px por fila frente a los ~100px previos).
+
+### 4. Ajuste Compacto de la Zona de Pago y Billetes
+- **Cajas de TOTAL y CAMBIO Optimizadas**: Reducción del padding interno a `0.35rem 0.65rem`, preservando números gigantes en `clamp(1.6rem, 2.2vw, 1.95rem)` (legibles para vista cansada) sin desperdiciar altura vertical.
+- **Cuadrícula de Billetes en 2 Filas Exactas**:
+  - **Fila 1**: `Exacto`, `Q10`, `Q20`, `Q50`.
+  - **Fila 2**: `Q100`, `Q200`, `Transferencia` (expandido a 2 columnas).
+  - Cada botón cuenta con altura de `36-38px`, bordes gruesos y tipografía en negrita `0.92rem`.
+- **Botón COBRAR Destacado y Visible**: Altura ajustada a `56px` con tipografía de `1.35rem fw-black`, ícono grande y sombra profunda, permanentemente al alcance en la esquina inferior derecha.
+- **Eliminación de Barra de Scroll Gris en Categorías**: Se configuró `.pos-category-pills` con `flex-wrap: wrap; overflow-x: hidden; scrollbar-width: none;`, retirando la molesta barra horizontal gris en Windows/Chrome y garantizando que el buscador Omnibox se sitúe nítidamente arriba de las categorías.
+- **Soporte Completo de Modo Oscuro**: Integración de colores y contrastes bajo `[data-theme="dark"]` para la fila horizontal compacta y cuadrícula de pago.
+
+### 5. Archivos Modificados
+- [`frontend/index.html`](../frontend/index.html): Ocultamiento de botones superiores, inclusión de `.pos-checkout-top`, renombramiento a `Exacto`, versionado `style.css?v=6.0` y `pos.js?v=2.3`.
+- [`frontend/js/pos.js`](../frontend/js/pos.js): Nueva plantilla horizontal compacta para el carrito sin miniaturas fotográficas y actualización de versión a `pos.js?v=2.3`.
+- [`frontend/css/style.css`](../frontend/css/style.css): Reglas completas de bloqueo 100vh, flex-column, scroll interno en `#pos-cart-list`, eliminación de scrollbar en categorías, cuadrícula de 2 filas de billetes y Modo Oscuro.
+
+## [2026-10-27] Rediseño Accesible de Punto de Venta (POS) para Adultos Mayores y Usuarios sin Experiencia
+
+### 1. Tarjetas de Producto (Clic en Toda la Tarjeta y Reconocimiento Visual)
+- **Clic en la Tarjeta Completa**: Se eliminó el botón circular pequeño de `+` en la esquina inferior. Ahora toda la superficie de la tarjeta actúa como un botón táctil grande con `role="button"`, agregando el producto al carrito con un solo toque o clic.
+- **Respuesta Táctil y Elevación Visual**: Se agregó un borde grueso de `2px solid #CBD5E1` en reposo, que al pasar el mouse o tocar (`:hover`, `:active`) se resalta con un borde de `3px solid var(--color-teal)` (o `#38BDF8` en Modo Oscuro), elevación suave (`translateY(-4px) scale(1.01)`) y sombra profunda difusa.
+- **Tipografía y Precio Gigante**:
+  - El nombre del producto se aumentó a `1.05rem` con peso `700`.
+  - El precio en Quetzales (`Q XX.XX`) se amplió a `1.45rem` (más de 23px, superando el mínimo requerido de 22px) en negrita ultra-pesada `900`, con espaciado matemático tabular.
+- **Sustitución de Siglas por Íconos Ilustrativos Grandes**: Cuando un producto carece de fotografía, se eliminaron por completo las siglas de texto abreviadas ("MD", "VD") y se reemplazaron por un ícono ilustrativo central grande (`3.5rem`) representativo de su categoría (ej. `bi-cup-straw` para Cristalería/Vasos, `bi-bag-heart-fill` para Ropa/Vestidos, `bi-controller` para Juguetes, `bi-house-heart-fill` para Hogar, `bi-gift-fill` para Curiosidades y Regalos).
+
+### 2. Limpieza de Ruido Técnico (Cero Distracciones)
+- **Ocultamiento de Etiquetas de Atajos**: Se retiraron visualmente de la interfaz las etiquetas `<kbd>` (`F2`, `F4`, `F12`) en el buscador, botón de Historial y botón de Cobrar, así como la leyenda textual informativa `Enter agrega · F4 historial · F12 cobra`.
+- **Preservación Total de Atajos de Teclado**: Las combinaciones y teclas (`F2` para enfocar buscador, `F4` para historial, `F12` para cobrar, `Escape` para limpiar) se mantienen 100% operativas en el controlador de eventos JavaScript, garantizando eficiencia para cajeros avanzados sin confundir visualmente a personas mayores.
+- **Barra de Búsqueda y Botones de Categoría Estilo Pestaña Táctil**:
+  - La barra de búsqueda Omnibox se elevó a una altura ergonómica de `64px`, con ícono de escáner grande (`1.55rem`) y texto en `1.15rem`.
+  - Las píldoras de categorías (*Todos, Cristalería, Juguetes, Ropa*) se transformaron en botones grandes tipo pestaña táctil de `48px` de altura mínima, con bordes gruesos de `2px`, esquinas redondeadas de `14px`, tipografía en `1rem fw-bold` y contador redondeado contrastado.
+
+### 3. Carrito de "Venta Actual" a Prueba de Errores
+- **Filas Amplias y Lectura a Distancia**: Cada fila del carrito cuenta con un espaciado vertical holgado (`padding: 0.85rem 0`), nombre de producto en `1rem fw-bold` y total de línea grande en `1.25rem fw-black` con alineación tabular.
+- **Controles de Cantidad Grandes y Separados `[ - ]  1  [ + ]`**: Botones de incremento y disminución de `44px x 44px` (superando los 40x40px mínimos requeridos) con íconos audaces de `bi-dash-lg` y `bi-plus-lg`, flanqueando una caja numérica central de `48px x 44px` con tipografía de `1.15rem fw-extrabold`.
+- **Botón de Eliminación Táctil con Ícono de Basurero**: Se reemplazó la cruz pequeña por un botón cuadrado amplio de `42px x 42px` en color rojo suave (`#FEF2F2`, borde `#FECACA`, ícono `bi-trash3-fill` en `#EF4444`), que se resalta a rojo vivo en hover/toque para corregir equivocaciones sin fricción.
+- **Botón Visible "Vaciar Carrito"**: Se implementó el botón `#btn-pos-clear` con estilo de acción visible en contorno rojo (`btn-outline-danger` con ícono `bi-trash3`) en la esquina superior derecha del carrito, visible automáticamente únicamente cuando existen productos cargados.
+
+### 4. Zona de Pago y Billetes Estilo Cajero Automático
+- **Cifras Gigantes en TOTAL A PAGAR y CAMBIO**: Los bloques de total y cambio incorporan números gigantes con tipografía responsive fluida de `clamp(2rem, 3.2vw, 2.5rem)` (32px a 40px), legibles sin esfuerzo incluso por personas con vista cansada.
+- **Campo de Efectivo Recibido con Borde Grueso**: El campo `EFECTIVO (Q)` se amplió a `52px` de altura, con borde grueso de `2.5px solid #0D7377`, selector monetario `Q` de `52px` y tipografía al escribir de `1.45rem fw-black`.
+- **Cuadrícula de Billetes y Pago Rápido (Mínimo 50px de Alto)**: Las fichas pequeñas se convirtieron en una cuadrícula táctil estilo cajero automático con botones de `50px` de altura, bordes de `2px` y texto en negrita `1.05rem` para: *Monto exacto, Q10, Q20, Q50, Q100, Q200* y botón extendido de *Transferencia*.
+- **Botón Principal COBRAR al Doble de Altura**: Se duplicó la altura del botón principal de cobro a `82px` (anteriormente 44px), con tipografía destacada de `1.45rem fw-black`, ícono monetario `bi-cash-coin fs-2` y sombra de elevación profunda (`rgba(10, 92, 94, 0.35)`), coronándolo como la acción primaria incontrovertible de la pantalla.
+- **Compatibilidad con Modo Oscuro**: Todos los nuevos controles, botones, tarjetas, controles de cantidad y cuadrícula de pago cuentan con estilos correspondientes bajo `[data-theme="dark"]` y `[data-bs-theme="dark"]` con alto contraste y legibilidad óptima.
+
+### 5. Archivos Modificados
+- [`frontend/js/pos.js`](../frontend/js/pos.js): Eliminación del botón `+`, renderizado de íconos hero de categoría (sin siglas de texto), controles táctiles de cantidad `[ - ] [ + ]`, botón de papelera y actualización de versión a `pos.js?v=2.2`.
+- [`frontend/index.html`](../frontend/index.html): Retiro de atajos de teclado visuales (`<kbd>`), inclusión de billetes rápidos `Q10` y `Q20`, botón visible de vaciar carrito, botón de cobro de doble altura y actualización de versiones de caché (`style.css?v=5.9`, `pos.js?v=2.2`).
+- [`frontend/css/style.css`](../frontend/css/style.css): Reglas completas para tarjetas de producto grandes, efectos táctiles, omnibox alto (64px), píldoras tab de categoría (48px), controles de cantidad (44px), zona de pago estilo cajero y reglas completas para Modo Oscuro.
+
 ## [2026-10-26] Rediseño Moderno de Pantalla de Inicio de Sesión (Login)
 
 ### 1. Limpieza del Fondo (Foco en la Conversión)
@@ -3552,3 +3668,126 @@ Se desarrolló el módulo de **Productos** y el mantenimiento de **Categorías**
   - `initDashboard()` ya no dispara la carga; solo enlaza acciones. La carga la hace `renderView('dashboard') -> showDashboardModule()` cuando el contenedor ya está visible (elimina la doble petición).
   - Se subieron versiones de caché en `index.html`: `dashboard.js?v=1.1` y `style.css?v=2.8`.
 - **Verificación**: reproducido y validado en Chrome headless contra `http://localhost:9090` (contenedor `regalito_frontend_prod` + `regalito_backend_prod`): con token y hash `#dashboard` el canvas queda 607×260 y dibuja la barra de Q630; con hash `#pos` no se crea instancia 0×0 y al navegar a `#dashboard` se dibuja correctamente.
+
+---
+
+## [2026-10-28] Fusión de Barra Superior Única Compacta (56px) y Optimización Vertical del Punto de Venta (POS)
+
+### Causa Raíz / Requerimiento
+1. **Doble barra superior redundante**: El sistema mostraba dos barras superiores apiladas: una cabecera global fija con saludo y fecha ("¡Hola, Administrador! Octubre de 2026") y debajo el encabezado propio del módulo ("🛒 Punto de Venta" con turno y botones de acción), consumiendo más de 130px de alto.
+2. **Pérdida de visibilidad de cobro**: Debido al espacio vertical desperdiciado, el panel de "Venta actual" (carrito y pie de cobro) sobrepasaba la altura del viewport (`100vh`), forzando al cajero a hacer scroll para ver las denominaciones de billetes rápidos y el botón principal de "COBRAR".
+3. **Elementos redundantes**: Existían indicadores técnicos no indispensables para el cajero (ej. "1 prod. locales", rol repetido "Administradora", botones "Pantalla Cliente" y "← Panel").
+
+### Solución Implementada
+1. **Estructura HTML (`frontend/index.html`)**:
+   - **Barra Superior Única Compacta (`.main-topbar`)**: Se unificaron los encabezados en una única barra de altura fija de 56px (`flex: 0 0 56px`).
+   - **Título dinámico y estado de turno**: Inmediatamente a la derecha del botón de menú hamburguesa (`#btn-sidebar-toggle`) se ubicó el título del módulo activo (`#topbar-module-title`) y la píldora de turno de caja (`#pos-turn-badge`).
+   - **Acciones a la derecha**: Se mantuvieron únicamente el botón de "Historial" del turno (`#btn-pos-history`, visible solo en POS), el alternador de Modo Oscuro/Claro (`#btn-theme-toggle`) y la campana de notificaciones (`#btn-notificaciones`).
+   - **Reubicación del saludo**: El saludo `#header-greeting` y la fecha `#header-date` se trasladaron de forma fija dentro del contenido del "Panel Principal" (`#dashboard-content`), preservando sus identificadores exactos para compatibilidad con `app.js` y `dashboard.js`.
+   - **Eliminación de la barra secundaria en POS**: Se retiró el contenedor redundante `.pos-header` de `#pos-view`, ganando ~80px verticales para el área de catálogo y cobro.
+   - **Elementos redundantes ocultos**: Se asignó `d-none` a `#btn-sync-modal` y `#header-role`.
+2. **Lógica Dinámica (`frontend/js/app.js`)**:
+   - Se implementó la función `updateTopbarHeader(viewKey)` con mapa de títulos e íconos para todos los módulos del sistema.
+   - La píldora de turno (`#pos-turn-badge`) y el botón de historial (`#btn-pos-history`) se muestran automáticamente solo al navegar a `pos`, ocultándose en los demás módulos.
+   - Se integró la actualización del encabezado dentro del ciclo de vida `renderView(viewKey)`.
+3. **Estilos CSS (`frontend/css/style.css`)**:
+   - Definición de `.main-topbar` con `height: 56px !important; min-height: 56px !important; max-height: 56px !important; flex: 0 0 56px !important;`.
+   - Soporte responsivo: en pantallas pequeñas (`<= 767px`) se ajustan los paddings y se oculta la píldora de turno para priorizar el título y controles.
+   - Estilizado completo para Modo Oscuro (`[data-theme="dark"]` y `[data-bs-theme="dark"]`) en topbar, título, píldora de turno, botón de historial y alternadores.
+   - Optimización de altura en `#pos-workspace`: ahora aprovecha el 100% de la altura disponible entre la topbar (56px) y la pantalla (`calc(100vh - 56px)`).
+4. **Control de Caché**:
+   - Versiones incrementadas en `frontend/index.html`: `style.css?v=6.2`, `app.js?v=3.5`, `pos.js?v=2.5`.
+
+### Verificación
+- **Validación de Sintaxis JavaScript**: `node --check frontend/js/app.js` y `node --check frontend/js/pos.js` sin errores.
+- **Prueba HTTP en vivo**: Contenedor `regalito_frontend_prod` en `http://localhost:9090` responde con HTTP 200, sirviendo la estructura `.main-topbar`, `height: 56px !important`, y `updateTopbarHeader`.
+
+---
+
+## [2026-10-28] Corrección: Pantalla de Ventas (POS) en blanco y Ancho Fijo Estable de la Barra Lateral
+
+### Causa Raíz
+1. **Módulo de Ventas (POS) en blanco (`posWorkspaceHeight: 0`)**:
+   - El contenedor `#system-module` utilizaba `min-vh-100` (`min-height: 100vh`) sin una altura definida fija (`height`).
+   - Según la especificación flexbox de CSS, el cálculo de porcentaje en un hijo con `height: 100%` (`<main>`) se resuelve como `auto` si la altura del contenedor padre no es explícita.
+   - Esto provocaba que `<main>` colapsara a la suma de alturas de sus hijos visibles (la topbar de 56px + el padding vertical de 16px de `#pos-view` = 72px en total).
+   - Como consecuencia, `#pos-view` recibía únicamente 16px de alto y el área interna `#pos-workspace` (con `flex: 1 1 0px` y `overflow: hidden`) colapsaba a **0px**, impidiendo que se vieran las tarjetas de productos, el catálogo y el panel de cobro.
+2. **Barra Lateral que cambiaba de tamaño al cambiar de módulo (`sidebarWidth` encogido)**:
+   - La barra lateral `<aside class="sidebar">` tenía `width: 272px !important`, pero flexbox tenía por defecto `flex-shrink: 1` y no contaba con `flex: 0 0 272px` ni `min-width: 272px`.
+   - Al navegar entre módulos con diferentes estructuras de contenido (`row`, `table`, etc.), flexbox recalculaba el espacio disponible y comprimía la barra lateral de 272px a 134px, truncando los textos de navegación ("El Regali", "POS / Ve", "Inventari Bodega").
+
+### Solución Implementada
+1. **Bloqueo Estructural a 100vh (`frontend/css/style.css`)**:
+   - `#system-module`: Se fijó con `height: 100vh !important; max-height: 100vh !important; overflow: hidden !important;`.
+   - `#system-module > main`: Se configuró con `flex: 1 1 0% !important; min-width: 0 !important; height: 100vh !important; max-height: 100vh !important; display: flex !important; flex-direction: column !important; overflow: hidden !important;`.
+   - `#pos-view:not(.d-none)`: Se especificó con `flex: 1 1 0% !important; height: calc(100vh - 56px) !important; max-height: calc(100vh - 56px) !important; min-height: 0 !important;`.
+   - `#pos-workspace`: Se configuró con `flex: 1 1 0% !important; min-height: 0 !important; height: 100% !important;`.
+2. **Ancho Fijo e Inmutable de la Barra Lateral**:
+   - En pantallas desktop (`@media (min-width: 1024px)`), `.sidebar` tiene `width: 272px !important; min-width: 272px !important; max-width: 272px !important; flex: 0 0 272px !important; flex-shrink: 0 !important;`.
+   - Se mantiene intacto el comportamiento off-canvas para móviles (`< 1024px`).
+3. **Versión de Caché Actualizada**:
+   - `frontend/index.html`: `style.css?v=6.3`.
+
+### Verificación
+- **Prueba automatizada con Chrome CDP**:
+  - En POS: `sidebarWidth = 272px`, `posViewHeight = 560px`, `posWorkspaceHeight = 544px`, 4 productos renderizados y botón COBRAR visible en pantalla.
+  - Navegación secuencial (`dashboard` → `users` → `inventory` → `cash` → `reportes` → `pos`): el ancho del sidebar se mantuvo invariable en **272px** en todos los módulos sin ninguna fluctuación.
+
+---
+
+## [2026-10-28] Corrección: Ocultamiento del Estado Vacío del Carrito y Anclaje Fijo de Paginación en POS
+
+### Causa Raíz
+1. **Mensaje de carrito vacío persistente al agregar productos**:
+   - La regla `.pos-cart-empty` en `style.css` contaba con la declaración `display: flex !important;`.
+   - Cuando `pos.js` agregaba la clase `.d-none` (`display: none !important;`), la especificidad de clase empataba y el orden en cascada priorizaba `display: flex !important`, impidiendo que el contenedor vacío se ocultara.
+   - En consecuencia, el recuadro "Agrega productos al carrito para iniciar la venta" continuaba visible ocupando la mitad del carrito aun con múltiples productos cargados.
+2. **Paginación del catálogo desubicada y flotante**:
+   - Todo el contenido de la tarjeta izquierda (`.pos-catalog-panel > .card-body`) compartía un único contenedor con `overflow-y: auto`.
+   - Al haber más filas de productos, el contenedor completo hacía scroll, haciendo que el buscador y las categorías desaparecieran hacia arriba y que la barra de paginación (`< Página 1 de 1 >`) se desplazara con el scroll, ubicándose en medio de la cuadrícula al lado de la última tarjeta.
+
+### Solución Implementada
+1. **Ocultamiento Estricto de Carrito Vacío**:
+   - `frontend/css/style.css`: Se definió `.pos-cart-empty.d-none, #pos-cart-empty.d-none { display: none !important; }`.
+   - `frontend/js/pos.js`: En `renderCart()`, se forzó `style.setProperty('display', hasItems ? 'none' : 'flex', 'important')` en `#pos-cart-empty` y `'block'` en `#pos-cart-list`.
+2. **Arquitectura de 3 Zonas en el Panel de Catálogo (`frontend/index.html` y `frontend/css/style.css`)**:
+   - `.pos-catalog-top` (Fijo arriba): Contiene el omnibox de búsqueda y las píldoras de categorías (`flex: 0 0 auto`). Nunca se oculta al hacer scroll.
+   - `.pos-catalog-body` (Scroll interno): Contiene la cuadrícula de productos (`#pos-products-grid`) con `flex: 1 1 0%; overflow-y: auto;`. Única área que hace scroll si hay muchos productos.
+   - `.pos-catalog-footer` (Fijo abajo anclado): Contiene la paginación (`#pos-grid-pagination`) con `flex: 0 0 auto; border-top: 1px solid #E2E8F0;`. Permanece firmemente fijada en la parte inferior de la tarjeta.
+3. **Versión de Caché Actualizada**:
+   - `style.css?v=6.4` y `pos.js?v=2.6` en `frontend/index.html`.
+
+### Verificación
+- Verificado en Chrome headless vía CDP:
+  - Carrito vacío: `#pos-cart-empty` en `display: flex`, `#pos-cart-list` en `display: none`.
+  - Con productos: `#pos-cart-empty` en `display: none` (0px de espacio ocupado), `#pos-cart-list` visible en `display: block`.
+  - Paginación anclada de forma fija en el fondo de la tarjeta (`bottom: 611px` en tarjeta de `624px`).
+
+---
+
+## [2026-10-28] Ajuste: Colapso Dinámico de Barra Lateral (Escritorio) y Adaptación Responsiva Completa (Móvil/Tablet)
+
+### Causa Raíz / Requerimiento
+1. **Colapso del menú lateral con botón hamburguesa**: Al fijar con `!important` el ancho de la barra lateral en 272px en la corrección previa, la regla de colapso a 76px (`.sidebar-collapsed .sidebar`) perdió especificidad, impidiendo que el menú se redujera a su modo compacto de solo íconos al pulsar el botón hamburguesa (☰).
+2. **Adaptación Responsiva Móvil y Cambio de Tamaño de Ventana**: El sistema debía acoplarse fluidamente a pantallas pequeñas (< 1024px) y redimensionamiento dinámico de ventana, permitiendo que la barra lateral actúe como cajón deslizable (off-canvas) y que el Punto de Venta organice el catálogo y el panel de cobro de forma apilada y accesible sin desbordamientos horizontales.
+
+### Solución Implementada
+1. **Reglas de Colapso con Alta Especificidad (`frontend/css/style.css`)**:
+   - Para escritorio (`@media (min-width: 1024px)`):
+     - Ancho por defecto normal: `#system-module > .sidebar { width: 272px !important; min-width: 272px !important; max-width: 272px !important; flex: 0 0 272px !important; }`.
+     - Ancho colapsado (únicamente al presionar el botón hamburguesa): `#system-module.sidebar-collapsed > .sidebar { width: 76px !important; min-width: 76px !important; max-width: 76px !important; flex: 0 0 76px !important; padding: 1rem 0.5rem !important; }`.
+     - Transición suave con curva cubic-bezier de 0.22s.
+2. **Adaptación Fluida para Móviles y Tablets (`< 1024px`)**:
+   - `#system-module`: Altura fluida con scroll natural vertical (`overflow-y: auto; overflow-x: hidden`).
+   - `#system-module > .sidebar`: Permanece oculta fuera de la pantalla (`left: -280px; position: fixed`) y se desliza suavemente (`translateX(0)`) al presionar el botón hamburguesa, con fondo desenfocado (backdrop). Se cierra al tocar fuera o al seleccionar un módulo.
+   - `#system-module > main`: Ocupa el 100% del ancho del dispositivo sin scroll horizontal.
+   - Punto de Venta en móvil: El catálogo se adapta con altura fija de 520px (buscador y categorías fijos arriba, cuadrícula con scroll interno y paginación fija abajo), mientras que el carrito y el pie de cobro se ubican debajo con scroll natural accesible.
+3. **Versión de Caché Actualizada**:
+   - `style.css?v=6.6` en `frontend/index.html`.
+
+### Verificación
+- Verificado en Chrome headless vía CDP:
+  - Escritorio inicial: Sidebar = **272px**.
+  - Clic en hamburguesa: Sidebar colapsa a **76px** (modo compacto con íconos).
+  - Segundo clic en hamburguesa: Sidebar se expande nuevamente a **272px**.
+  - Móvil (390px ancho): Main = 390px, menú lateral en modo drawer deslizable, catálogo a 520px y panel de cobro visible y accesible.

@@ -3799,6 +3799,61 @@ function initBloque3Tables() {
     populateB3Departamentos();
 }
 
+function calculateEAN13CheckDigit(first12) {
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+        const d = parseInt(first12.charAt(i), 10);
+        sum += d * (i % 2 === 0 ? 1 : 3);
+    }
+    return String((10 - (sum % 10)) % 10);
+}
+
+function generateEAN13Barcode() {
+    const random9 = Math.floor(100000000 + Math.random() * 900000000).toString();
+    const first12 = '740' + random9;
+    return first12 + calculateEAN13CheckDigit(first12);
+}
+
+async function requestOrGenerateBarcode() {
+    try {
+        const token = (typeof getToken === 'function') ? getToken() : (localStorage.getItem('token') || localStorage.getItem('access_token'));
+        if (token) {
+            const res = await fetch('/api/productos/generar-codigo', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.codigo_barras) return data.codigo_barras;
+            }
+        }
+    } catch (_) {}
+    return generateEAN13Barcode();
+}
+
+function initProductBarcodeGenerator() {
+    const btnGen = document.getElementById('btn-generate-barcode');
+    if (btnGen) {
+        btnGen.addEventListener('click', async () => {
+            const codeInput = document.getElementById('codigo_barras');
+            if (codeInput) {
+                btnGen.disabled = true;
+                const originalHtml = btnGen.innerHTML;
+                btnGen.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>...';
+                try {
+                    const code = await requestOrGenerateBarcode();
+                    codeInput.value = code;
+                    codeInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    codeInput.dispatchEvent(new Event('change', { bubbles: true }));
+                } finally {
+                    btnGen.innerHTML = originalHtml;
+                    btnGen.disabled = false;
+                }
+            }
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initBloque3Listeners();
+    initProductBarcodeGenerator();
 });
