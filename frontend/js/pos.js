@@ -8,7 +8,7 @@
     const CUSTOMER_STATE_KEY = 'regalito_pos_customer_state';
     const TICKET_FORMAT_KEY = 'regalito_pos_ticket_format';
     const TICKET_CACHE_KEY = 'regalito_pos_ticket_cache_v1';
-    const CHARGE_HTML = '<span class="d-flex align-items-center justify-content-center gap-2"><i class="bi bi-cash-coin"></i> COBRAR <kbd class="pos-charge-kbd">F12</kbd></span>';
+    const CHARGE_HTML = '<span class="d-flex align-items-center justify-content-center gap-3"><i class="bi bi-cash-coin fs-2"></i> <span class="fs-4 fw-black">COBRAR</span></span>';
     const SCANNER_MAX_GAP = 35;
 
     const state = {
@@ -64,6 +64,15 @@
         clientBadge: document.getElementById('pos-client-badge'),
         btnSearchClient: document.getElementById('btn-pos-search-client'),
         btnCustomerScreen: document.getElementById('btn-pos-customer-screen'),
+        btnScanner: document.getElementById('btn-pos-scanner'),
+        scannerModal: document.getElementById('pos-scanner-modal'),
+        scannerVideo: document.getElementById('pos-scanner-video'),
+        scannerStatus: document.getElementById('pos-scanner-status'),
+        scannerTorch: document.getElementById('btn-pos-scanner-torch'),
+        scannerSwitch: document.getElementById('btn-pos-scanner-switch'),
+        scannerAlert: document.getElementById('pos-scanner-alert'),
+        scannerManualInput: document.getElementById('pos-scanner-manual-input'),
+        scannerManualAdd: document.getElementById('btn-pos-scanner-manual-add'),
         btnHistory: document.getElementById('btn-pos-history'),
         historyModal: document.getElementById('pos-history-modal'),
         historyBody: document.getElementById('pos-history-body'),
@@ -84,6 +93,17 @@
     let page = 1;
     let ticketModal = null;
     let historyModal = null;
+    let scannerModalInstance = null;
+    let cameraStream = null;
+    let barcodeDetector = null;
+    let scanInterval = null;
+    let lastScannedCode = null;
+    let lastScanTime = 0;
+    let currentFacingMode = 'environment';
+    let torchActive = false;
+    let audioCtx = null;
+    let globalScanBuffer = '';
+    let lastGlobalKeyTime = 0;
     let customerChannel = null;
     let customerWindow = null;
     let lastSaleTimer = null;
@@ -99,6 +119,14 @@
         if (typeof bootstrap !== 'undefined') {
             if (DOM.ticketModal) ticketModal = new bootstrap.Modal(DOM.ticketModal);
             if (DOM.historyModal) historyModal = new bootstrap.Modal(DOM.historyModal);
+            if (DOM.scannerModal) {
+                scannerModalInstance = new bootstrap.Modal(DOM.scannerModal);
+                DOM.scannerModal.addEventListener('shown.bs.modal', () => {
+                    startCameraScanner();
+                    if (DOM.scannerManualInput) setTimeout(() => DOM.scannerManualInput.focus(), 300);
+                });
+                DOM.scannerModal.addEventListener('hidden.bs.modal', stopCameraScanner);
+            }
         }
         setupEvents();
         initCustomerChannel();
@@ -320,6 +348,269 @@
         window.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'request-state') syncCustomerScreen();
         });
+
+        if (DOM.btnScanner) {
+            DOM.btnScanner.addEventListener('click', () => {
+                if (scannerModalInstance) scannerModalInstance.show();
+            });
+        }
+        if (DOM.scannerManualAdd) {
+            DOM.scannerManualAdd.addEventListener('click', handleManualScannerSubmit);
+        }
+        if (DOM.scannerManualInput) {
+            DOM.scannerManualInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleManualScannerSubmit();
+                }
+            });
+        }
+        if (DOM.scannerTorch) {
+            DOM.scannerTorch.addEventListener('click', toggleTorch);
+        }
+        if (DOM.scannerSwitch) {
+            DOM.scannerSwitch.addEventListener('click', switchCamera);
+        }
+
+        // Listener global para lectores láser de código de barras (USB / Bluetooth)
+        window.addEventListener('keydown', (event) => {
+            if (!isPosVisible()) return;
+            const active = document.activeElement;
+            const tag = active ? active.tagName.toLowerCase() : '';
+            const id = active ? active.id : '';
+            if (tag === 'textarea' || (tag === 'input' && !['pos-search', 'pos-scanner-manual-input'].includes(id))) {
+                return;
+            }
+
+            const now = performance.now();
+            const gap = now - lastGlobalKeyTime;
+            lastGlobalKeyTime = now;
+
+            if (event.key === 'Enter') {
+                if (globalScanBuffer.length >= 4) {
+                    event.preventDefault();
+                    const code = globalScanBuffer;
+                    globalScanBuffer = '';
+                    handleBarcodeDetected(code);
+                    if (DOM.search) DOM.search.value = '';
+                    return;
+                }
+                globalScanBuffer = '';
+            } else if (event.key.length === 1) {
+                if (gap < 60 || globalScanBuffer.length === 0) {
+                    globalScanBuffer += event.key;
+                } else {
+                    globalScanBuffer = event.key;
+                }
+            }
+        });
+    }
+
+    function playScanBeep(success) {
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            if (success) {
+                osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1800, audioCtx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.12);
+            } else {
+                osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.2);
+            }
+        } catch (_) {}
+    }
+
+    async function handleBarcodeDetected(code) {
+        const clean = String(code || '').trim();
+        if (!clean) return;
+
+        const now = Date.now();
+        if (clean === lastScannedCode && (now - lastScanTime) < 1300) return;
+        lastScannedCode = clean;
+        lastScanTime = now;
+
+        const reticle = document.querySelector('.pos-scanner-reticle');
+        if (reticle) {
+            reticle.classList.add('scan-success');
+            setTimeout(() => reticle.classList.remove('scan-success'), 500);
+        }
+
+        // Buscar en catálogo local
+        let item = state.catalog.find(entry => String(entry.codigo_barras || '').trim() === clean);
+
+        // Si no está en catálogo local, buscar en backend por código de barras
+        if (!item) {
+            try {
+                const token = (typeof getToken === 'function') ? getToken() : (localStorage.getItem('token') || localStorage.getItem('access_token'));
+                const res = await fetch(`/api/productos/barcode/${encodeURIComponent(clean)}`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                if (res.ok) {
+                    const prod = await res.json();
+                    if (prod && prod.variantes && prod.variantes.length > 0) {
+                        const matchedVar = prod.variantes.find(v => String(v.codigo_barras || '').trim() === clean) || prod.variantes[0];
+                        const inv = (matchedVar.inventarios && matchedVar.inventarios[0]) ? matchedVar.inventarios[0] : null;
+                        item = {
+                            id_producto: prod.id_producto,
+                            id_variante: matchedVar.id_variante,
+                            nombre: prod.nombre,
+                            precio: Number(matchedVar.precio_detalle),
+                            precio_mayoreo: Number(matchedVar.precio_mayoreo),
+                            stock: inv ? Number(inv.stock_actual) : 999,
+                            codigo_barras: clean,
+                            categoria: prod.subcategoria ? (prod.subcategoria.categoria ? prod.subcategoria.categoria.nombre : prod.subcategoria.nombre) : 'General'
+                        };
+                        state.catalog.push(item);
+                    }
+                }
+            } catch (_) {}
+        }
+
+        if (item) {
+            playScanBeep(true);
+            addToCart(item.id_variante, 1);
+            showScannerBanner(`✓ ${item.nombre} agregado al carrito`, false);
+            toast(`'${item.nombre}' agregado a la venta`, 'success');
+        } else {
+            playScanBeep(false);
+            showScannerBanner(`Código '${clean}' no encontrado`, true);
+            toast(`Código '${clean}' no encontrado en el sistema`, 'warning');
+        }
+    }
+
+    function showScannerBanner(msg, isError) {
+        if (!DOM.scannerAlert) return;
+        DOM.scannerAlert.textContent = msg;
+        DOM.scannerAlert.className = `pos-scanner-alert position-absolute bottom-0 start-0 w-100 p-2 text-center text-white small fw-bold ${isError ? 'error' : ''}`;
+        DOM.scannerAlert.classList.remove('d-none');
+        setTimeout(() => {
+            if (DOM.scannerAlert) DOM.scannerAlert.classList.add('d-none');
+        }, 2200);
+    }
+
+    async function startCameraScanner() {
+        stopCameraScanner();
+        if (!DOM.scannerVideo) return;
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            if (DOM.scannerStatus) DOM.scannerStatus.textContent = 'Cámara no soportada en este navegador';
+            return;
+        }
+
+        try {
+            if (DOM.scannerStatus) DOM.scannerStatus.innerHTML = '<span class="spinner-grow spinner-grow-sm text-teal me-1"></span>Iniciando cámara...';
+            const constraints = {
+                video: {
+                    facingMode: { ideal: currentFacingMode },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            };
+            cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+            DOM.scannerVideo.srcObject = cameraStream;
+            await DOM.scannerVideo.play();
+
+            if (DOM.scannerStatus) DOM.scannerStatus.textContent = 'Apunta al código de barras...';
+
+            const track = cameraStream.getVideoTracks()[0];
+            const capabilities = track && track.getCapabilities ? track.getCapabilities() : {};
+            if (capabilities.torch && DOM.scannerTorch) {
+                DOM.scannerTorch.classList.remove('d-none');
+            }
+            if (DOM.scannerSwitch) {
+                DOM.scannerSwitch.classList.remove('d-none');
+            }
+
+            initBarcodeDetectionLoop();
+        } catch (err) {
+            console.warn('Error al iniciar cámara de escaneo:', err);
+            if (DOM.scannerStatus) {
+                DOM.scannerStatus.textContent = 'Permiso denegado o cámara no disponible';
+            }
+        }
+    }
+
+    function stopCameraScanner() {
+        if (scanInterval) {
+            clearInterval(scanInterval);
+            scanInterval = null;
+        }
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+        }
+        if (DOM.scannerVideo) {
+            DOM.scannerVideo.srcObject = null;
+        }
+        torchActive = false;
+        if (DOM.scannerTorch) {
+            DOM.scannerTorch.classList.add('d-none');
+            DOM.scannerTorch.innerHTML = '<i class="bi bi-lightning-fill"></i>';
+        }
+    }
+
+    async function toggleTorch() {
+        if (!cameraStream) return;
+        const track = cameraStream.getVideoTracks()[0];
+        if (!track || !track.applyConstraints) return;
+        try {
+            torchActive = !torchActive;
+            await track.applyConstraints({ advanced: [{ torch: torchActive }] });
+            if (DOM.scannerTorch) {
+                DOM.scannerTorch.innerHTML = torchActive ? '<i class="bi bi-lightning text-warning"></i>' : '<i class="bi bi-lightning-fill"></i>';
+            }
+        } catch (_) {}
+    }
+
+    async function switchCamera() {
+        currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+        await startCameraScanner();
+    }
+
+    function handleManualScannerSubmit() {
+        if (!DOM.scannerManualInput) return;
+        const code = DOM.scannerManualInput.value.trim();
+        if (!code) return;
+        DOM.scannerManualInput.value = '';
+        handleBarcodeDetected(code);
+        DOM.scannerManualInput.focus();
+    }
+
+    function initBarcodeDetectionLoop() {
+        if ('BarcodeDetector' in window) {
+            if (!barcodeDetector) {
+                try {
+                    barcodeDetector = new window.BarcodeDetector({
+                        formats: ['ean_13', 'code_128', 'qr_code', 'upc_a', 'ean_8', 'code_39']
+                    });
+                } catch (_) {}
+            }
+        }
+
+        if (scanInterval) clearInterval(scanInterval);
+
+        scanInterval = setInterval(async () => {
+            if (!DOM.scannerVideo || DOM.scannerVideo.readyState < 2) return;
+            if (barcodeDetector) {
+                try {
+                    const barcodes = await barcodeDetector.detect(DOM.scannerVideo);
+                    if (barcodes && barcodes.length > 0) {
+                        handleBarcodeDetected(barcodes[0].rawValue);
+                    }
+                } catch (_) {}
+            }
+        }, 160);
     }
 
     function trackScannerKey(event) {
@@ -679,7 +970,7 @@
                 : '';
 
             column.innerHTML = `
-                <div class="card pos-product-card border-0 shadow-sm rounded-4 h-100 ${isOut ? 'is-out' : ''}"
+                <div class="card pos-product-card shadow-sm rounded-4 h-100 ${isOut ? 'is-out' : ''}"
                      data-variante="${item.id_variante}"
                      role="button"
                      tabindex="${isOut ? '-1' : '0'}"
@@ -688,21 +979,19 @@
                     <div class="pos-product-media">
                         ${image}
                         <div class="pos-product-placeholder">
-                            <span class="pos-product-initials">${escapeHtml(getInitials(item.nombre))}</span>
-                            <i class="bi ${categoryIcon(item.categoria)} pos-product-cat-icon"></i>
+                            <i class="bi ${categoryIcon(item.categoria)} pos-product-cat-hero-icon"></i>
                         </div>
                         <span class="pos-stock-badge ${stock.className}">${escapeHtml(stock.label)}</span>
                         <span class="pos-category-tag">${escapeHtml(item.categoria || 'General')}</span>
                     </div>
-                    <div class="card-body p-2 p-lg-3 d-flex flex-column">
-                        <div class="pos-product-name" title="${escapeHtml(item.nombre)}">${escapeHtml(item.nombre)}</div>
-                        <div class="pos-product-variant">${escapeHtml(variant || 'Sin variante')}</div>
-                        <div class="mt-auto d-flex justify-content-between align-items-end gap-2 pt-2">
-                            <div>
-                                <div class="pos-product-price">${fmtQ(item.precio_detalle)}</div>
-                                ${wholesale}
-                            </div>
-                            <span class="pos-add-btn" aria-hidden="true"><i class="bi ${isOut ? 'bi-slash-circle' : 'bi-plus-lg'}"></i></span>
+                    <div class="card-body p-3 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="pos-product-name" title="${escapeHtml(item.nombre)}">${escapeHtml(item.nombre)}</div>
+                            <div class="pos-product-variant">${escapeHtml(variant || 'Sin variante')}</div>
+                        </div>
+                        <div class="mt-auto pt-2">
+                            <div class="pos-product-price">${fmtQ(item.precio_detalle)}</div>
+                            ${wholesale}
                         </div>
                     </div>
                 </div>
@@ -793,8 +1082,14 @@
         const hasItems = state.cart.length > 0;
         const units = state.cart.reduce((sum, item) => sum + Number(item.cantidad || 0), 0);
 
-        if (DOM.cartEmpty) DOM.cartEmpty.classList.toggle('d-none', hasItems);
-        if (DOM.cartList) DOM.cartList.classList.toggle('d-none', !hasItems);
+        if (DOM.cartEmpty) {
+            DOM.cartEmpty.classList.toggle('d-none', hasItems);
+            DOM.cartEmpty.style.setProperty('display', hasItems ? 'none' : 'flex', 'important');
+        }
+        if (DOM.cartList) {
+            DOM.cartList.classList.toggle('d-none', !hasItems);
+            DOM.cartList.style.setProperty('display', hasItems ? 'block' : 'none', 'important');
+        }
         if (DOM.btnClear) DOM.btnClear.classList.toggle('d-none', !hasItems);
         if (DOM.cartCount) {
             DOM.cartCount.textContent = `${units} artículo${units === 1 ? '' : 's'}`;
@@ -807,43 +1102,34 @@
             const gross = round2(Number(item.precio_detalle) * Number(item.cantidad));
             const saving = round2(gross - lineTotal);
             const variant = [item.talla, item.color].filter(Boolean).join(' · ');
-            const image = item.imagen_url
-                ? `<img src="${escapeHtml(item.imagen_url)}" alt="${escapeHtml(item.nombre)}">`
-                : '';
             const mayoreo = saving > 0.009;
 
             const row = document.createElement('div');
             row.className = 'pos-cart-item';
             row.dataset.variante = item.id_variante;
             row.innerHTML = `
-                <div class="pos-cart-thumb">
-                    ${image}
-                    <span class="pos-cart-thumb-fallback">${escapeHtml(getInitials(item.nombre))}</span>
+                <div class="pos-cart-col-info">
+                    <div class="pos-cart-name text-truncate" title="${escapeHtml(item.nombre)}">${escapeHtml(item.nombre)}</div>
+                    ${variant ? `<div class="pos-cart-meta text-truncate">${escapeHtml(variant)}</div>` : ''}
+                    ${mayoreo ? '<div class="pos-cart-meta text-success"><i class="bi bi-tags-fill me-1"></i>Mayoreo</div>' : ''}
                 </div>
-                <div class="pos-cart-info">
-                    <div class="d-flex justify-content-between align-items-start gap-2">
-                        <div class="pos-cart-name">${escapeHtml(item.nombre)}</div>
-                        <button type="button" class="pos-cart-remove" data-action="remove" title="Quitar producto" aria-label="Quitar ${escapeHtml(item.nombre)}">
-                            <i class="bi bi-trash3"></i>
-                        </button>
+                <div class="pos-cart-col-qty">
+                    <div class="pos-qty" role="group" aria-label="Control de cantidad">
+                        <button type="button" data-action="dec" title="Disminuir" aria-label="Disminuir"><i class="bi bi-dash-lg"></i></button>
+                        <input type="number" data-qty value="${item.cantidad}" min="1" max="${item.stock}" inputmode="numeric" aria-label="Cantidad">
+                        <button type="button" data-action="inc" title="Aumentar" aria-label="Aumentar"><i class="bi bi-plus-lg"></i></button>
                     </div>
-                    <div class="pos-cart-meta">${escapeHtml(variant || 'Sin variante')} · Stock ${item.stock}</div>
-                    ${mayoreo ? '<span class="pos-mayoreo-badge"><i class="bi bi-tags-fill"></i>Precio mayoreo</span>' : ''}
-                    <div class="d-flex justify-content-between align-items-end gap-2 mt-2">
-                        <div class="pos-qty">
-                            <button type="button" data-action="dec" title="Disminuir" aria-label="Disminuir cantidad"><i class="bi bi-dash-lg"></i></button>
-                            <input type="number" data-qty value="${item.cantidad}" min="1" max="${item.stock}" inputmode="numeric" aria-label="Cantidad de ${escapeHtml(item.nombre)}">
-                            <button type="button" data-action="inc" title="Aumentar" aria-label="Aumentar cantidad"><i class="bi bi-plus-lg"></i></button>
-                        </div>
-                        <div class="text-end">
-                            <div class="pos-cart-line-total">${fmtQ(lineTotal)}</div>
-                            ${saving > 0.009 ? `<div class="pos-cart-line-savings">Ahorras ${fmtQ(saving)}</div>` : ''}
-                        </div>
-                    </div>
+                </div>
+                <div class="pos-cart-col-price text-end">
+                    <div class="pos-cart-line-total">${fmtQ(lineTotal)}</div>
+                    ${saving > 0.009 ? `<div class="pos-cart-line-savings">Ahorro ${fmtQ(saving)}</div>` : ''}
+                </div>
+                <div class="pos-cart-col-action">
+                    <button type="button" class="btn pos-cart-remove" data-action="remove" title="Eliminar del carrito" aria-label="Eliminar ${escapeHtml(item.nombre)}">
+                        <i class="bi bi-trash3-fill"></i>
+                    </button>
                 </div>
             `;
-            const img = row.querySelector('img');
-            if (img) img.addEventListener('error', () => img.remove());
             DOM.cartList.appendChild(row);
         });
 
@@ -1046,7 +1332,7 @@
         if (!DOM.btnCharge) return;
         if (charging) {
             DOM.btnCharge.disabled = true;
-            DOM.btnCharge.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Procesando...';
+            DOM.btnCharge.innerHTML = '<span class="spinner-border" aria-hidden="true"></span> <span class="fs-4 fw-black ms-2">Procesando...</span>';
         } else {
             DOM.btnCharge.innerHTML = CHARGE_HTML;
             renderTotals();
@@ -1436,11 +1722,13 @@
 
     function categoryIcon(category) {
         const value = String(category || '').toLowerCase();
-        if (value.includes('cristal') || value.includes('vaso') || value.includes('florero')) return 'bi-cup-straw';
-        if (value.includes('ropa') || value.includes('bebé') || value.includes('bebe')) return 'bi-bag-heart';
-        if (value.includes('juguete') || value.includes('muñeca') || value.includes('muneca')) return 'bi-controller';
-        if (value.includes('hogar') || value.includes('deco')) return 'bi-house-heart';
-        return 'bi-box-seam';
+        if (value.includes('cristal') || value.includes('vaso') || value.includes('florero') || value.includes('copa') || value.includes('vidrio')) return 'bi-cup-straw';
+        if (value.includes('ropa') || value.includes('vestid') || value.includes('pantalon') || value.includes('camis') || value.includes('blusa') || value.includes('bebé') || value.includes('bebe')) return 'bi-bag-heart-fill';
+        if (value.includes('juguete') || value.includes('muñeca') || value.includes('muneca') || value.includes('juego') || value.includes('peluche') || value.includes('carro')) return 'bi-controller';
+        if (value.includes('hogar') || value.includes('deco') || value.includes('cuadro') || value.includes('adorno')) return 'bi-house-heart-fill';
+        if (value.includes('accesorio') || value.includes('joya') || value.includes('reloj')) return 'bi-gem';
+        if (value.includes('papeleria') || value.includes('escolar') || value.includes('util')) return 'bi-pencil-square';
+        return 'bi-gift-fill';
     }
 
     function safeImageUrl(value) {

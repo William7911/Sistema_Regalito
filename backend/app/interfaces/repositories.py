@@ -150,6 +150,10 @@ class ProductRepository(ABC):
         ...
 
     @abstractmethod
+    async def get_variantes_without_barcode(self) -> List[VarianteProducto]:
+        ...
+
+    @abstractmethod
     async def get_variante_by_id(self, variante_id: int) -> Optional[VarianteProducto]:
         ...
 

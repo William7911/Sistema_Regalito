@@ -25,7 +25,7 @@
     <!-- Custom CSS -->
     <!-- Corrección UI: versión incrementada para forzar la recarga de los estilos nuevos -->
     <!-- Rediseño de Catálogos: toolbar con tabs/dropdown, buscadores con clear y miniaturas. -->
-    <link rel="stylesheet" href="css/style.css?v=5.8">
+    <link rel="stylesheet" href="css/style.css?v=6.7">
     <style id="pos-ticket-page-style">@page { size: 80mm auto; margin: 0; }</style>
     <style>
         /* Desactivar de inmediato ícono nativo de contraseña en Edge/Chromium */
@@ -276,27 +276,44 @@
 
         <!-- Main Content -->
         <main class="flex-grow-1 bg-light-gray d-flex flex-column h-100">
-            <!-- Header -->
-            <header class="bg-white shadow-sm px-4 py-3 d-flex justify-content-between align-items-center border-bottom">
-               <div class="d-flex align-items-center gap-3">
-    <button id="btn-sidebar-toggle" type="button" class="btn btn-light border rounded-3" title="Ocultar/mostrar menú"><i class="bi bi-list fs-5"></i></button>
-    <div>
-        <h5 class="mb-0 fw-bold text-dark" id="header-greeting">¡Hola, Administrador!</h5>
-        <small class="text-muted" id="header-date">Septiembre 2026</small>
-    </div>
-</div>
-                <div class="d-flex align-items-center gap-3">
+            <!-- Topbar Única Compacta (56px) Fusionada -->
+            <header class="main-topbar bg-white shadow-sm px-3 px-md-4 d-flex justify-content-between align-items-center border-bottom">
+                <div class="d-flex align-items-center gap-2 gap-md-3">
+                    <button id="btn-sidebar-toggle" type="button" class="btn btn-light border rounded-3 p-1 px-2" title="Ocultar/mostrar menú">
+                        <i class="bi bi-list fs-5"></i>
+                    </button>
+                    <!-- Título del Módulo Activo y Estado de Turno POS -->
+                    <div class="d-flex align-items-center gap-2 flex-wrap" id="topbar-title-container">
+                        <h5 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2" id="topbar-module-title">
+                            <i class="bi bi-cart3 text-teal"></i> <span>Punto de Venta</span>
+                        </h5>
+                        <span id="pos-turn-badge" class="badge bg-light text-dark px-2 px-md-3 py-1-5 rounded-pill border">
+                            <i class="bi bi-cash-stack me-1"></i> <span id="pos-turn-text">Verificando turno...</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <!-- Botón Historial de Turno POS (solo visible en POS) -->
+                    <button type="button" id="btn-pos-history" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 pos-header-btn" title="Historial de ventas del turno">
+                        <i class="bi bi-clock-history me-1"></i><span>Historial</span>
+                    </button>
+
                     <!-- Interruptor Modo Oscuro / Claro -->
-                    <button id="btn-theme-toggle" type="button" class="btn btn-sm btn-light border rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;" title="Alternar Modo Oscuro / Modo Claro" aria-label="Cambiar tema">
+                    <button id="btn-theme-toggle" type="button" class="btn btn-sm btn-light border rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 36px; height: 36px;" title="Alternar Modo Oscuro / Modo Claro" aria-label="Cambiar tema">
                         <i class="bi bi-moon-stars-fill text-secondary fs-6" id="theme-icon"></i>
                     </button>
-                    <button id="btn-sync-modal" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#sync-modal" title="Estado de Sincronización Offline (SQLite)">
+
+                    <!-- Elementos redundantes ocultos por directiva (1 prod locales, rol repetido) -->
+                    <button id="btn-sync-modal" class="btn btn-sm btn-outline-secondary d-none" data-bs-toggle="modal" data-bs-target="#sync-modal">
                         <i class="bi bi-cloud-check-fill text-success" id="sync-icon-indicator"></i>
                         <span class="small fw-semibold" id="sync-text-indicator">Copia Local</span>
                     </button>
-                    <span class="badge bg-teal-light text-teal-dark px-3 py-2 rounded-pill"><i class="bi bi-shield-check"></i> <span id="header-role">Administrador</span></span>
+                    <span id="header-role" class="d-none">Administrador</span>
+
+                    <!-- Campana de Notificaciones -->
                     <div class="dropdown">
-                        <button class="btn btn-light rounded-circle position-relative dropdown-toggle" id="btn-notificaciones" data-bs-toggle="dropdown" aria-expanded="false" title="Notificaciones de stock">
+                        <button class="btn btn-light rounded-circle position-relative dropdown-toggle d-flex align-items-center justify-content-center p-0" id="btn-notificaciones" data-bs-toggle="dropdown" aria-expanded="false" title="Notificaciones de stock" style="width: 36px; height: 36px;">
                             <i class="bi bi-bell"></i>
                             <span id="badge-notificaciones" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light d-none">0</span>
                         </button>
@@ -312,8 +329,8 @@
             <!-- Dashboard Content -->
             <div id="dashboard-content" class="p-4 flex-grow-1 overflow-auto" data-main-view="dashboard">
                 <div class="mb-4">
-                    <h4 class="fw-bold">Panel Principal</h4>
-                    <p class="text-muted">Resumen del día en tu tienda</p>
+                    <h4 class="fw-bold mb-1" id="header-greeting">¡Hola, Administrador!</h4>
+                    <p class="text-muted mb-0"><span id="header-date">Octubre de 2026</span> · Resumen del día en tu tienda</p>
                 </div>
 
                 <!-- 1. Barra superior: estado de caja -->
@@ -561,23 +578,10 @@
             </div>
 
             <!-- POS / Ventas Module View -->
-            <div id="pos-view" class="pos-view p-3 p-md-4 flex-grow-1 d-none" data-main-view="pos">
-                <div class="pos-header d-flex justify-content-between align-items-center gap-2 gap-md-3 mb-3">
-                    <div class="d-flex align-items-center gap-2 gap-md-3 flex-wrap">
-                        <h4 class="fw-bold mb-0"><i class="bi bi-cart3 me-2 text-teal"></i>Punto de Venta</h4>
-                        <span id="pos-turn-badge" class="badge bg-light text-dark px-3 py-2 rounded-pill"><i class="bi bi-cash-stack me-1"></i> <span id="pos-turn-text">Verificando turno...</span></span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                        <button type="button" id="btn-pos-history" class="btn btn-outline-secondary pos-header-btn" title="Historial de ventas del turno (F4)">
-                            <i class="bi bi-clock-history"></i><span class="d-none d-lg-inline ms-1">Historial</span><kbd class="pos-header-kbd d-none d-md-inline ms-1">F4</kbd>
-                        </button>
-                        <button type="button" id="btn-pos-customer-screen" class="btn btn-outline-teal pos-header-btn" title="Abrir la pantalla para el cliente en un segundo monitor o tablet">
-                            <i class="bi bi-display"></i><span class="d-none d-sm-inline ms-1">Pantalla Cliente</span>
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary pos-header-btn" onclick="navigateTo('dashboard')" title="Volver al panel">
-                            <i class="bi bi-arrow-left"></i><span class="d-none d-xl-inline ms-1">Panel</span>
-                        </button>
-                    </div>
+            <div id="pos-view" class="pos-view flex-grow-1 d-none" data-main-view="pos">
+                <!-- Referencias ocultas para compatibilidad JS -->
+                <div class="d-none">
+                    <button type="button" id="btn-pos-customer-screen"></button>
                 </div>
 
                 <!-- Alerta: turno de caja requerido -->
@@ -593,33 +597,42 @@
                         <!-- Columna izquierda: catálogo de productos -->
                         <div class="col-12 col-xl-7 d-flex">
                             <div class="card border-0 shadow-sm rounded-4 flex-grow-1 pos-catalog-panel">
-                                <div class="card-body p-3 d-flex flex-column">
-                                    <!-- Omnibox unificado: búsqueda manual + lector láser -->
-                                    <div class="pos-omnibox mb-2">
-                                        <i class="bi bi-upc-scan pos-omnibox-icon" aria-hidden="true"></i>
-                                        <input type="text" id="pos-search" class="pos-omnibox-input" placeholder="Buscar producto o escanear código de barras..." autocomplete="off" spellcheck="false" aria-label="Buscar producto o escanear código de barras">
-                                        <button type="button" id="btn-pos-search-clear" class="pos-omnibox-clear d-none" aria-label="Limpiar búsqueda" title="Limpiar búsqueda"><i class="bi bi-x-lg"></i></button>
-                                        <kbd class="pos-omnibox-kbd d-none d-sm-inline">F2</kbd>
+                                <div class="card-body p-3 d-flex flex-column h-100">
+                                    <!-- Zona Superior (Fija): Buscador y Categorías -->
+                                    <div class="pos-catalog-top flex-shrink-0">
+                                        <!-- Omnibox unificado: búsqueda manual + lector láser -->
+                                        <div class="pos-omnibox mb-2">
+                                            <button type="button" id="btn-pos-scanner" class="btn btn-link pos-omnibox-scan-btn p-0 border-0" title="Abrir escáner de código de barras con cámara" aria-label="Escanear con cámara">
+                                                <i class="bi bi-upc-scan pos-omnibox-icon" aria-hidden="true"></i>
+                                            </button>
+                                            <input type="text" id="pos-search" class="pos-omnibox-input" placeholder="Buscar producto o escanear código de barras..." autocomplete="off" spellcheck="false" aria-label="Buscar producto o escanear código de barras">
+                                            <button type="button" id="btn-pos-search-clear" class="pos-omnibox-clear d-none" aria-label="Limpiar búsqueda" title="Limpiar búsqueda"><i class="bi bi-x-lg"></i></button>
+                                        </div>
+
+                                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2 flex-wrap">
+                                            <div id="pos-category-pills" class="pos-category-pills"></div>
+                                        </div>
                                     </div>
 
-                                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2 flex-wrap">
-                                        <div id="pos-category-pills" class="pos-category-pills"></div>
-                                        <span class="pos-shortcut-hint d-none d-xl-inline"><i class="bi bi-keyboard me-1"></i>Enter agrega · F4 historial · F12 cobra</span>
+                                    <!-- Zona Central (Única con scroll interno): Cuadrícula de Productos -->
+                                    <div class="pos-catalog-body flex-grow-1">
+                                        <div id="pos-products-grid" class="row row-cols-2 row-cols-md-3 row-cols-xl-3 g-2 g-lg-3 mb-2"></div>
+
+                                        <div id="pos-products-empty" class="text-center text-muted py-4 d-none">
+                                            <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
+                                            <span>No hay productos con stock en esta sucursal</span>
+                                        </div>
                                     </div>
 
-                                    <div id="pos-products-grid" class="row row-cols-2 row-cols-md-3 row-cols-xl-3 g-2 g-lg-3 mb-2"></div>
-
-                                    <div id="pos-products-empty" class="text-center text-muted py-4 d-none">
-                                        <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
-                                        <span>No hay productos con stock en esta sucursal</span>
-                                    </div>
-
-                                    <div id="pos-grid-pagination" class="d-flex justify-content-between align-items-center gap-2 mt-auto pt-2">
-                                        <span id="pos-grid-info" class="text-muted small">0 productos</span>
-                                        <div class="d-flex align-items-center gap-1">
-                                            <button id="pos-grid-prev" class="btn btn-sm btn-outline-secondary" title="Página anterior"><i class="bi bi-chevron-left"></i></button>
-                                            <span id="pos-grid-page" class="text-muted small px-2">Página 1 de 1</span>
-                                            <button id="pos-grid-next" class="btn btn-sm btn-outline-secondary" title="Página siguiente"><i class="bi bi-chevron-right"></i></button>
+                                    <!-- Zona Inferior (Fija y anclada abajo): Paginación y Conteo -->
+                                    <div class="pos-catalog-footer flex-shrink-0 mt-auto pt-2 border-top">
+                                        <div id="pos-grid-pagination" class="d-flex justify-content-between align-items-center gap-2">
+                                            <span id="pos-grid-info" class="text-muted small">0 productos</span>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <button id="pos-grid-prev" class="btn btn-sm btn-outline-secondary" title="Página anterior"><i class="bi bi-chevron-left"></i></button>
+                                                <span id="pos-grid-page" class="text-muted small px-2">Página 1 de 1</span>
+                                                <button id="pos-grid-next" class="btn btn-sm btn-outline-secondary" title="Página siguiente"><i class="bi bi-chevron-right"></i></button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -627,39 +640,44 @@
                         </div>
 
                         <!-- Columna derecha: carrito y cobro -->
-                        <div class="col-12 col-xl-5 d-flex">
+                        <div class="col-12 col-xl-5 d-flex h-100 min-h-0">
                             <div class="card border-0 shadow-sm rounded-4 flex-grow-1 pos-checkout-panel">
-                                <div class="card-body p-3 d-flex flex-column">
-                                    <div class="pos-cart-head">
-                                        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-cart3 me-2 text-teal"></i>Venta actual</h6>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <button id="btn-pos-clear" class="pos-clear-link" type="button" title="Vaciar carrito">Vaciar</button>
-                                            <span id="pos-cart-count" class="badge bg-teal-light text-teal-dark rounded-pill">0 artículos</span>
+                                <div class="card-body p-2 p-md-3 d-flex flex-column h-100">
+                                    <!-- Zona Superior (Fija) -->
+                                    <div class="pos-checkout-top flex-shrink-0">
+                                        <div class="pos-cart-head mb-2">
+                                            <h6 class="fw-bold text-dark mb-0"><i class="bi bi-cart3 me-2 text-teal"></i>Venta actual</h6>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <button id="btn-pos-clear" class="btn btn-sm btn-outline-danger pos-clear-btn d-none" type="button" title="Vaciar todo el carrito"><i class="bi bi-trash3 me-1"></i>Vaciar carrito</button>
+                                                <span id="pos-cart-count" class="badge bg-teal-light text-teal-dark rounded-pill">0 artículos</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Cliente / NIT Receptor FEL: una sola línea compacta -->
+                                        <div class="pos-client-line mb-2">
+                                            <i class="bi bi-person-badge pos-client-icon" aria-hidden="true"></i>
+                                            <input type="text" id="pos-client-nit" class="pos-client-input" placeholder="CF / Consumidor Final" value="CF / Consumidor Final" autocomplete="off" title="Escribe un NIT y presiona Enter">
+                                            <button class="pos-client-btn" type="button" id="btn-pos-search-client" title="Buscar NIT" aria-label="Buscar NIT"><i class="bi bi-search"></i></button>
+                                            <span id="pos-client-badge" class="pos-client-badge">CF</span>
                                         </div>
                                     </div>
 
-                                    <!-- Cliente / NIT Receptor FEL: una sola línea compacta -->
-                                    <div class="pos-client-line">
-                                        <i class="bi bi-person-badge pos-client-icon" aria-hidden="true"></i>
-                                        <input type="text" id="pos-client-nit" class="pos-client-input" placeholder="CF / Consumidor Final" value="CF / Consumidor Final" autocomplete="off" title="Escribe un NIT y presiona Enter">
-                                        <button class="pos-client-btn" type="button" id="btn-pos-search-client" title="Buscar NIT" aria-label="Buscar NIT"><i class="bi bi-search"></i></button>
-                                        <span id="pos-client-badge" class="pos-client-badge">CF</span>
-                                    </div>
-
-                                    <div id="pos-cart-empty" class="pos-cart-empty">
+                                    <!-- Zona Central (Única con Scroll interno) -->
+                                    <div id="pos-cart-empty" class="pos-cart-empty flex-grow-1">
                                         <i class="bi bi-cart3 d-block mb-2"></i>
                                         <span class="small">Agrega productos al carrito para iniciar la venta</span>
                                     </div>
 
-                                    <div id="pos-cart-list" class="pos-cart-list d-none"></div>
+                                    <div id="pos-cart-list" class="pos-cart-list flex-grow-1 d-none"></div>
 
-                                    <div class="pos-checkout-footer">
-                                        <div class="pos-summary">
+                                    <!-- Zona Inferior (Siempre visible y anclada abajo) -->
+                                    <div class="pos-checkout-footer flex-shrink-0 mt-auto">
+                                        <div class="pos-summary mb-2">
                                             <span>Subtotal <strong id="pos-subtotal">Q 0.00</strong></span>
                                             <span class="pos-summary-discount"><i class="bi bi-tags-fill"></i> Ahorro <strong id="pos-discount">- Q 0.00</strong></span>
                                         </div>
 
-                                        <div class="pos-hero">
+                                        <div class="pos-hero mb-2">
                                             <div class="pos-total-hero">
                                                 <span>TOTAL A PAGAR</span>
                                                 <strong id="pos-total">Q 0.00</strong>
@@ -667,28 +685,29 @@
                                             <div class="pos-change-box">
                                                 <span class="pos-change-label">CAMBIO</span>
                                                 <strong class="pos-change-value" id="pos-change">Q 0.00</strong>
-                                                <span class="pos-received-line">Recibido <strong id="pos-received">Q 0.00</strong></span>
                                             </div>
                                         </div>
 
                                         <div class="pos-payment">
-                                            <div class="pos-cash-row">
+                                            <div class="pos-cash-row mb-2">
                                                 <label class="form-label" for="pos-cash-received">Efectivo (Q)</label>
                                                 <div class="input-group pos-cash-input">
                                                     <span class="input-group-text">Q</span>
                                                     <input type="number" id="pos-cash-received" class="form-control" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
                                                 </div>
                                             </div>
-                                            <div class="pos-quick-cash" role="group" aria-label="Efectivo rápido">
-                                                <button type="button" class="btn pos-cash-chip" data-cash="exact">Monto exacto</button>
+                                            <div class="pos-quick-cash mb-2" role="group" aria-label="Efectivo rápido">
+                                                <button type="button" class="btn pos-cash-chip" data-cash="exact">Exacto</button>
+                                                <button type="button" class="btn pos-cash-chip" data-cash="10">Q10</button>
+                                                <button type="button" class="btn pos-cash-chip" data-cash="20">Q20</button>
                                                 <button type="button" class="btn pos-cash-chip" data-cash="50">Q50</button>
                                                 <button type="button" class="btn pos-cash-chip" data-cash="100">Q100</button>
                                                 <button type="button" class="btn pos-cash-chip" data-cash="200">Q200</button>
                                                 <button type="button" id="btn-pos-toggle-transfer" class="btn pos-transfer-toggle">
-                                                    <i class="bi bi-plus-circle"></i><span id="pos-transfer-toggle-text">Transferencia</span>
+                                                    <i class="bi bi-arrow-left-right me-1"></i><span id="pos-transfer-toggle-text">Transferencia</span>
                                                 </button>
                                             </div>
-                                            <div id="pos-transfer-wrap" class="pos-transfer-wrap d-none">
+                                            <div id="pos-transfer-wrap" class="pos-transfer-wrap d-none mb-2">
                                                 <label class="form-label" for="pos-transfer-amount">Transferencia (Q)</label>
                                                 <div class="input-group pos-cash-input">
                                                     <span class="input-group-text">Q</span>
@@ -700,8 +719,8 @@
 
                                         <button id="btn-pos-charge" class="btn btn-pos-charge w-100" disabled>
                                             <span class="d-flex align-items-center justify-content-center gap-2">
-                                                <i class="bi bi-cash-coin"></i> COBRAR
-                                                <kbd class="pos-charge-kbd">F12</kbd>
+                                                <i class="bi bi-cash-coin fs-3"></i>
+                                                <span class="fs-4 fw-black">COBRAR</span>
                                             </span>
                                         </button>
                                     </div>
@@ -3509,12 +3528,17 @@
                             <section class="product-form-card">
                                 <h6 class="product-form-section-title"><i class="bi bi-upc-scan" aria-hidden="true"></i>Identificación y Opciones</h6>
                                 <div class="row g-3">
-                                    <div class="col-md-4">
+                                    <div class="col-md-5">
                                         <label for="codigo_barras" class="form-label product-form-label">Código de barras</label>
-                                        <input type="text" id="codigo_barras" class="form-control" autocomplete="off">
+                                        <div class="input-group">
+                                            <input type="text" id="codigo_barras" class="form-control" autocomplete="off" placeholder="EAN-13 o escaneado">
+                                            <button type="button" class="btn btn-outline-teal" id="btn-generate-barcode" title="Generar código de barras automáticamente">
+                                                <i class="bi bi-magic me-1"></i>Generar
+                                            </button>
+                                        </div>
                                         <div class="invalid-feedback" id="error-codigo_barras"></div>
                                     </div>
-                                    <div class="col-md-8">
+                                    <div class="col-md-7">
                                         <!--
                                             Atributo universal: campo optimizado para captura rápida en
                                             inventarios mixtos. Sustituye los campos rígidos de Talla y
@@ -4019,6 +4043,64 @@
         </div>
     </div>
 
+    <!-- Modal: Escáner de Código de Barras (Cámara + Entrada Rápida) -->
+    <div class="modal fade" id="pos-scanner-modal" tabindex="-1" aria-labelledby="posScannerModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="modal-header border-0 pb-2">
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark" id="posScannerModalTitle">
+                            <i class="bi bi-upc-scan text-teal me-2"></i>Escanear Código de Barras
+                        </h5>
+                        <small class="text-muted">Apunta la cámara al código de barras del producto</small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar" id="btn-close-scanner"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <!-- Visor de Cámara con Retícula y Láser -->
+                    <div class="pos-scanner-viewport-wrapper position-relative rounded-3 overflow-hidden mb-3">
+                        <video id="pos-scanner-video" autoplay playsinline muted></video>
+                        <div class="pos-scanner-reticle">
+                            <div class="pos-scanner-laser"></div>
+                        </div>
+                        <div class="pos-scanner-overlay-top d-flex justify-content-between align-items-center p-2 position-absolute top-0 start-0 w-100">
+                            <span id="pos-scanner-status" class="badge bg-dark bg-opacity-75 text-white px-2 py-1">
+                                <span class="spinner-grow spinner-grow-sm text-teal me-1" role="status" aria-hidden="true"></span>
+                                Buscando código...
+                            </span>
+                            <div class="d-flex gap-1">
+                                <button type="button" id="btn-pos-scanner-torch" class="btn btn-sm btn-dark bg-opacity-75 text-white d-none" title="Encender/apagar linterna">
+                                    <i class="bi bi-lightning-fill"></i>
+                                </button>
+                                <button type="button" id="btn-pos-scanner-switch" class="btn btn-sm btn-dark bg-opacity-75 text-white d-none" title="Cambiar cámara">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="pos-scanner-alert" class="pos-scanner-alert d-none position-absolute bottom-0 start-0 w-100 p-2 text-center text-white small fw-bold"></div>
+                    </div>
+
+                    <!-- Entrada manual / Escáner físico como respaldo rápido -->
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-upc"></i></span>
+                        <input type="text" id="pos-scanner-manual-input" class="form-control border-start-0" placeholder="Escribir o pistolazo directo..." autocomplete="off">
+                        <button type="button" id="btn-pos-scanner-manual-add" class="btn btn-teal">
+                            <i class="bi bi-plus-lg me-1"></i>Agregar
+                        </button>
+                    </div>
+                    <small class="text-muted d-block mt-2 text-center">
+                        <i class="bi bi-shield-check text-teal me-1"></i>Si tienes lector láser USB o Bluetooth, puedes disparar directamente.
+                    </small>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">
+                        Terminar de Escanear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Historial de ventas del turno (atajo F4) -->
     <div class="modal fade" id="pos-history-modal" tabindex="-1" aria-labelledby="posHistoryModalTitle" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -4169,7 +4251,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
     <!-- App Logic -->
-    <script src="js/app.js?v=3.3"></script>
+    <script src="js/app.js?v=3.5"></script>
     <script src="js/dashboard.js?v=1.1"></script>
     <script src="js/notificaciones.js?v=1.0"></script>
     <!-- Corrección UI: versión incrementada para forzar la recarga de users.js
@@ -4177,7 +4259,7 @@
     <script src="js/users.js?v=2.4"></script>
     <script src="js/clients.js?v=2.0"></script>
     <!-- Catálogos: rediseño visual (tabs agrupadas, miniaturas y soft badges). -->
-    <script src="js/catalog.js?v=3.8"></script>
+    <script src="js/catalog.js?v=3.9"></script>
     <script src="js/cash_register.js?v=2.4"></script>
     <script src="js/reportes.js?v=3.3"></script>
 
@@ -4309,7 +4391,7 @@
 
     <script src="js/sync.js?v=2.3"></script>
     <script src="js/configuracion.js?v=2.3"></script>
-    <script src="js/pos.js?v=2.1"></script>
+    <script src="js/pos.js?v=2.7"></script>
     <!-- Inventario: versión con miniaturas, zoom, soft badges y ghost button (cache-busting) -->
     <script src="js/inventory.js?v=3.8"></script>
     <script src="js/compras.js?v=1.0"></script>
