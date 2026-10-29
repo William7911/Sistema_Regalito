@@ -38,7 +38,7 @@ async def get_reportes(
 async def exportar_reportes(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
-    formato: str = Query("excel", pattern="^(excel|csv)$"),
+    formato: str = Query("excel", pattern="^(excel|csv|pdf)$"),
     current_user: Usuario = Depends(require_permission("REPORTE_VER")),
     service: ReportesService = Depends(get_reporte_service),
 ):

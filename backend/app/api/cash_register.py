@@ -26,6 +26,16 @@ async def close_cash_register(
     return await service.cerrar_caja(turno_data, current_user.id_usuario)
 
 
+@router.post("/movimiento", response_model=schemas.MovimientoCajaResponse, status_code=status.HTTP_201_CREATED)
+async def create_cash_movement(
+    data: schemas.MovimientoCajaCreate,
+    service: ConcreteCashService = Depends(get_cash_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Registra una entrada (sencillo) o salida (gasto menor) de efectivo en el turno activo."""
+    return await service.registrar_movimiento(data, current_user.id_usuario)
+
+
 @router.get("/denominaciones", response_model=List[schemas.DenominacionOut])
 async def get_denominaciones(
     service: ConcreteCashService = Depends(get_cash_service),

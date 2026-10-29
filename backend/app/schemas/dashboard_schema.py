@@ -100,6 +100,7 @@ class VentaReciente(BaseModel):
     fecha: Optional[datetime] = None
     total: Decimal = Decimal("0.00")
     vendedor: str = ""
+    articulos: int = 0
 
 
 class DashboardResumenResponse(BaseModel):
@@ -119,5 +120,6 @@ class DashboardResumenResponse(BaseModel):
     ordenes_pendientes: List[OrdenPendiente] = []
     traslados_pendientes: List[TrasladoPendiente] = []
     ultimas_ventas: List[VentaReciente] = []
+    efectivo_esperado: Decimal = Decimal("0.00")
 
     model_config = ConfigDict(from_attributes=True)

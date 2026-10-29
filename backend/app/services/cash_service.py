@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Optional, List
 from datetime import datetime
 from fastapi import HTTPException
-from app.db.models import TurnoCaja, CierreCajaCiegas, DetalleArqueoEfectivo
+from app.db.models import TurnoCaja, CierreCajaCiegas, DetalleArqueoEfectivo, MovimientoCaja
 from app.interfaces.services import CashRegisterService
 from app.schemas import schemas
 from app.services.audit_service import log_action
@@ -82,11 +82,26 @@ class ConcreteCashService(CashRegisterService):
                 detail="El usuario no tiene un turno de caja abierto",
             )
 
-        # 2. Actualizar datos de cierre
+        # 2. Calcular valores esperados y diferencia (Lógica híbrida)
+        monto_apertura = Decimal(str(active_turno.monto_apertura or 0))
+        ventas = await self.uow.turnos.get_efectivo_ventas_turno(active_turno.id_turno)
+        entradas, salidas = await self.uow.turnos.get_movimientos_caja_turno(active_turno.id_turno)
+        esperado = monto_apertura + ventas + entradas - salidas
+        diferencia = Decimal(str(data.monto_cierre)) - esperado
+
+        # 3. Actualizar datos de cierre
         active_turno.fecha_cierre = datetime.now()
         active_turno.monto_cierre = data.monto_cierre
-        if data.notas is not None:
-            active_turno.notas = data.notas.strip() if data.notas.strip() else None
+        
+        user_notes = data.notas.strip() if data.notas and data.notas.strip() else ""
+        if diferencia == 0:
+            cuadre_str = f"Cuadre: Exacto (Q{esperado:.2f})"
+        elif diferencia > 0:
+            cuadre_str = f"Cuadre: Sobrante +Q{diferencia:.2f} (Esperado: Q{esperado:.2f})"
+        else:
+            cuadre_str = f"Cuadre: Faltante -Q{abs(diferencia):.2f} (Esperado: Q{esperado:.2f})"
+        
+        active_turno.notas = f"{cuadre_str} | {user_notes}".strip(" | ") if user_notes else cuadre_str
         active_turno.estado = "Cerrado"
 
         try:
@@ -102,16 +117,33 @@ class ConcreteCashService(CashRegisterService):
             id_usuario=user_id,
             tabla="turno_caja",
             accion="CIERRE",
-            descripcion=f"Cerró turno ID {fresh.id_turno} con monto Q{data.monto_cierre:.2f}.",
+            descripcion=f"Cerró turno ID {fresh.id_turno} con monto contado Q{data.monto_cierre:.2f} (Esperado: Q{esperado:.2f}, Dif: Q{diferencia:+.2f}).",
         )
         await self.uow.commit()
-        return schemas.TurnoResponse.model_validate(fresh)
+        resp = schemas.TurnoResponse.model_validate(fresh)
+        resp.ventas_efectivo = ventas
+        resp.entradas_efectivo = entradas
+        resp.salidas_efectivo = salidas
+        resp.efectivo_esperado = esperado
+        resp.diferencia = diferencia
+        return resp
 
     async def get_estado_actual(self, user_id: int) -> Optional[schemas.TurnoResponse]:
         active = await self.uow.turnos.get_active_by_user(user_id)
         if not active:
             return None
-        return schemas.TurnoResponse.model_validate(active)
+        
+        monto_apertura = Decimal(str(active.monto_apertura or 0))
+        ventas = await self.uow.turnos.get_efectivo_ventas_turno(active.id_turno)
+        entradas, salidas = await self.uow.turnos.get_movimientos_caja_turno(active.id_turno)
+        esperado = monto_apertura + ventas + entradas - salidas
+
+        resp = schemas.TurnoResponse.model_validate(active)
+        resp.ventas_efectivo = ventas
+        resp.entradas_efectivo = entradas
+        resp.salidas_efectivo = salidas
+        resp.efectivo_esperado = esperado
+        return resp
 
     async def list_turnos(self, filters: schemas.TurnoFilter) -> List[schemas.TurnoResponse]:
         turnos = await self.uow.turnos.search(
@@ -124,7 +156,57 @@ class ConcreteCashService(CashRegisterService):
             limit=filters.limit,
             offset=filters.offset,
         )
-        return [schemas.TurnoResponse.model_validate(t) for t in turnos]
+        result = []
+        for t in turnos:
+            monto_apertura = Decimal(str(t.monto_apertura or 0))
+            ventas = await self.uow.turnos.get_efectivo_ventas_turno(t.id_turno)
+            entradas, salidas = await self.uow.turnos.get_movimientos_caja_turno(t.id_turno)
+            esperado = monto_apertura + ventas + entradas - salidas
+
+            resp = schemas.TurnoResponse.model_validate(t)
+            resp.ventas_efectivo = ventas
+            resp.entradas_efectivo = entradas
+            resp.salidas_efectivo = salidas
+            resp.efectivo_esperado = esperado
+            if t.monto_cierre is not None:
+                resp.diferencia = Decimal(str(t.monto_cierre)) - esperado
+            result.append(resp)
+        return result
+
+    async def registrar_movimiento(
+        self, data: schemas.MovimientoCajaCreate, user_id: int
+    ) -> schemas.MovimientoCajaResponse:
+        active = await self.uow.turnos.get_active_by_user(user_id)
+        if not active:
+            raise HTTPException(
+                status_code=400,
+                detail="El usuario no tiene un turno de caja abierto",
+            )
+        mov = MovimientoCaja(
+            id_turno=active.id_turno,
+            id_tipo_movimiento=data.id_tipo_movimiento,
+            id_usuario=user_id,
+            monto=data.monto,
+            justificacion=data.justificacion.strip(),
+            fecha_hora=datetime.now(),
+        )
+        try:
+            created = await self.uow.turnos.create_movimiento(mov)
+            await self.uow.commit()
+        except Exception:
+            await self.uow.rollback()
+            raise
+
+        tipo_str = "ENTRADA" if data.id_tipo_movimiento == 1 else "SALIDA"
+        await log_action(
+            self.uow.db,
+            id_usuario=user_id,
+            tabla="movimiento_caja",
+            accion="MOVIMIENTO_CAJA",
+            descripcion=f"Movimiento {tipo_str} de Q{data.monto:.2f} en turno {active.id_turno}: {data.justificacion}.",
+        )
+        await self.uow.commit()
+        return schemas.MovimientoCajaResponse.model_validate(created)
 
     async def count_turnos(self, filters: schemas.TurnoFilter) -> int:
         return await self.uow.turnos.count_search(

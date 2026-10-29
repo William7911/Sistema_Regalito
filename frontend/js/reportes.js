@@ -138,8 +138,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Botones consolidado
     document.getElementById('btn-filter-reportes')?.addEventListener('click', loadReportesPreview);
+    document.getElementById('btn-export-pdf')?.addEventListener('click', () => exportReporte('pdf'));
     document.getElementById('btn-export-excel')?.addEventListener('click', () => exportReporte('excel'));
     document.getElementById('btn-export-csv')?.addEventListener('click', () => exportReporte('csv'));
+
+    // Botones de filtro rápido de temporada (Hoy / Semana / Mes / Año)
+    document.querySelectorAll('[data-quick-filter]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const filterType = btn.getAttribute('data-quick-filter');
+            document.querySelectorAll('[data-quick-filter]').forEach(b => b.classList.toggle('active', b === btn));
+            
+            const today = new Date();
+            let fromDate = new Date();
+            let toDate = new Date();
+
+            if (filterType === 'hoy') {
+                fromDate = today;
+                toDate = today;
+            } else if (filterType === 'semana') {
+                const day = today.getDay() || 7; // Lunes = 1 ... Domingo = 7
+                fromDate.setDate(today.getDate() - day + 1);
+                toDate = today;
+            } else if (filterType === 'mes') {
+                fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                toDate = today;
+            } else if (filterType === 'ano') {
+                fromDate = new Date(today.getFullYear(), 0, 1);
+                toDate = today;
+            }
+
+            const elFrom = document.getElementById('filter-reportes-from');
+            const elTo = document.getElementById('filter-reportes-to');
+            if (elFrom) elFrom.value = toDateString(fromDate);
+            if (elTo) elTo.value = toDateString(toDate);
+
+            if (typeof window.updateReportesDateLabel === 'function') {
+                window.updateReportesDateLabel();
+            }
+            loadReportesPreview();
+        });
+    });
+
+    // Pestañas de la tarjeta derecha de rankings (Más Vendidos / Baja Rotación)
+    document.querySelectorAll('.reportes-rank-pill').forEach(pill => {
+        pill.addEventListener('click', (e) => {
+            e.preventDefault();
+            const rankTab = pill.getAttribute('data-rank-tab') || 'productos';
+            reportesRankTipo = rankTab;
+            document.querySelectorAll('.reportes-rank-pill').forEach(p => p.classList.toggle('active', p === pill));
+            const subTitle = document.getElementById('reportes-rank-subtitle');
+            if (subTitle) {
+                subTitle.textContent = rankTab === 'productos' 
+                    ? 'Top 5 más vendidos en el período seleccionado' 
+                    : 'Top 5 productos con menor stock o sin rotación';
+            }
+            cargarRanking();
+        });
+    });
 
     // Botones Reporte Usuarios
     document.getElementById('btn-filter-rep-usuarios')?.addEventListener('click', loadReporteUsuarios);
@@ -171,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
        ==================================================== */
     document.querySelectorAll('.reportes-chart-pill').forEach((pill) => {
         pill.addEventListener('click', () => {
-            reportesChartTab = pill.getAttribute('data-chart-tab') || 'tendencia';
+            reportesChartTab = pill.getAttribute('data-chart-tab') || pill.getAttribute('data-chart') || 'tendencia';
             document.querySelectorAll('.reportes-chart-pill').forEach((p) => {
                 p.classList.toggle('active', p === pill);
                 p.setAttribute('aria-selected', p === pill ? 'true' : 'false');
@@ -339,19 +395,28 @@ async function loadReportesPreview() {
 function renderReportesKPIs(kpi) {
     const datos = kpi || {
         ventas: 0, count_ventas: 0,
+        ganancia_estimada: 0, costo_vendido: 0, margen_ganancia: 0,
         mermas: 0, count_mermas: 0,
         compras: 0, count_compras: 0,
     };
 
     const elTotalVentas = document.getElementById('reportes-total-ventas');
     const elCountVentas = document.getElementById('reportes-count-ventas');
+    const elTotalGanancia = document.getElementById('reportes-total-ganancia');
+    const elMargenGanancia = document.getElementById('reportes-margen-ganancia');
     const elTotalMermas = document.getElementById('reportes-total-mermas');
     const elCountMermas = document.getElementById('reportes-count-mermas');
     const elTotalCompras = document.getElementById('reportes-total-compras');
     const elCountCompras = document.getElementById('reportes-count-compras');
 
     if (elTotalVentas) elTotalVentas.textContent = formatoQuetzal(datos.ventas);
-    if (elCountVentas) elCountVentas.textContent = `${Number(datos.count_ventas) || 0} registros`;
+    if (elCountVentas) elCountVentas.textContent = `${Number(datos.count_ventas) || 0} ventas cobradas`;
+
+    if (elTotalGanancia) elTotalGanancia.textContent = formatoQuetzal(datos.ganancia_estimada);
+    if (elMargenGanancia) {
+        const margen = Number(datos.margen_ganancia || 0).toFixed(1);
+        elMargenGanancia.textContent = `Margen: ${margen}% · Costo: ${formatoQuetzal(datos.costo_vendido)}`;
+    }
 
     if (elTotalMermas) elTotalMermas.textContent = formatoQuetzal(datos.mermas);
     if (elCountMermas) elCountMermas.textContent = `${Number(datos.count_mermas) || 0} registros`;
@@ -362,42 +427,52 @@ function renderReportesKPIs(kpi) {
 
 function renderReportesPreview(data) {
     const tbody = document.getElementById('reportes-table-body');
+    if (!tbody) return;
 
     if (!data || typeof data !== 'object') {
-        if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No se pudo cargar la vista previa o no hay informaciÃ³n para el perÃ­odo seleccionado.</td></tr>';
-        }
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No se pudo cargar la vista previa para el período seleccionado.</td></tr>';
         return;
     }
 
     const ventas = Array.isArray(data.ventas) ? data.ventas : [];
-
-    if (!tbody) return;
     tbody.innerHTML = '';
 
     if (ventas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No se encontraron ventas en el periodo seleccionado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No se registraron ventas en el período seleccionado</td></tr>';
         return;
     }
 
     const recientes = ventas.slice(0, 10);
     recientes.forEach(v => {
         const tr = document.createElement('tr');
-        const estado = v.estado || 'Completada';
-        const badgeColor = estado === 'Completada' ? 'bg-success' : (estado === 'Anulada' ? 'bg-danger' : 'bg-warning');
-        const fechaRaw = v.fecha || v.fecha_venta;
-        const fechaFormatted = fechaRaw ? new Date(fechaRaw).toLocaleString() : 'N/A';
-        const vendedor = v.vendedor || 'Desconocido';
-        const subtotal = Number(v.subtotal ?? (v.total ?? 0)) || 0;
-        const descuento = Number(v.descuento ?? 0) || 0;
-        const total = Number(v.total ?? (v.total_venta ?? 0)) || 0;
+        const fechaRaw = v.fecha_venta || v.fecha;
+        const fechaStr = fechaRaw 
+            ? new Date(fechaRaw).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })
+            : 'N/A';
+        const articulosStr = v.articulos || 'Venta de mostrador';
+        const vendedor = v.vendedor || 'Mostrador';
+        const metodo = v.metodo_pago || 'Efectivo';
+        const metodoBadge = metodo.toLowerCase().includes('transf')
+            ? '<span class="badge bg-info-subtle text-info border border-info-subtle"><i class="bi bi-arrow-left-right me-1"></i>Transferencia</span>'
+            : '<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-cash me-1"></i>Efectivo</span>';
+
+        const descuento = Number(v.descuento || 0);
+        const total = Number(v.total_venta ?? (v.total ?? 0)) || 0;
+        const anuladaTag = (v.estado && v.estado.toLowerCase() === 'anulada')
+            ? ' <span class="badge bg-danger-subtle text-danger ms-1">Anulada</span>'
+            : '';
 
         tr.innerHTML = `
-            <td>${fechaFormatted}</td>
-            <td><span class="badge ${badgeColor}">${estado}</span></td>
-            <td>${vendedor}</td>
-            <td class="text-end">Q ${subtotal.toFixed(2)}</td>
-            <td class="text-end">Q ${descuento.toFixed(2)}</td>
+            <td class="text-nowrap small text-muted">${fechaStr}</td>
+            <td>
+                <div class="fw-semibold text-dark small" style="max-width: 320px; white-space: normal; line-height: 1.3;">
+                    ${esc(articulosStr)}
+                </div>
+                ${anuladaTag}
+            </td>
+            <td class="small text-muted">${esc(vendedor)}</td>
+            <td class="text-center">${metodoBadge}</td>
+            <td class="text-end small text-muted">Q ${descuento.toFixed(2)}</td>
             <td class="text-end fw-bold text-teal">Q ${total.toFixed(2)}</td>
         `;
         tbody.appendChild(tr);
@@ -405,7 +480,7 @@ function renderReportesPreview(data) {
 
     if (ventas.length > 10) {
         const extraRow = document.createElement('tr');
-        extraRow.innerHTML = `<td colspan="6" class="text-center text-muted small bg-light">Mostrando 10 de ${ventas.length} ventas. Descargue el reporte para ver el detalle completo.</td>`;
+        extraRow.innerHTML = `<td colspan="6" class="text-center text-muted small bg-light">Mostrando 10 de ${ventas.length} ventas. Descargue el reporte completo en PDF o Excel.</td>`;
         tbody.appendChild(extraRow);
     }
 }
@@ -415,7 +490,8 @@ async function exportReporte(formato) {
     if (!rango) return;
 
     const url = `${REPORTES_API_URL}/exportar?fecha_inicio=${rango.fecha_inicio}&fecha_fin=${rango.fecha_fin}&formato=${formato}`;
-    const defaultFilename = `Reporte_${rango.fecha_inicio}_al_${rango.fecha_fin}.${formato === 'excel' ? 'xlsx' : 'csv'}`;
+    const ext = formato === 'excel' ? 'xlsx' : (formato === 'pdf' ? 'pdf' : 'csv');
+    const defaultFilename = `Reporte_${rango.fecha_inicio}_al_${rango.fecha_fin}.${ext}`;
     await downloadReporteFile(url, defaultFilename);
 }
 
@@ -474,24 +550,35 @@ async function loadReporteUsuarios() {
             return;
         }
 
-        data.forEach((u, index) => {
+        data.forEach((u) => {
             const tr = document.createElement('tr');
             const estadoBadge = u.estado === 'Activo'
-                ? '<span class="badge bg-success">Activo</span>'
-                : '<span class="badge bg-secondary">Inactivo</span>';
+                ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Activo</span>'
+                : '<span class="badge bg-secondary-subtle text-secondary border">Inactivo</span>';
 
-            const fechaStr = u.fecha_creacion ? new Date(u.fecha_creacion).toLocaleDateString() : '-';
+            const cuadreClass = Number(u.diferencia_caja) !== 0 ? 'text-danger fw-bold' : 'text-muted';
+            const difStr = Number(u.diferencia_caja) > 0 ? `+${formatoQuetzal(u.diferencia_caja)}` : formatoQuetzal(u.diferencia_caja || 0);
 
             tr.innerHTML = `
-                <td>${index + 1}</td>
-                <td class="fw-semibold text-dark">${u.username}</td>
-                <td>${u.nombre_completo || '-'}</td>
-                <td><span class="badge bg-light text-dark border">${u.rol_nombre || '-'}</span></td>
-                <td>${estadoBadge}</td>
-                <td>${fechaStr}</td>
+                <td>
+                    <div class="fw-bold text-dark">${esc(u.nombre_completo || u.username)}</div>
+                    <small class="text-muted">@${esc(u.username)}</small>
+                </td>
+                <td><span class="badge bg-light text-dark border">${esc(u.rol_nombre || '-')}</span></td>
                 <td class="text-center">
-                    <button class="btn btn-sm btn-outline-primary btn-ver-usuario" data-id="${u.id_usuario}">
-                        <i class="bi bi-eye me-1"></i>Ver
+                    <span class="badge bg-teal-subtle text-teal fw-semibold">${u.ventas_count || 0} ventas</span>
+                </td>
+                <td class="text-end fw-bold text-success">${formatoQuetzal(u.total_vendido || 0)}</td>
+                <td class="text-center">
+                    <div class="fw-medium">${u.turnos_cerrados || 0} turnos</div>
+                    <small class="${cuadreClass}">${difStr} dif.</small>
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-light text-dark border">${u.ingresos_bodega || 0} ingresos</span>
+                </td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-teal btn-ver-usuario" data-id="${u.id_usuario}">
+                        <i class="bi bi-eye me-1"></i>Ver Detalle
                     </button>
                 </td>
             `;
@@ -536,16 +623,39 @@ window.verFichaUsuario = async function(id_usuario) {
         const data = await res.json();
 
         document.getElementById('ficha-usuario-id').value = data.id_usuario;
-        document.getElementById('ficha-usuario-username').textContent = data.username;
-        document.getElementById('ficha-usuario-nombre').textContent = data.nombre_completo;
+        document.getElementById('ficha-usuario-username').textContent = `@${data.username}`;
+        document.getElementById('ficha-usuario-nombre').textContent = data.nombre_completo || '-';
         document.getElementById('ficha-usuario-rol').textContent = data.rol_nombre || '-';
         
         const estadoEl = document.getElementById('ficha-usuario-estado');
-        estadoEl.textContent = data.estado;
-        estadoEl.className = data.estado === 'Activo' ? 'badge bg-success' : 'badge bg-secondary';
+        if (estadoEl) {
+            estadoEl.textContent = data.estado;
+            estadoEl.className = data.estado === 'Activo' ? 'badge bg-success' : 'badge bg-secondary';
+        }
 
         const fechaStr = data.fecha_creacion ? new Date(data.fecha_creacion).toLocaleString() : '-';
-        document.getElementById('ficha-usuario-fecha').textContent = fechaStr;
+        const fechaEl = document.getElementById('ficha-usuario-fecha');
+        if (fechaEl) fechaEl.textContent = fechaStr;
+
+        // Métricas operativas en la ficha
+        const ventasEl = document.getElementById('ficha-usuario-ventas');
+        if (ventasEl) ventasEl.textContent = `${data.ventas_count || 0} ventas registradas`;
+
+        const totalVendidoEl = document.getElementById('ficha-usuario-total-vendido');
+        if (totalVendidoEl) totalVendidoEl.textContent = formatoQuetzal(data.total_vendido || 0);
+
+        const turnosEl = document.getElementById('ficha-usuario-turnos');
+        if (turnosEl) turnosEl.textContent = `${data.turnos_cerrados || 0} turnos finalizados`;
+
+        const difEl = document.getElementById('ficha-usuario-diferencia');
+        if (difEl) {
+            const difVal = Number(data.diferencia_caja || 0);
+            difEl.textContent = formatoQuetzal(difVal);
+            difEl.className = difVal !== 0 ? 'fw-bold text-danger' : 'fw-bold text-dark';
+        }
+
+        const comprasEl = document.getElementById('ficha-usuario-compras');
+        if (comprasEl) comprasEl.textContent = `${data.ingresos_bodega || 0} compras/ingresos procesados`;
 
         const modalEl = document.getElementById('modal-reporte-ficha-usuario');
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -884,87 +994,152 @@ function renderGrafica(data) {
  *   - 'categoria' -> GrÃ¡fica de DONA con los ingresos por categorÃ­a.
  *   - 'hora'      -> GrÃ¡fica de BARRAS con el conteo por hora pico.
  */
+// Plugin de etiquetas numéricas directas sobre las barras (accesibilidad senior)
+const barValueLabelsPlugin = {
+    id: 'barValueLabels',
+    afterDatasetsDraw(chart) {
+        const { ctx, data } = chart;
+        const isHorizontal = chart.config.options.indexAxis === 'y';
+        if (!data.datasets || !data.datasets[0] || !data.datasets[0].data) return;
+        
+        const totalSum = data.datasets[0].data.reduce((a, b) => a + (Number(b) || 0), 0);
+        
+        chart.data.datasets.forEach((dataset, i) => {
+            const meta = chart.getDatasetMeta(i);
+            if (!meta || !meta.data) return;
+            meta.data.forEach((bar, index) => {
+                const val = Number(dataset.data[index]) || 0;
+                if (val <= 0) return;
+                ctx.save();
+                ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+                ctx.fillStyle = '#0f172a';
+                
+                if (isHorizontal) {
+                    const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : '0';
+                    const text = `${formatoQuetzal(val)} (${pct}%)`;
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(text, bar.x + 8, bar.y);
+                } else {
+                    const text = formatoQuetzal(val);
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(text, bar.x, bar.y - 4);
+                }
+                ctx.restore();
+            });
+        });
+    }
+};
+
+/**
+ * construirConfiguracionGrafica(tipo, data)
+ * ----------------------------------------
+ * Simplificada para adultos mayores (cero emojis, barras claras con números visibles):
+ *   - 'tendencia' (Ventas por Día): Barras verticales en teal institucional (#0d7377) con montos Q arriba.
+ *   - 'categoria' (Ventas por Categoría): Barras horizontales por categoría con monto Q y porcentaje visible.
+ */
 function construirConfiguracionGrafica(tipo, data) {
     const etiquetas = data.etiquetas || [];
     const valores = (data.valores || []).map((v) => Number(v) || 0);
-    const paleta = ['#0d7377', '#f59e0b', '#dc2626', '#2563eb', '#7c3aed', '#059669', '#db2777', '#65a30d', '#0891b2', '#9333ea'];
-
-    if (tipo === 'tendencia') {
-        return {
-            type: 'line',
-            data: {
-                labels: etiquetas,
-                datasets: [{
-                    label: 'Ventas (Q)',
-                    data: valores,
-                    borderColor: '#0d7377',
-                    backgroundColor: 'rgba(13, 115, 119, 0.15)',
-                    fill: true,
-                    tension: 0.35,
-                    pointBackgroundColor: '#0d7377',
-                    pointRadius: 4,
-                }],
-            },
-            options: baseOptionsGrafica(true),
-        };
-    }
+    const paleta = ['#0A5C5E', '#0d7377', '#14b8a6', '#059669', '#10b981', '#f59e0b', '#2563eb', '#7c3aed', '#dc2626', '#64748b'];
 
     if (tipo === 'categoria') {
         return {
-            type: 'doughnut',
+            type: 'bar',
+            plugins: [barValueLabelsPlugin],
             data: {
                 labels: etiquetas,
                 datasets: [{
+                    label: 'Ventas por Categoría (Q)',
                     data: valores,
-                    backgroundColor: paleta,
-                    borderColor: '#ffffff',
-                    borderWidth: 3,
-                    hoverOffset: 8,
+                    backgroundColor: paleta.slice(0, etiquetas.length),
+                    borderRadius: 6,
+                    maxBarThickness: 28,
                 }],
             },
             options: {
+                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '62%',
+                layout: {
+                    padding: { top: 10, right: 110, left: 10, bottom: 5 }
+                },
                 plugins: {
-                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } },
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (ctx) => ` ${ctx.label}: ${formatoQuetzal(ctx.parsed)}`,
-                        },
-                    },
+                            label: (ctx) => ` Total: ${formatoQuetzal(ctx.parsed.x)}`
+                        }
+                    }
                 },
-            },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grace: '20%',
+                        ticks: { callback: (v) => `Q${Number(v).toLocaleString('es-GT')}` },
+                        grid: { color: '#f1f5f9' }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            font: { weight: '600', size: 12 },
+                            color: '#1e293b'
+                        }
+                    }
+                }
+            }
         };
     }
 
-    // tipo === 'hora': barras de transacciones por franja horaria.
+    // Default 'tendencia' -> Barras verticales en teal institucional (#0d7377) con valor visible en la parte superior
     return {
         type: 'bar',
+        plugins: [barValueLabelsPlugin],
         data: {
             labels: etiquetas,
             datasets: [{
-                label: 'Transacciones',
+                label: 'Ventas por Día (Q)',
                 data: valores,
-                backgroundColor: 'rgba(13, 115, 119, 0.55)',
-                hoverBackgroundColor: 'rgba(13, 115, 119, 0.8)',
-                borderColor: '#0A5C5E',
-                borderWidth: 1,
-                borderRadius: 4,
-                maxBarThickness: 22,
+                backgroundColor: '#0d7377',
+                hoverBackgroundColor: '#0A5C5E',
+                borderRadius: 6,
+                maxBarThickness: 45,
             }],
         },
-        options: baseOptionsGrafica(false),
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: { top: 25, right: 15, left: 10, bottom: 5 }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ` Ventas: ${formatoQuetzal(ctx.parsed.y)}`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grace: '15%',
+                    ticks: { callback: (v) => `Q${Number(v).toLocaleString('es-GT')}` },
+                    grid: { color: '#f1f5f9' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: { weight: '600', size: 11 },
+                        color: '#334155'
+                    }
+                }
+            }
+        }
     };
 }
 
-/**
- * baseOptionsGrafica(esDinero)
- * ----------------------------
- * Opciones compartidas por las grÃ¡ficas cartesianas (lÃ­nea y barras): el eje Y
- * inicia en cero y los tooltips formatean la serie como Q (money) o como
- * conteo de transacciones (cuando `esDinero` es false).
- */
 function baseOptionsGrafica(esDinero) {
     return {
         responsive: true,
@@ -1049,26 +1224,38 @@ function renderRanking(data) {
     const items = (data && Array.isArray(data.items)) ? data.items : [];
 
     if (items.length === 0) {
-        ul.innerHTML = '<li class="reportes-rank-item"><span class="reportes-rank-name text-muted"><i class="bi bi-inbox me-1"></i>Sin datos para el rango seleccionado</span></li>';
+        ul.innerHTML = '<li class="reportes-rank-item py-3 text-center"><span class="reportes-rank-name text-muted"><i class="bi bi-inbox me-1"></i>Sin datos para el período seleccionado</span></li>';
         return;
     }
 
-    ul.innerHTML = items.map((item, i) => `
-        <li class="reportes-rank-item">
-            <span class="reportes-rank-num">${i + 1}</span>
-            <span class="reportes-rank-name" title="${esc(item.nombre)}">${esc(item.nombre)}</span>
-            <span class="reportes-rank-amount">${formatoQuetzal(item.valor)}</span>
-        </li>
-    `).join('');
+    ul.innerHTML = items.map((item, i) => {
+        let detalleBadge = '';
+        if (reportesRankTipo === 'productos') {
+            const uds = item.cantidad || 0;
+            detalleBadge = `<span class="badge bg-teal-subtle text-teal fw-semibold">${uds} ${uds === 1 ? 'ud vendida' : 'uds vendidas'}</span>`;
+        } else if (reportesRankTipo === 'estancados') {
+            const stock = item.cantidad || 0;
+            const badgeClass = stock <= 8 ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+            detalleBadge = `<span class="badge ${badgeClass} fw-semibold">Stock actual: ${stock} uds</span>`;
+        }
+
+        return `
+            <li class="reportes-rank-item py-2 border-bottom d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center me-2 text-truncate" style="min-width: 0;">
+                    <span class="reportes-rank-num me-2 flex-shrink-0">${i + 1}</span>
+                    <div class="text-truncate">
+                        <div class="reportes-rank-name fw-semibold text-dark text-truncate" title="${esc(item.nombre)}">${esc(item.nombre)}</div>
+                        <div class="mt-1">${detalleBadge}</div>
+                    </div>
+                </div>
+                <div class="text-end flex-shrink-0 ms-2">
+                    <span class="reportes-rank-amount fw-bold text-dark">${formatoQuetzal(item.valor)}</span>
+                </div>
+            </li>
+        `;
+    }).join('');
 }
 
-/**
- * cargarRanking()
- * ---------------
- * Consulta el endpoint /ranking con `tipo_reporte` y `limite` de los selects
- * actuales, usando el Ãºltimo rango de fechas consultado. Se invoca cada vez
- * que el usuario cambia cualquiera de los dos selects (Event Listeners).
- */
 function cargarRanking() {
     if (!reportesRangoActual) {
         reportesRangoActual = obtenerRangoReportes();

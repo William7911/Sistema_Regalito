@@ -1046,7 +1046,8 @@ INSERT INTO metodo_pago (id_metodo_pago, nombre) VALUES
 INSERT INTO proveedor (id_proveedor, nombre_contacto, distribuidora, telefono, correo, cuenta_bancaria, direccion) VALUES
 (1, 'Carlos Mendoza', 'Vidriería Lago S.A.', '5522-7788', 'ventas@vidrierialago.com', '3456-789012-3', 'Zona 3, Sololá'),
 (2, 'Lucía Ramírez', 'Textiles del Altiplano', '5544-2233', 'pedidos@textilesaltiplano.com', '6789-012345-6', 'Zona 5, Quetzaltenango'),
-(3, 'Ana Pérez', 'Juguetería Maya Distribuciones', '5500-1122', 'ventas@jugueteriamaya.com', '1234-567890-1', 'Zona 2, Panajachel');
+(3, 'Ana Pérez', 'Juguetería Maya Distribuciones', '5500-1122', 'ventas@jugueteriamaya.com', '1234-567890-1', 'Zona 2, Panajachel'),
+(4, 'General', 'Proveedor General / Sin especificar', '0000-0000', 'general@tiendaelregalito.com', NULL, 'Local');
 
 
 -- ============================================================================

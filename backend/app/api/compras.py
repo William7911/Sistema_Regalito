@@ -95,3 +95,14 @@ async def ingresar_mercaderia(
         .where(Compra.id_orden == orden.id_orden)
     )
     return result.scalar_one()
+
+
+@router.post("/ingreso-directo", response_model=compras_schema.OrdenCompraOut, status_code=status.HTTP_201_CREATED)
+async def registrar_ingreso_directo(
+    data: compras_schema.IngresoDirectoCreate,
+    service: ConcreteComprasService = Depends(get_compras_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Registra ingreso directo de mercadería a inventario en un solo paso.
+    Aumenta stock inmediatamente y actualiza costos si fueron modificados."""
+    return await service.ingreso_directo(data, current_user.id_usuario)
