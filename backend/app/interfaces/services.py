@@ -215,6 +215,12 @@ class CashRegisterService(ABC):
     async def list_cajas(self, include_inactive: bool = False) -> List[schemas.CajaOut]:
         ...
 
+    @abstractmethod
+    async def registrar_movimiento(
+        self, data: schemas.MovimientoCajaCreate, user_id: int
+    ) -> schemas.MovimientoCajaResponse:
+        ...
+
 
 class SyncService(ABC):
     """Contrato del servicio de sincronización offline y réplica de datos maestros."""

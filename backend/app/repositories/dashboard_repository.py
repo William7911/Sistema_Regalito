@@ -234,7 +234,10 @@ class DashboardRepositoryImpl(DashboardRepository):
     async def get_ultimas_ventas(self, limit: int = 5) -> List[Venta]:
         stmt = (
             select(Venta)
-            .options(selectinload(Venta.usuario))
+            .options(
+                selectinload(Venta.usuario),
+                selectinload(Venta.detalles),
+            )
             .where(Venta.estado == "Completada")
             .order_by(Venta.fecha_venta.desc())
             .limit(limit)

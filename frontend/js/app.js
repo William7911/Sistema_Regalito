@@ -870,10 +870,10 @@ if (btnLogout) {
     });
 }
 
-/* ===== Control de Navegación: Sidebar Colapsable (Desktop) y Off-Canvas Móvil (< 1024px) ===== */
+/* ===== Control de Navegación: Sidebar Colapsable y Adaptabilidad Móvil (< 768px) ===== */
 (function () {
     var KEY = 'sidebarCollapsed';
-    var MOBILE_BREAKPOINT = 1024;
+    var MOBILE_BREAKPOINT = 768; // Breakpoint estándar (Bootstrap md)
 
     function isMobile() {
         return window.innerWidth < MOBILE_BREAKPOINT;
@@ -888,14 +888,21 @@ if (btnLogout) {
         }
         m.classList.toggle('sidebar-collapsed', collapsed);
         document.querySelectorAll('.sidebar .sidebar-link').forEach(function (a) {
-            if (collapsed) a.setAttribute('title', a.textContent.trim());
-            else a.removeAttribute('title');
+            if (collapsed) {
+                var span = a.querySelector('span');
+                var text = span ? span.textContent.trim() : a.textContent.trim();
+                a.setAttribute('title', text);
+            } else {
+                a.removeAttribute('title');
+            }
         });
     }
 
     function openMobileSidebar() {
         var m = document.getElementById('system-module');
         if (!m) return;
+        // Garantizar que en móvil el texto SIEMPRE esté visible y no colapsado
+        m.classList.remove('sidebar-collapsed');
         m.classList.add('mobile-sidebar-open');
     }
 
@@ -908,7 +915,11 @@ if (btnLogout) {
     function toggleMobileSidebar() {
         var m = document.getElementById('system-module');
         if (!m) return;
-        m.classList.toggle('mobile-sidebar-open');
+        if (m.classList.contains('mobile-sidebar-open')) {
+            closeMobileSidebar();
+        } else {
+            openMobileSidebar();
+        }
     }
 
     // Exponer globalmente para cierre al navegar
@@ -923,7 +934,7 @@ if (btnLogout) {
             applySidebarDesktop(collapsed);
         }
 
-        // Botón hamburguesa (☰) en la cabecera
+        // Botón hamburguesa (☰) en la cabecera: hace el menú "menos ancho" / alterna colapso
         var btnToggle = document.getElementById('btn-sidebar-toggle');
         if (btnToggle) {
             btnToggle.addEventListener('click', function (e) {
@@ -972,7 +983,7 @@ if (btnLogout) {
             }
         });
 
-        // Sincronización al redimensionar pantalla
+        // Sincronización al redimensionar pantalla (únicamente adapta cuando cruza el breakpoint)
         window.addEventListener('resize', function () {
             if (!isMobile()) {
                 closeMobileSidebar();

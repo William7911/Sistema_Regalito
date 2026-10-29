@@ -643,7 +643,7 @@ input[type="password"]::-ms-clear {
     display: none;
 }
 
-@media (max-width: 1023.98px) {
+@media (max-width: 767.98px) {
     /* Sidebar oculto fuera de pantalla por defecto */
     #system-module > .sidebar {
         position: fixed !important;
@@ -780,28 +780,127 @@ input[type="password"]::-ms-clear {
 .sidebar > .dropdown > a strong { font-size: .9rem; font-weight: 600; }
 .sidebar > .dropdown > a img { border: 2px solid rgba(255,255,255,.35); }
 
-/* ===== Sidebar colapsable ===== */
-.sidebar { transition: width .25s ease; }
+/* ===== Sidebar colapsable ("menos ancho" al pulsar hamburguesa ☰) ===== */
+.sidebar {
+    transition: width .22s cubic-bezier(0.4, 0, 0.2, 1), min-width .22s, max-width .22s, flex-basis .22s !important;
+}
 
-.sidebar-collapsed .sidebar { width: 76px !important; padding: 1rem .6rem !important; }
+/* Regla Universal de Alta Especificidad para Sidebar Colapsado */
+#system-module.sidebar-collapsed > .sidebar,
+.sidebar-collapsed .sidebar {
+    width: 72px !important;
+    min-width: 72px !important;
+    max-width: 72px !important;
+    flex: 0 0 72px !important;
+    flex-shrink: 0 !important;
+    padding: 0.85rem 0.4rem !important;
+    transform: none !important;
+    position: sticky !important;
+    top: 0 !important;
+    height: 100vh !important;
+    z-index: 1040 !important;
+    box-shadow: 2px 0 12px rgba(0,0,0,0.12) !important;
+}
+
+#system-module.sidebar-collapsed > .sidebar .sidebar-brand,
+.sidebar-collapsed .sidebar-brand {
+    justify-content: center !important;
+    padding: 0 0 1rem !important;
+}
+
+#system-module.sidebar-collapsed > .sidebar .sidebar-brand i,
+.sidebar-collapsed .sidebar-brand i {
+    margin: 0 !important;
+    width: 38px !important;
+    height: 38px !important;
+}
+
+#system-module.sidebar-collapsed > .sidebar .sidebar-brand span,
+#system-module.sidebar-collapsed > .sidebar .sidebar-section,
+#system-module.sidebar-collapsed > .sidebar .dropdown-toggle::after,
+#system-module.sidebar-collapsed > .sidebar > .dropdown strong,
+#system-module.sidebar-collapsed > .sidebar #btn-sidebar-close,
 .sidebar-collapsed .sidebar-brand span,
 .sidebar-collapsed .sidebar-section,
 .sidebar-collapsed .sidebar .dropdown-toggle::after,
-.sidebar-collapsed .sidebar > .dropdown strong { display: none !important; }
-
-.sidebar-collapsed .sidebar-brand { justify-content: center; padding: 0 0 1rem !important; }
-.sidebar-collapsed .sidebar-brand i { margin: 0 !important; }
-
-.sidebar-collapsed .sidebar .nav-link.sidebar-link {
-    font-size: 0;              /* oculta el texto, deja el icono */
-    justify-content: center;
-    padding: .7rem 0;
+.sidebar-collapsed .sidebar > .dropdown strong {
+    display: none !important;
 }
-.sidebar-collapsed .sidebar .nav-link.sidebar-link i { font-size: 1.25rem; width: auto; }
-.sidebar-collapsed .sidebar .nav-link.active::before { left: -.6rem; }
 
-.sidebar-collapsed .sidebar > .dropdown > a { justify-content: center; padding: .4rem; }
-.sidebar-collapsed .sidebar > .dropdown img { margin: 0 !important; }
+#system-module.sidebar-collapsed > .sidebar .nav-link.sidebar-link,
+.sidebar-collapsed .sidebar .nav-link.sidebar-link {
+    font-size: 0 !important;
+    justify-content: center !important;
+    padding: 0.65rem 0 !important;
+    margin-bottom: 3px !important;
+}
+
+#system-module.sidebar-collapsed > .sidebar .nav-link.sidebar-link i,
+.sidebar-collapsed .sidebar .nav-link.sidebar-link i {
+    font-size: 1.25rem !important;
+    width: auto !important;
+    margin: 0 !important;
+    opacity: 0.9;
+}
+
+#system-module.sidebar-collapsed > .sidebar .nav-link.active::before,
+.sidebar-collapsed .sidebar .nav-link.active::before {
+    left: -0.4rem !important;
+    width: 4px !important;
+}
+
+#system-module.sidebar-collapsed > .sidebar > .dropdown > a,
+.sidebar-collapsed .sidebar > .dropdown > a {
+    justify-content: center !important;
+    padding: 0.4rem !important;
+}
+
+#system-module.sidebar-collapsed > .sidebar > .dropdown img,
+.sidebar-collapsed .sidebar > .dropdown img {
+    margin: 0 !important;
+}
+
+#system-module.sidebar-collapsed > main {
+    width: calc(100% - 72px) !important;
+    flex: 1 1 calc(100% - 72px) !important;
+    min-width: 0 !important;
+}
+
+/* En móvil con menú abierto, el texto SIEMPRE debe ser visible */
+#system-module.mobile-sidebar-open > .sidebar .sidebar-brand span,
+#system-module.mobile-sidebar-open > .sidebar .sidebar-section,
+#system-module.mobile-sidebar-open > .sidebar .dropdown-toggle::after,
+#system-module.mobile-sidebar-open > .sidebar > .dropdown strong {
+    display: inline-block !important;
+}
+
+#system-module.mobile-sidebar-open > .sidebar .nav-link.sidebar-link {
+    font-size: 0.95rem !important;
+    justify-content: flex-start !important;
+    padding: 0.65rem 0.9rem !important;
+}
+
+/* Adaptabilidad para pantallas móviles pequeñas (< 576px) */
+@media (max-width: 575.98px) {
+    .main-topbar {
+        padding: 0.45rem 0.75rem !important;
+        min-height: 52px !important;
+        overflow-x: hidden !important;
+    }
+    #topbar-module-title {
+        font-size: 0.95rem !important;
+    }
+    #pos-turn-badge {
+        font-size: 0.72rem !important;
+        padding: 0.2rem 0.5rem !important;
+    }
+    .pos-header-btn span {
+        display: none !important;
+    }
+    .pos-header-btn {
+        padding: 0.35rem 0.6rem !important;
+    }
+}
 /* ============================================================================
  * Panel Principal (Dashboard) - Rediseño
  * Tarjetas, skeletons, gráfico y accesos rápidos. Misma paleta corporativa.
@@ -1593,8 +1692,8 @@ input[type="password"]::-ms-clear {
  * Estructura Global Fija del Sistema (100vh) y Barra Lateral Estable
  * ========================================================================== */
 
-/* Desktop (>= 1024px) */
-@media (min-width: 1024px) {
+/* Desktop & Tablet (>= 768px) */
+@media (min-width: 768px) {
     #system-module {
         height: 100vh !important;
         max-height: 100vh !important;
@@ -1661,8 +1760,8 @@ input[type="password"]::-ms-clear {
     }
 }
 
-/* Mobile & Tablet (< 1024px) */
-@media (max-width: 1023.98px) {
+/* Mobile (< 768px) */
+@media (max-width: 767.98px) {
     #system-module {
         height: 100% !important;
         min-height: 100vh !important;
@@ -2947,7 +3046,8 @@ input[type="password"]::-ms-clear {
     white-space: nowrap;
 }
 
-#inventory-view .inventory-product-thumb {
+#inventory-view .inventory-product-thumb,
+#compras-view .inventory-product-thumb {
     width: 40px;
     height: 40px;
     flex: 0 0 40px;
@@ -2957,17 +3057,24 @@ input[type="password"]::-ms-clear {
     background-color: #F1F5F9;
 }
 
-#inventory-view .inventory-product-thumb--placeholder {
+#inventory-view .inventory-product-thumb--placeholder,
+#compras-view .inventory-product-thumb--placeholder {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
     background-color: #F8FAFC;
     color: #94A3B8;
     font-size: 1.15rem;
     line-height: 1;
 }
 
-#inventory-view .inventory-product-thumb-wrap {
+#inventory-view .inventory-product-thumb-wrap,
+#compras-view .inventory-product-thumb-wrap {
     position: relative;
     width: 40px;
     height: 40px;
@@ -2975,12 +3082,14 @@ input[type="password"]::-ms-clear {
     display: inline-flex;
 }
 
-#inventory-view .inventory-product-thumb-wrap .inventory-product-thumb {
+#inventory-view .inventory-product-thumb-wrap .inventory-product-thumb,
+#compras-view .inventory-product-thumb-wrap .inventory-product-thumb {
     position: absolute;
     inset: 0;
 }
 
-#inventory-view .inventory-product-thumb-fallback {
+#inventory-view .inventory-product-thumb-fallback,
+#compras-view .inventory-product-thumb-fallback {
     display: none;
     width: 40px;
     height: 40px;
@@ -2995,26 +3104,32 @@ input[type="password"]::-ms-clear {
 }
 
 /* Se muestra el placeholder si la imagen falla al cargar. */
-#inventory-view .inventory-product-thumb-wrap.is-placeholder .inventory-product-thumb-fallback {
+#inventory-view .inventory-product-thumb-wrap.is-placeholder .inventory-product-thumb-fallback,
+#compras-view .inventory-product-thumb-wrap.is-placeholder .inventory-product-thumb-fallback {
     display: inline-flex;
 }
 
 /* Affordance de zoom: la miniatura con imagen real invita a ampliarla. */
-#inventory-view .inventory-product-thumb-wrap[data-zoom-src] {
+#inventory-view .inventory-product-thumb-wrap[data-zoom-src],
+#compras-view .inventory-product-thumb-wrap[data-zoom-src] {
     cursor: zoom-in;
 }
 
-#inventory-view .inventory-product-thumb-wrap[data-zoom-src] .inventory-product-thumb {
+#inventory-view .inventory-product-thumb-wrap[data-zoom-src] .inventory-product-thumb,
+#compras-view .inventory-product-thumb-wrap[data-zoom-src] .inventory-product-thumb {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 #inventory-view .inventory-product-thumb-wrap[data-zoom-src]:hover .inventory-product-thumb,
-#inventory-view .inventory-product-thumb-wrap[data-zoom-src]:focus-visible .inventory-product-thumb {
+#inventory-view .inventory-product-thumb-wrap[data-zoom-src]:focus-visible .inventory-product-thumb,
+#compras-view .inventory-product-thumb-wrap[data-zoom-src]:hover .inventory-product-thumb,
+#compras-view .inventory-product-thumb-wrap[data-zoom-src]:focus-visible .inventory-product-thumb {
     border-color: var(--color-teal);
     box-shadow: 0 0 0 3px var(--color-teal-light);
 }
 
-#inventory-view .inventory-product-thumb-wrap:focus-visible {
+#inventory-view .inventory-product-thumb-wrap:focus-visible,
+#compras-view .inventory-product-thumb-wrap:focus-visible {
     outline: none;
     border-radius: 10px;
 }
@@ -4562,6 +4677,29 @@ input[type="password"]::-ms-clear {
         max-width: 100%;
         width: 100%;
     }
+}
+
+/* ---------------------------------------------------------------------------
+   7) TABLAS DE REPORTES - CONTRASTE DE ENCABEZADOS Y ACCESIBILIDAD
+   Encabezados con fondo teal institucional (#0A5C5E) y texto blanco puro (#FFFFFF)
+   en negrita para máxima legibilidad según requerimiento de accesibilidad.
+--------------------------------------------------------------------------- */
+#reportes-view thead th,
+#reportes-view .table thead th,
+#table-reporte-usuarios thead th,
+#table-reporte-clientes thead th {
+    background-color: #0A5C5E !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    vertical-align: middle;
+    padding: 0.75rem 0.75rem;
+    border-bottom: 2px solid #064042 !important;
+}
+
+#table-reporte-usuarios tbody td,
+#table-reporte-clientes tbody td {
+    vertical-align: middle;
+    font-size: 0.9rem;
 }
 
 
@@ -7349,4 +7487,162 @@ table th,
 
 .pos-scanner-alert.error {
     background: rgba(239, 68, 68, 0.92);
+}
+
+/* ==========================================================================
+   Módulo de Caja: Diseño Limpio, Sobrio y Profesional
+   ========================================================================== */
+
+/* Estructura vertical limpia para métricas de Caja Abierta */
+.cash-card-label {
+    display: block !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    color: #4b5563 !important;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+}
+
+[data-theme="dark"] .cash-card-label {
+    color: #cbd5e1 !important;
+}
+
+#cash-active-details strong {
+    white-space: nowrap !important;
+}
+
+/* Modal de Cierre de Caja compacto y minimalista */
+#close-cash-modal .modal-dialog {
+    max-width: 480px;
+}
+
+/* Ocultar flechas / spinners del input numérico de cierre */
+#close-cash-monto::-webkit-outer-spin-button,
+#close-cash-monto::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+#close-cash-monto {
+    -moz-appearance: textfield !important;
+    font-size: 1.25rem !important;
+    letter-spacing: 0.5px;
+}
+
+/* Tabla de Historial de Turnos: compacta sin scroll horizontal */
+.cash-table th,
+.cash-table td {
+    padding-top: 0.6rem !important;
+    padding-bottom: 0.6rem !important;
+    font-size: 0.85rem;
+}
+
+
+/* ==========================================================================
+   Módulo de Compras: Ingreso Directo a Inventario
+   ========================================================================== */
+
+.compras-cant::-webkit-outer-spin-button,
+.compras-cant::-webkit-inner-spin-button,
+.compras-costo::-webkit-outer-spin-button,
+.compras-costo::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+
+.compras-cant,
+.compras-costo {
+    -moz-appearance: textfield !important;
+}
+
+.btn-cant-minus,
+.btn-cant-plus {
+    width: 28px !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Módulo de Compras: Mercadería a Ingresar (Encabezado blanco y 100% responsive)
+--------------------------------------------------------------------------- */
+#compras-view #compras-cart-table,
+#compras-cart-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+    margin-bottom: 0.5rem;
+}
+
+#compras-view #compras-cart-table thead th,
+#compras-cart-table thead th {
+    background-color: var(--color-teal-dark) !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    vertical-align: middle;
+}
+
+#compras-view #compras-cart-table th,
+#compras-view #compras-cart-table td {
+    padding: 0.4rem 0.2rem;
+}
+
+#compras-view .table-responsive:has(#compras-cart-table) {
+    overflow-x: hidden !important;
+}
+
+/* ---------------------------------------------------------------------------
+   8) MEJORAS CONSOLIDADO OPERATIVO - BOTONES RÁPIDOS Y PESTAÑAS RANKING
+--------------------------------------------------------------------------- */
+.reportes-quick-filters .btn {
+    border-color: #cbd5e1;
+    color: #475569;
+    font-size: 0.825rem;
+    font-weight: 500;
+    padding: 0.35rem 0.65rem;
+}
+.reportes-quick-filters .btn:hover {
+    background-color: var(--color-teal-light, #e6f4f4);
+    color: var(--color-teal, #0d7377);
+    border-color: var(--color-teal, #0d7377);
+}
+.reportes-quick-filters .btn.active {
+    background-color: var(--color-teal, #0d7377) !important;
+    color: #FFFFFF !important;
+    border-color: var(--color-teal, #0d7377) !important;
+    font-weight: 600;
+}
+
+.reportes-rank-pill {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.35rem 0.5rem;
+    transition: all 0.2s ease;
+}
+.reportes-rank-pill:hover {
+    background-color: #e2e8f0;
+    color: #1e293b;
+}
+.reportes-rank-pill.active {
+    background-color: #ffffff !important;
+    color: #0A5C5E !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    font-weight: 600;
+}
+
+/* Encabezado y ajuste de ancho sin scroll para Últimas Ventas en Dashboard */
+#dash-ultimas-container table {
+    min-width: 100% !important;
+    width: 100% !important;
+}
+#dash-ultimas-container table thead,
+#dash-ultimas-container table thead tr,
+#dash-ultimas-container table thead th {
+    background-color: #0A5C5E !important;
+    background: #0A5C5E !important;
+    color: #FFFFFF !important;
 }

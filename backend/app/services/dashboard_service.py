@@ -63,11 +63,22 @@ class ConcreteDashboardService(DashboardService):
                 fecha=v.fecha_venta.replace(tzinfo=timezone.utc) if v.fecha_venta else None,
                 total=v.total_venta,
                 vendedor=v.usuario.nombre_completo if v.usuario else "",
+                articulos=sum(int(d.cantidad) for d in v.detalles) if getattr(v, "detalles", None) else 1,
             )
             for v in await self.repository.get_ultimas_ventas(5)
         ]
 
+        # Cálculo de efectivo esperado en caja
+        efectivo_ventas = Decimal("0.00")
+        for m in ventas_por_metodo:
+            if "efectivo" in m.nombre.lower():
+                efectivo_ventas += m.total
+
         turno = await self.repository.get_turno_actual(user_id)
+        efectivo_esperado = Decimal("0.00")
+        if turno and turno.estado in ("Abierto", "Abierta"):
+            efectivo_esperado = (turno.monto_apertura or Decimal("0.00")) + efectivo_ventas
+
         turno_actual = (
             TurnoDashboard(
                 id_turno=turno.id_turno,
@@ -162,4 +173,5 @@ class ConcreteDashboardService(DashboardService):
             ordenes_pendientes=ordenes_pendientes,
             traslados_pendientes=traslados_pendientes,
             ultimas_ventas=ultimas_ventas,
+            efectivo_esperado=efectivo_esperado,
         )

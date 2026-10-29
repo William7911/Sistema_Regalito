@@ -16,6 +16,8 @@ class VentaReporteDTO(BaseModel):
     fecha_venta: datetime
     estado: str = "Completada"
     vendedor: str = ""
+    articulos: str = ""
+    metodo_pago: str = "Efectivo"
     subtotal: Decimal = Decimal("0.00")
     descuento: Decimal = Decimal("0.00")
     total: Decimal = Decimal("0.00")
@@ -64,15 +66,20 @@ class ReporteExportadoDTO(BaseModel):
 class KPITotalesDTO(BaseModel):
     """Totales agregados (SUM) dentro del rango de fechas seleccionado.
 
-    ventas      -> Ingresos por ventas netas (total_venta) de ventas Completadas.
-    mermas      -> Suma del costo de los DetalleMerma asociados a las mermas
-                   registradas en el periodo (costo de la pérdida).
-    compras     -> Gasto en mercadería (total_compra de las compras ingresadas).
-    count_*     -> Número de registros de cada tipo dentro del rango.
+    ventas            -> Ingresos por ventas netas (total_venta) de ventas Completadas.
+    ganancia_estimada -> Ventas netas menos costo de los productos vendidos.
+    costo_vendido     -> Suma del costo promedio de los artículos vendidos.
+    margen_ganancia   -> Porcentaje de ganancia sobre ventas netas (%).
+    mermas            -> Suma del costo de los DetalleMerma asociados a las mermas.
+    compras           -> Gasto en mercadería (total_compra de las compras ingresadas).
+    count_*           -> Número de registros de cada tipo dentro del rango.
     """
 
     ventas: Decimal = Decimal("0.00")
     count_ventas: int = 0
+    ganancia_estimada: Decimal = Decimal("0.00")
+    costo_vendido: Decimal = Decimal("0.00")
+    margen_ganancia: Decimal = Decimal("0.00")
     mermas: Decimal = Decimal("0.00")
     count_mermas: int = 0
     compras: Decimal = Decimal("0.00")
@@ -125,6 +132,11 @@ class UsuarioReporteDTO(BaseModel):
     rol_nombre: str
     estado: str
     fecha_creacion: Optional[datetime] = None
+    ventas_count: int = 0
+    total_vendido: Decimal = Decimal("0.00")
+    turnos_cerrados: int = 0
+    diferencia_caja: Decimal = Decimal("0.00")
+    ingresos_bodega: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

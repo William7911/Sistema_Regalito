@@ -8,6 +8,19 @@
 
 const CASH_API = '/api/caja';
 
+// Denominaciones oficiales de Guatemala para la calculadora de arqueo accesible
+const GT_BILL_DENOMINATIONS = [
+    { valor: 200, label: 'Billetes de Q200' },
+    { valor: 100, label: 'Billetes de Q100' },
+    { valor: 50,  label: 'Billetes de Q50' },
+    { valor: 20,  label: 'Billetes de Q20' },
+    { valor: 10,  label: 'Billetes de Q10' },
+    { valor: 5,   label: 'Billetes de Q5' },
+    { valor: 1,   label: 'Billetes de Q1' },
+];
+
+let activeExpectedCash = 0;
+
 // Estado local reactivo
 let currentTurno = null;
 let cashHistoryState = {
@@ -17,6 +30,19 @@ let cashHistoryState = {
     sortBy: 'id_turno',
     sortDir: 'desc',
 };
+
+// Cálculo centralizado de Efectivo Esperado: Monto Inicial + Ventas Efectivo + Entradas - Salidas
+function computeExpectedCash(turno) {
+    if (!turno) return 0;
+    const inicial = Number(turno.monto_apertura || 0);
+    const ventas = Number(turno.ventas_efectivo != null ? turno.ventas_efectivo : (turno.total_ventas_efectivo != null ? turno.total_ventas_efectivo : 0));
+    const entradas = Number(turno.entradas_efectivo || 0);
+    const salidas = Number(turno.salidas_efectivo || 0);
+    if (turno.efectivo_esperado != null) {
+        return Number(turno.efectivo_esperado);
+    }
+    return Math.max(0, inicial + ventas + entradas - salidas);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers generales y de autenticación
@@ -287,7 +313,8 @@ function renderCashStatusCard(turno) {
 
         const montoInicial = Number(turno.monto_apertura || 0);
         const ventasEfectivo = Number(turno.ventas_efectivo != null ? turno.ventas_efectivo : (turno.total_ventas_efectivo != null ? turno.total_ventas_efectivo : 0));
-        const efectivoEsperado = Number(turno.efectivo_esperado != null ? turno.efectivo_esperado : (montoInicial + ventasEfectivo));
+        const efectivoEsperado = computeExpectedCash(turno);
+        activeExpectedCash = efectivoEsperado;
 
         if (ventasEl) ventasEl.textContent = formatCurrency(ventasEfectivo);
         if (esperadoEl) esperadoEl.textContent = formatCurrency(efectivoEsperado);
@@ -378,18 +405,44 @@ window.openCloseCashModal = function() {
         return;
     }
 
-    // Poblar resumen del turno que se está cerrando
-    const cajaEl = document.getElementById('close-summary-caja');
-    const fechaEl = document.getElementById('close-summary-fecha');
-    const montoEl = document.getElementById('close-summary-monto');
+    const montoInicial = Number(currentTurno.monto_apertura || 0);
+    const ventasEfectivo = Number(currentTurno.ventas_efectivo != null ? currentTurno.ventas_efectivo : (currentTurno.total_ventas_efectivo != null ? currentTurno.total_ventas_efectivo : 0));
+    const entradas = Number(currentTurno.entradas_efectivo || 0);
+    const salidas = Number(currentTurno.salidas_efectivo || 0);
+    const netoMovimientos = entradas - salidas;
+    const efectivoEsperado = computeExpectedCash(currentTurno);
+    activeExpectedCash = efectivoEsperado;
 
-    if (cajaEl) {
-        cajaEl.textContent = currentTurno.caja
-            ? `${currentTurno.caja.descripcion} (#${currentTurno.id_caja})`
-            : `Caja #${currentTurno.id_caja}`;
+    // Resumen superior compacto (4 filas limpias sin signos)
+    const montoEl = document.getElementById('close-summary-monto');
+    const ventasEl = document.getElementById('close-summary-ventas');
+    const movsEl = document.getElementById('close-summary-movimientos');
+    const esperadoEl = document.getElementById('close-summary-esperado');
+    const quickBtnText = document.getElementById('btn-cash-quick-match-text');
+
+    if (montoEl) montoEl.textContent = formatCurrency(montoInicial);
+    if (ventasEl) ventasEl.textContent = formatCurrency(ventasEfectivo);
+    if (movsEl) {
+        if (netoMovimientos === 0) {
+            movsEl.textContent = 'Q 0.00';
+            movsEl.className = 'fw-semibold text-dark small font-monospace';
+        } else if (netoMovimientos > 0) {
+            movsEl.textContent = `+ ${formatCurrency(netoMovimientos)}`;
+            movsEl.className = 'fw-semibold text-success small font-monospace';
+        } else {
+            movsEl.textContent = `- ${formatCurrency(Math.abs(netoMovimientos))}`;
+            movsEl.className = 'fw-semibold text-danger small font-monospace';
+        }
     }
-    if (fechaEl) fechaEl.textContent = formatDateTime(currentTurno.fecha_apertura);
-    if (montoEl) montoEl.textContent = formatCurrency(currentTurno.monto_apertura);
+    if (esperadoEl) esperadoEl.textContent = formatCurrency(efectivoEsperado);
+
+    // Botón sobrio: "Usar monto esperado (Q X.XX)" (sin emojis)
+    if (quickBtnText) {
+        quickBtnText.textContent = `Usar monto esperado (${formatCurrency(efectivoEsperado)})`;
+    }
+
+    // Actualizar indicador de diferencia (oculto mientras el campo esté vacío)
+    updateCashDifferenceIndicator();
 
     const modal = getModal('close-cash-modal');
     if (modal) {
@@ -402,9 +455,54 @@ window.openCloseCashModal = function() {
 };
 
 // ---------------------------------------------------------------------------
-// Manejo de envíos de formularios (Apertura y Cierre)
+// Indicador de Diferencia en Tiempo Real (Minimalista)
 // ---------------------------------------------------------------------------
 
+function updateCashDifferenceIndicator() {
+    const montoInput = document.getElementById('close-cash-monto');
+    const alertEl = document.getElementById('close-cash-diff-alert');
+    if (!alertEl || !montoInput) return;
+
+    const valStr = montoInput.value.trim();
+    if (valStr === '') {
+        alertEl.textContent = '';
+        alertEl.className = 'small mt-1 mb-1 d-none';
+        return;
+    }
+
+    const entered = parseFloat(valStr);
+    if (isNaN(entered) || entered < 0) {
+        alertEl.className = 'small fw-semibold text-danger mt-1 mb-1';
+        alertEl.textContent = 'Ingrese un monto numérico válido mayor o igual a 0.';
+        alertEl.classList.remove('d-none');
+        return;
+    }
+
+    const diff = Math.round((entered - activeExpectedCash) * 100) / 100;
+    
+    if (Math.abs(diff) < 0.005) {
+        // Cuadre exacto (verde, sobrio, sin emojis)
+        alertEl.className = 'small fw-bold text-success mt-1 mb-1';
+        alertEl.textContent = 'Cuadre exacto (Diferencia: Q 0.00)';
+    } else if (diff < 0) {
+        // Faltante (rojo, sobrio, sin emojis)
+        const faltan = Math.abs(diff).toFixed(2);
+        alertEl.className = 'small fw-bold text-danger mt-1 mb-1';
+        alertEl.textContent = `Faltante en caja: -Q ${faltan}`;
+    } else {
+        // Sobrante (azul, sobrio, sin emojis)
+        const sobran = diff.toFixed(2);
+        alertEl.className = 'small fw-bold text-primary mt-1 mb-1';
+        alertEl.textContent = `Sobrante en caja: +Q ${sobran}`;
+    }
+    alertEl.classList.remove('d-none');
+}
+
+function renderCashCalculator() {}
+function updateCalculatorTotal() {}
+function resetCashCalculator() {}
+
+// ---------------------------------------------------------------------------
 async function handleOpenCashSubmit(e) {
     e.preventDefault();
     const form = document.getElementById('open-cash-form');
@@ -577,7 +675,7 @@ window.openCashMovementModal = function() {
     if (modal) modal.show();
 };
 
-function handleCashMovementSubmit(e) {
+async function handleCashMovementSubmit(e) {
     e.preventDefault();
     const form = document.getElementById('cash-movement-form');
     if (!form) return;
@@ -591,20 +689,43 @@ function handleCashMovementSubmit(e) {
         return;
     }
 
-    // Actualizar indicador de efectivo esperado en pantalla
-    const esperadoEl = document.getElementById('cash-active-esperado');
-    if (esperadoEl) {
-        const currentExpected = parseFloat(esperadoEl.textContent.replace(/[^0-9.]/g, '')) || 0;
-        const newExpected = type === 'gasto' ? Math.max(0, currentExpected - amount) : (currentExpected + amount);
-        esperadoEl.textContent = formatCurrency(newExpected);
-    }
+    const submitBtn = document.getElementById('btn-submit-cash-movement');
+    if (submitBtn) submitBtn.disabled = true;
 
-    const modal = getModal('cash-movement-modal');
-    if (modal) modal.hide();
+    try {
+        const payload = {
+            id_tipo_movimiento: type === 'entrada' ? 1 : 2,
+            monto: amount,
+            justificacion: concept,
+        };
+        const res = await fetch(`${CASH_API}/movimiento`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify(payload),
+        });
 
-    if (typeof window.showToast === 'function') {
-        const typeLabel = type === 'gasto' ? 'Gasto menor' : 'Entrada para cambio';
-        window.showToast(`${typeLabel} registrado (${formatCurrency(amount)}): "${escapeHtml(concept)}"`, 'success');
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error((err && err.detail) || 'Error al registrar movimiento');
+        }
+
+        const modal = getModal('cash-movement-modal');
+        if (modal) modal.hide();
+
+        const typeLabel = type === 'gasto' ? 'Gasto menor (salida)' : 'Entrada para cambio';
+        if (typeof window.showToast === 'function') {
+            window.showToast(`${typeLabel} registrado (${formatCurrency(amount)}): "${escapeHtml(concept)}"`, 'success');
+        }
+
+        await loadCurrentCashStatus();
+        await loadCashTurnos();
+    } catch (err) {
+        console.error('Error registrando movimiento:', err);
+        if (typeof window.showToast === 'function') {
+            window.showToast(err.message || 'Error al registrar movimiento en servidor', 'danger');
+        }
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
@@ -646,22 +767,47 @@ async function loadCashTurnos() {
                 const badgeClass = isOpen ? 'bg-success text-white' : 'bg-secondary text-white';
                 const estadoText = isOpen ? 'Abierto' : 'Cerrado';
                 const fechaCierre = t.fecha_cierre ? formatDateTime(t.fecha_cierre) : '<span class="text-muted fst-italic">En curso</span>';
-                const montoCierre = t.monto_cierre !== null && t.monto_cierre !== undefined
-                    ? formatCurrency(t.monto_cierre)
-                    : '<span class="text-muted">-</span>';
-                const notas = t.notas ? escapeHtml(t.notas) : '<span class="text-muted">-</span>';
+                const montoApertura = Number(t.monto_apertura || 0);
+                const ventasEfectivo = Number(t.ventas_efectivo != null ? t.ventas_efectivo : 0);
+                const entradas = Number(t.entradas_efectivo || 0);
+                const salidas = Number(t.salidas_efectivo || 0);
+                const efectivoEsperado = t.efectivo_esperado != null
+                    ? Number(t.efectivo_esperado)
+                    : Math.max(0, montoApertura + ventasEfectivo + entradas - salidas);
+
+                const montoCierre = (t.monto_cierre !== null && t.monto_cierre !== undefined)
+                    ? Number(t.monto_cierre)
+                    : null;
+
+                // Diferencia: Badge limpio sin iconos (verde Q 0.00, rojo -Q X.XX, azul +Q X.XX, o gris En curso)
+                let diffBadge = '<span class="badge bg-light text-muted border px-2 py-1 font-monospace">En curso</span>';
+                if (!isOpen && montoCierre !== null) {
+                    const diff = t.diferencia != null ? Number(t.diferencia) : (montoCierre - efectivoEsperado);
+                    if (Math.abs(diff) < 0.005) {
+                        diffBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 font-monospace">Q 0.00</span>`;
+                    } else if (diff < 0) {
+                        diffBadge = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 font-monospace">-Q ${Math.abs(diff).toFixed(2)}</span>`;
+                    } else {
+                        diffBadge = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 font-monospace">+Q ${diff.toFixed(2)}</span>`;
+                    }
+                }
 
                 return `
                     <tr>
-                        <td class="fw-semibold text-muted">#${t.id_turno}</td>
-                        <td class="fw-medium text-dark">${escapeHtml(cajaDesc)}</td>
-                        <td>${escapeHtml(cajero)}</td>
-                        <td class="text-verde fw-semibold">${formatCurrency(t.monto_apertura)}</td>
-                        <td class="fw-semibold">${montoCierre}</td>
-                        <td class="small">${formatDateTime(t.fecha_apertura)}</td>
-                        <td class="small">${fechaCierre}</td>
+                        <td>
+                            <strong class="text-dark">#${t.id_turno}</strong>
+                            <span class="text-muted small d-block">${escapeHtml(cajaDesc)}</span>
+                        </td>
+                        <td class="text-dark">${escapeHtml(cajero)}</td>
+                        <td>
+                            <div class="small fw-medium text-dark">${formatDateTime(t.fecha_apertura)}</div>
+                            <div class="small text-muted">${fechaCierre}</div>
+                        </td>
+                        <td class="font-monospace text-dark">${formatCurrency(t.monto_apertura)}</td>
+                        <td class="fw-bold font-monospace text-teal">${formatCurrency(efectivoEsperado)}</td>
+                        <td class="fw-bold font-monospace">${montoCierre !== null ? formatCurrency(montoCierre) : '<span class="text-muted">-</span>'}</td>
+                        <td>${diffBadge}</td>
                         <td><span class="badge ${badgeClass} rounded-pill px-2 py-1">${estadoText}</span></td>
-                        <td class="small text-muted" style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(t.notas || '')}">${notas}</td>
                     </tr>
                 `;
             }).join('');
@@ -787,6 +933,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeForm = document.getElementById('close-cash-form');
     if (closeForm) closeForm.addEventListener('submit', handleCloseCashSubmit);
+
+    // Botón de llenado rápido ("Todo cuadra")
+    const btnQuickMatch = document.getElementById('btn-cash-quick-match');
+    if (btnQuickMatch) {
+        btnQuickMatch.addEventListener('click', () => {
+            const montoInput = document.getElementById('close-cash-monto');
+            if (montoInput) {
+                montoInput.value = activeExpectedCash.toFixed(2);
+                montoInput.classList.remove('is-invalid');
+                updateCashDifferenceIndicator();
+            }
+        });
+    }
+
+    // Input de monto de cierre: deshabilitar scroll de mouse y actualizar diferencia en vivo
+    const closeMontoInput = document.getElementById('close-cash-monto');
+    if (closeMontoInput) {
+        closeMontoInput.addEventListener('input', updateCashDifferenceIndicator);
+        closeMontoInput.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+    }
+
+    // Botón para reiniciar calculadora de billetes
+    const btnResetCalc = document.getElementById('btn-reset-cash-calculator');
+    if (btnResetCalc) {
+        btnResetCalc.addEventListener('click', resetCashCalculator);
+    }
 
     const movementForm = document.getElementById('cash-movement-form');
     if (movementForm) movementForm.addEventListener('submit', handleCashMovementSubmit);

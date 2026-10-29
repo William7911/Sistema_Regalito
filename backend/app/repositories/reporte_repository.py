@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.models import (
     Categoria,
+    CierreCajaCiegas,
     Cliente,
     ClienteContacto,
     Compra,
@@ -15,9 +16,12 @@ from app.db.models import (
     DetalleVenta,
     InventarioSucursal,
     Merma,
+    MetodoPago,
     Municipio,
+    PagoVenta,
     Producto,
     Subcategoria,
+    TurnoCaja,
     Usuario,
     VarianteProducto,
     Venta,
@@ -48,7 +52,13 @@ class ReporteRepositoryImpl:
         dt_inicio, dt_fin = _rango_utc(inicio, fin)
         stmt = (
             select(Venta)
-            .options(selectinload(Venta.usuario))
+            .options(
+                selectinload(Venta.usuario),
+                selectinload(Venta.detalles)
+                .selectinload(DetalleVenta.variante)
+                .selectinload(VarianteProducto.producto),
+                selectinload(Venta.pagos).selectinload(PagoVenta.metodo_pago),
+            )
             .where(Venta.fecha_venta >= dt_inicio, Venta.fecha_venta <= dt_fin)
             .order_by(Venta.fecha_venta.desc())
         )
@@ -99,13 +109,109 @@ class ReporteRepositoryImpl:
         )
         if estado:
             stmt = stmt.where(func.lower(Usuario.estado) == func.lower(estado))
-        if fecha_desde:
-            stmt = stmt.where(Usuario.fecha_creacion >= datetime.combine(fecha_desde, time.min))
-        if fecha_hasta:
-            stmt = stmt.where(Usuario.fecha_creacion <= datetime.combine(fecha_hasta, time.max))
 
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_usuarios_metricas_operativas(
+        self,
+        fecha_desde: Optional[date] = None,
+        fecha_hasta: Optional[date] = None,
+    ) -> Dict[int, dict]:
+        """Calcula el rendimiento operativo por usuario en el rango de fechas:
+        - Ventas cobradas / realizadas (count y total)
+        - Turnos de caja cerrados
+        - Diferencia acumulada en cierres de caja
+        - Compras / ingresos a bodega registrados
+        """
+        metricas: Dict[int, dict] = {}
+
+        # 1. Ventas realizadas por usuario
+        stmt_v = (
+            select(
+                Venta.id_usuario,
+                func.count(Venta.id_venta).label("ventas_count"),
+                func.coalesce(func.sum(Venta.total_venta), Decimal("0.00")).label("total_vendido")
+            )
+            .where(func.lower(Venta.estado) != "anulada")
+        )
+        if fecha_desde and fecha_hasta:
+            dt_inicio, dt_fin = _rango_utc(fecha_desde, fecha_hasta)
+            stmt_v = stmt_v.where(Venta.fecha_venta >= dt_inicio, Venta.fecha_venta <= dt_fin)
+        elif fecha_desde:
+            stmt_v = stmt_v.where(Venta.fecha_venta >= datetime.combine(fecha_desde, time.min) + GUATEMALA_OFFSET)
+        elif fecha_hasta:
+            stmt_v = stmt_v.where(Venta.fecha_venta <= datetime.combine(fecha_hasta, time.max) + GUATEMALA_OFFSET)
+
+        stmt_v = stmt_v.group_by(Venta.id_usuario)
+        res_v = await self.db.execute(stmt_v)
+        for row in res_v:
+            metricas.setdefault(row.id_usuario, {})
+            metricas[row.id_usuario]["ventas_count"] = int(row.ventas_count or 0)
+            metricas[row.id_usuario]["total_vendido"] = Decimal(str(row.total_vendido or 0))
+
+        # 2. Turnos de caja cerrados
+        stmt_t = (
+            select(
+                TurnoCaja.id_usuario,
+                func.count(TurnoCaja.id_turno).label("turnos_cerrados")
+            )
+            .where(func.lower(TurnoCaja.estado) == "cerrado")
+        )
+        if fecha_desde and fecha_hasta:
+            dt_inicio, dt_fin = _rango_utc(fecha_desde, fecha_hasta)
+            stmt_t = stmt_t.where(TurnoCaja.fecha_apertura >= dt_inicio, TurnoCaja.fecha_apertura <= dt_fin)
+        elif fecha_desde:
+            stmt_t = stmt_t.where(TurnoCaja.fecha_apertura >= datetime.combine(fecha_desde, time.min) + GUATEMALA_OFFSET)
+        elif fecha_hasta:
+            stmt_t = stmt_t.where(TurnoCaja.fecha_apertura <= datetime.combine(fecha_hasta, time.max) + GUATEMALA_OFFSET)
+
+        stmt_t = stmt_t.group_by(TurnoCaja.id_usuario)
+        res_t = await self.db.execute(stmt_t)
+        for row in res_t:
+            metricas.setdefault(row.id_usuario, {})
+            metricas[row.id_usuario]["turnos_cerrados"] = int(row.turnos_cerrados or 0)
+
+        # 3. Diferencia de caja en cierres
+        stmt_c = (
+            select(
+                CierreCajaCiegas.id_usuario_cajero,
+                func.coalesce(func.sum(CierreCajaCiegas.diferencia), Decimal("0.00")).label("diferencia_caja")
+            )
+        )
+        if fecha_desde and fecha_hasta:
+            dt_inicio, dt_fin = _rango_utc(fecha_desde, fecha_hasta)
+            stmt_c = stmt_c.where(CierreCajaCiegas.fecha_cierre >= dt_inicio, CierreCajaCiegas.fecha_cierre <= dt_fin)
+        elif fecha_desde:
+            stmt_c = stmt_c.where(CierreCajaCiegas.fecha_cierre >= datetime.combine(fecha_desde, time.min) + GUATEMALA_OFFSET)
+        elif fecha_hasta:
+            stmt_c = stmt_c.where(CierreCajaCiegas.fecha_cierre <= datetime.combine(fecha_hasta, time.max) + GUATEMALA_OFFSET)
+
+        stmt_c = stmt_c.group_by(CierreCajaCiegas.id_usuario_cajero)
+        res_c = await self.db.execute(stmt_c)
+        for row in res_c:
+            metricas.setdefault(row.id_usuario_cajero, {})
+            metricas[row.id_usuario_cajero]["diferencia_caja"] = Decimal(str(row.diferencia_caja or 0))
+
+        # 4. Ingresos de bodega (compras)
+        stmt_comp = (
+            select(
+                Compra.id_usuario,
+                func.count(Compra.id_compra).label("ingresos_bodega")
+            )
+        )
+        if fecha_desde:
+            stmt_comp = stmt_comp.where(Compra.fecha_ingreso >= fecha_desde)
+        if fecha_hasta:
+            stmt_comp = stmt_comp.where(Compra.fecha_ingreso <= fecha_hasta)
+
+        stmt_comp = stmt_comp.group_by(Compra.id_usuario)
+        res_comp = await self.db.execute(stmt_comp)
+        for row in res_comp:
+            metricas.setdefault(row.id_usuario, {})
+            metricas[row.id_usuario]["ingresos_bodega"] = int(row.ingresos_bodega or 0)
+
+        return metricas
 
     async def get_usuario_by_id(self, id_usuario: int) -> Optional[Usuario]:
         stmt = (
@@ -209,9 +315,33 @@ class ReporteRepositoryImpl:
         )
         total_compras, count_compras = (await self.db.execute(stmt_compras)).one()
 
+        # 4) Costo de lo vendido y Ganancia Estimada (Utilidad Neta del período)
+        stmt_costos = (
+            select(
+                func.coalesce(func.sum(DetalleVenta.cantidad * VarianteProducto.costo_promedio), 0)
+            )
+            .select_from(DetalleVenta)
+            .join(Venta, DetalleVenta.id_venta == Venta.id_venta)
+            .join(VarianteProducto, DetalleVenta.id_variante == VarianteProducto.id_variante)
+            .where(
+                Venta.fecha_venta >= dt_inicio,
+                Venta.fecha_venta <= dt_fin,
+                Venta.estado == "Completada",
+            )
+        )
+        costo_vendido = Decimal(str((await self.db.execute(stmt_costos)).scalar() or 0))
+        total_ventas_dec = Decimal(str(total_ventas))
+        ganancia_estimada = total_ventas_dec - costo_vendido
+        margen = Decimal("0.00")
+        if total_ventas_dec > 0:
+            margen = ((ganancia_estimada / total_ventas_dec) * 100).quantize(Decimal("0.1"))
+
         return {
-            "ventas": Decimal(str(total_ventas)),
+            "ventas": total_ventas_dec,
             "count_ventas": int(count_ventas),
+            "ganancia_estimada": ganancia_estimada,
+            "costo_vendido": costo_vendido,
+            "margen_ganancia": margen,
             "mermas": Decimal(str(total_mermas)),
             "count_mermas": int(count_mermas),
             "compras": Decimal(str(total_compras)),
@@ -412,7 +542,7 @@ class ReporteRepositoryImpl:
                 VarianteProducto.color,
                 VarianteProducto.costo_promedio,
             )
-            .order_by(stock_total.desc(), Producto.nombre.asc())
+            .order_by(stock_total.asc(), Producto.nombre.asc())
             .limit(limite)
         )
         rows = (await self.db.execute(stmt)).all()

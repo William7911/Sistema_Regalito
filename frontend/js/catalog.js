@@ -1044,6 +1044,7 @@ function openCreateProductModal() {
         setTimeout(() => nameInput && nameInput.focus(), 350);
     });
 }
+window.openCreateProductModal = openCreateProductModal;
 
 async function editProduct(productId) {
     clearCatalogErrors('product-form');
@@ -1256,12 +1257,26 @@ async function saveProduct(event) {
             await handleCatalogApiError(res, formId);
             return;
         }
+        const createdProduct = await res.json().catch(() => null);
         const modal = getModal('product-modal');
         if (modal) modal.hide();
         // REDISEÑO UI/UX: cada valor nuevo se suma a las sugerencias del combobox
         // de atributo universal para agilizar la captura en inventarios mixtos.
         registerAtributoSugerido(inputFor(formId, 'atributo_variante')?.value?.trim() || '');
         showToast(id ? 'Producto actualizado correctamente.' : 'Producto creado correctamente.', 'success');
+
+        // Hook de callback para compras u otros módulos que invocan el modal
+        if (!id && typeof window.onProductCreatedSuccess === 'function') {
+            const cb = window.onProductCreatedSuccess;
+            window.onProductCreatedSuccess = null;
+            try {
+                await cb(createdProduct);
+            } catch (cbErr) {
+                console.error('Error en onProductCreatedSuccess:', cbErr);
+            }
+            return;
+        }
+
         await loadProducts();
     } catch (err) {
         showToast(err.message, 'danger');
@@ -1527,7 +1542,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const productModal = document.getElementById('product-modal');
-    if (productModal) productModal.addEventListener('hidden.bs.modal', resetProductForm);
+    if (productModal) {
+        productModal.addEventListener('hidden.bs.modal', () => {
+            resetProductForm();
+            if (typeof window.onProductCreatedSuccess === 'function') {
+                window.onProductCreatedSuccess = null;
+            }
+        });
+    }
     const categoryModal = document.getElementById('category-modal');
     if (categoryModal) categoryModal.addEventListener('hidden.bs.modal', resetCategoryForm);
 

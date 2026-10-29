@@ -25,7 +25,7 @@
     <!-- Custom CSS -->
     <!-- Corrección UI: versión incrementada para forzar la recarga de los estilos nuevos -->
     <!-- Rediseño de Catálogos: toolbar con tabs/dropdown, buscadores con clear y miniaturas. -->
-    <link rel="stylesheet" href="css/style.css?v=6.7">
+    <link rel="stylesheet" href="css/style.css?v=9.0">
     <style id="pos-ticket-page-style">@page { size: 80mm auto; margin: 0; }</style>
     <style>
         /* Desactivar de inmediato ícono nativo de contraseña en Edge/Chromium */
@@ -327,138 +327,143 @@
             </header>
 
             <!-- Dashboard Content -->
-            <div id="dashboard-content" class="p-4 flex-grow-1 overflow-auto" data-main-view="dashboard">
-                <div class="mb-4">
+            <div id="dashboard-content" class="p-3 p-md-4 flex-grow-1 overflow-auto" data-main-view="dashboard">
+                <div class="mb-3 mb-md-4">
                     <h4 class="fw-bold mb-1" id="header-greeting">¡Hola, Administrador!</h4>
                     <p class="text-muted mb-0"><span id="header-date">Octubre de 2026</span> · Resumen del día en tu tienda</p>
                 </div>
 
-                <!-- 1. Barra superior: estado de caja -->
-                <div data-dashblock="turno-bar">
-                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <!-- 1. Barra superior: Estado de caja -->
+                <div data-dashblock="turno-bar" class="mb-3 mb-md-4">
+                    <div class="card border-0 shadow-sm rounded-4">
                         <div class="card-body p-3 p-md-4">
                             <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
                                 <div class="d-flex align-items-center gap-3">
                                     <div class="icon-circle bg-teal-light text-teal-dark"><i class="bi bi-cash-stack"></i></div>
                                     <div>
                                         <div class="d-flex align-items-center gap-2 mb-1">
-                                            <span class="fw-bold text-dark">Estado de caja</span>
-                                            <span id="dash-turno-badge" class="badge rounded-pill bg-secondary-subtle text-secondary" ><i class="bi bi-circle-fill me-1"></i>Verificando...</span>
+                                            <span class="fw-bold text-dark fs-6">Estado de caja</span>
+                                            <span id="dash-turno-badge" class="badge rounded-pill bg-secondary-subtle text-secondary"><i class="bi bi-circle-fill me-1"></i>Verificando...</span>
                                         </div>
                                         <div class="text-muted small" id="dash-turno-detalle">Cargando...</div>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
-                                    <button id="dash-btn-pos" type="button" class="btn btn-teal"><i class="bi bi-cart-fill me-1"></i> Ir al POS</button>
-                                    <button id="dash-btn-abrir-caja" type="button" class="btn btn-outline-secondary"><i class="bi bi-cash-coin me-1"></i> Abrir caja</button>
-                                    <button id="dash-btn-cerrar-caja" type="button" class="btn btn-outline-danger"><i class="bi bi-cash-stack me-1"></i> Cerrar caja</button>
+                                    <button id="dash-btn-pos" type="button" class="btn btn-teal px-3 py-2"><i class="bi bi-cart-fill me-1"></i> Ir a Vender</button>
+                                    <button id="dash-btn-abrir-caja" type="button" class="btn btn-outline-secondary px-3 py-2"><i class="bi bi-cash-coin me-1"></i> Abrir caja</button>
+                                    <button id="dash-btn-cerrar-caja" type="button" class="btn btn-outline-danger px-3 py-2"><i class="bi bi-cash-stack me-1"></i> Cerrar caja</button>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. KPIs -->
-                <div class="row g-4 mb-4">
-                    <div class="col-md-6 col-xl-4" data-dashblock="kpi-ventas">
+
+                <!-- 3. Tarjetas de Resumen del Día ("HOY") -->
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-calendar2-day me-2 text-teal"></i>Resumen de hoy</h6>
+                </div>
+                <div class="row g-3 g-md-4 mb-4" data-dashblock="resumen-hoy">
+                    <!-- KPI 1: Ventas de hoy -->
+                    <div class="col-12 col-md-4" data-dashblock="kpi-ventas">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body">
+                            <div class="card-body p-3 p-md-4">
                                 <div class="d-flex justify-content-between mb-3">
                                     <div class="icon-circle bg-teal-light text-teal-dark"><i class="bi bi-currency-dollar"></i></div>
-                                    <span class="status-dot status-normal" title="Normal"></span>
+                                    <span class="badge bg-teal-subtle text-teal-dark rounded-pill px-2 py-1 small">Hoy</span>
                                 </div>
                                 <p class="text-muted mb-1 fw-medium">Ventas de hoy</p>
-                                <h3 class="fw-bold text-dark"><span id="dash-ventas-hoy">Q 0.00</span></h3>
-                                <div class="small text-muted" id="dash-ventas-hoy-detalle"></div>
+                                <h3 class="fw-bold text-dark mb-1"><span id="dash-ventas-hoy">Q 0.00</span></h3>
+                                <div class="small text-muted" id="dash-ventas-hoy-detalle">0 ventas realizadas</div>
                                 <div class="small fw-medium mt-1" id="dash-ventas-hoy-vs-ayer"></div>
                                 <div class="small text-warning fw-medium mt-1 d-none" id="dash-ventas-hoy-empty">
                                     <i class="bi bi-exclamation-circle me-1"></i>Aún no hay ventas hoy.
-                                    <a href="#" class="text-teal text-decoration-none fw-semibold" data-dash-nav="pos">Ir al POS</a>
+                                    <a href="#" class="text-teal text-decoration-none fw-semibold ms-1" data-dash-nav="pos">Realizar Venta</a>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6 col-xl-4" data-dashblock="kpi-metodos">
+
+                    <!-- KPI 2: Ingresos por método de pago (Hoy) -->
+                    <div class="col-12 col-md-4" data-dashblock="kpi-metodos">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body">
+                            <div class="card-body p-3 p-md-4">
                                 <div class="d-flex justify-content-between mb-3">
                                     <div class="icon-circle bg-celeste-light text-celeste"><i class="bi bi-credit-card-2-front"></i></div>
-                                    <span class="status-dot status-normal" title="Normal"></span>
+                                    <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-2 py-1 small">Hoy</span>
                                 </div>
-                                <p class="text-muted mb-2 fw-medium">Ventas por método de pago hoy</p>
+                                <p class="text-muted mb-2 fw-medium">Ingresos por método de pago (Hoy)</p>
                                 <div id="dash-metodos-list">
                                     <div class="dash-skeleton-line mb-2"></div>
                                     <div class="dash-skeleton-line w-75 mb-2"></div>
                                     <div class="dash-skeleton-line w-50"></div>
                                 </div>
-                                <div class="small text-muted mt-2 d-none" id="dash-metodos-empty">Sin métodos registrados hoy.</div>
+                                <div class="small text-muted mt-2 d-none" id="dash-metodos-empty">Sin ingresos registrados hoy.</div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6 col-xl-4" data-dashblock="kpi-mermas">
+
+                    <!-- KPI 3: Efectivo esperado en caja -->
+                    <div class="col-12 col-md-4" data-dashblock="kpi-efectivo-caja">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body">
+                            <div class="card-body p-3 p-md-4">
                                 <div class="d-flex justify-content-between mb-3">
-                                    <div class="icon-circle bg-danger-light text-danger"><i class="bi bi-trash3"></i></div>
-                                    <span class="status-dot status-normal" title="Normal"></span>
+                                    <div class="icon-circle bg-teal-light text-teal-dark"><i class="bi bi-safe"></i></div>
+                                    <span class="badge bg-teal-subtle text-teal-dark rounded-pill px-2 py-1 small">En gaveta</span>
                                 </div>
-                                <p class="text-muted mb-1 fw-medium">Mermas del mes</p>
-                                <h3 class="fw-bold text-dark"><span id="dash-mermas-mes">Q 0.00</span></h3>
-                                <small class="text-muted fs-6" id="dash-mermas-mes-detalle">Cargando...</small>
+                                <p class="text-muted mb-1 fw-medium">Efectivo esperado en caja</p>
+                                <h3 class="fw-bold text-dark mb-1"><span id="dash-efectivo-caja">Q 0.00</span></h3>
+                                <div class="small text-muted" id="dash-efectivo-caja-detalle">Fondo inicial + ventas en efectivo</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 3. Gráfico 7 días + top productos -->
+                <!-- 4. Sección Inferior en 2 Columnas: Últimas ventas y Stock por agotarse -->
                 <div class="row g-4 mb-4">
-                    <div class="col-12 col-lg-8" data-dashblock="grafico-ventas">
+                    <!-- Columna Izquierda: Últimas ventas -->
+                    <div class="col-12 col-lg-7" data-dashblock="ultimas-ventas">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body p-4">
+                            <div class="card-body p-3 p-md-4">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                                    <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-line me-2 text-celeste"></i>Ventas de los últimos 7 días</h6>
-                                    <span class="badge bg-teal-light text-teal-dark">últimos 7 días</span>
+                                    <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-receipt-cutoff me-2 text-teal"></i>Últimas ventas</h6>
+                                    <a href="#" class="small text-teal text-decoration-none fw-semibold" data-dash-nav="pos">Ver todas las ventas</a>
                                 </div>
-                                <div class="dash-skeleton" id="dash-chart-skeleton" style="height: 220px;"></div>
-                                <div class="dash-chart-wrap d-none" id="dash-chart-wrap">
-                                    <canvas id="dash-ventas-chart"></canvas>
+                                <div class="dash-skeleton mb-2 d-block" id="dash-ultimas-skeleton">
+                                    <div class="dash-skeleton-line mb-2"></div>
+                                    <div class="dash-skeleton-line mb-2"></div>
+                                    <div class="dash-skeleton-line"></div>
                                 </div>
-                                <div class="text-center text-muted py-4 d-none" id="dash-chart-empty">
-                                    <i class="bi bi-bar-chart fs-1 d-block mb-2 opacity-50"></i>
-                                    <span>No hay ventas en los últimos 7 días.</span>
+                                <div class="table-responsive d-none rounded-3 overflow-hidden border" id="dash-ultimas-container">
+                                    <table class="table table-sm table-hover align-middle mb-0">
+                                        <thead style="background-color: #0A5C5E !important;">
+                                            <tr>
+                                                <th class="text-white fw-bold py-2 px-3 border-0">No. Venta</th>
+                                                <th class="text-white fw-bold py-2 border-0">Hora</th>
+                                                <th class="text-white fw-bold py-2 text-center border-0">Artículos</th>
+                                                <th class="text-white fw-bold py-2 px-3 text-end border-0">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="dash-ultimas-ventas-body"></tbody>
+                                    </table>
+                                </div>
+                                <div class="text-center text-muted py-4 d-none" id="dash-ultimas-empty">
+                                    <i class="bi bi-receipt fs-1 d-block mb-2 opacity-50"></i>
+                                    <span>Aún no hay ventas registradas hoy.</span>
+                                    <div class="mt-2">
+                                        <a href="#" class="btn btn-sm btn-teal" data-dash-nav="pos"><i class="bi bi-cart-fill me-1"></i>Realizar Venta</a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-12 col-lg-4" data-dashblock="top-productos">
-                        <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body p-4">
-                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                                    <h6 class="fw-bold mb-0"><i class="bi bi-trophy me-2 text-rosado"></i>Top 5 productos de la semana</h6>
-                                    <a href="#" class="small text-teal text-decoration-none fw-semibold text-nowrap" data-dash-nav="reportes">Ver reportes</a>
-                                </div>
-                                <div id="dash-top-productos-list">
-                                    <div class="dash-skeleton-line mb-2"></div>
-                                    <div class="dash-skeleton-line mb-2"></div>
-                                    <div class="dash-skeleton-line mb-2"></div>
-                                    <div class="dash-skeleton-line w-75"></div>
-                                </div>
-                                <div class="text-center text-muted py-4 d-none" id="dash-top-productos-empty">
-                                    <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
-                                    <span>Sin productos vendidos esta semana.</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- 4. Stock crítico + pendientes -->
-                <div class="row g-4 mb-4">
+                    <!-- Columna Derecha: Alertas de Inventario / Productos por agotarse -->
                     <div class="col-12 col-lg-5" data-dashblock="stock-critico">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body p-4">
+                            <div class="card-body p-3 p-md-4">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                                    <h6 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-danger"></i>Stock crítico</h6>
+                                    <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-box-seam me-2 text-danger"></i>Productos por agotarse</h6>
                                     <a href="#" class="small text-teal text-decoration-none fw-semibold text-nowrap" data-dash-nav="inventory">Ver inventario</a>
                                 </div>
                                 <div id="dash-stock-list">
@@ -468,115 +473,14 @@
                                 </div>
                                 <div class="text-center text-muted py-4 d-none" id="dash-stock-empty">
                                     <i class="bi bi-check-circle fs-1 d-block mb-2 opacity-50 text-success"></i>
-                                    <span>Stock en niveles adecuados.</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-lg-7" data-dashblock="pendientes">
-                        <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body p-4">
-                                <h6 class="fw-bold mb-3"><i class="bi bi-hourglass-split me-2 text-warning-dark"></i>Pendientes por atender</h6>
-                                <div data-dashblock="pendientes-compras">
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <span class="fw-semibold small text-muted"><i class="bi bi-bag-check me-1"></i>Órdenes de compra por recibir</span>
-                                        <a href="#" class="small text-teal text-decoration-none fw-semibold" data-dash-nav="compras">Compras</a>
-                                    </div>
-                                    <div id="dash-ordenes-list">
-                                        <div class="dash-skeleton-line mb-2"></div>
-                                        <div class="dash-skeleton-line w-75"></div>
-                                    </div>
-                                    <div class="small text-muted py-2 d-none" id="dash-ordenes-empty">Sin órdenes emitidas pendientes de recibir.</div>
-                                </div>
-                                <div class="my-3 border-top"></div>
-                                <div data-dashblock="pendientes-traslados">
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <span class="fw-semibold small text-muted"><i class="bi bi-arrow-left-right me-1"></i>Traslados en tránsito</span>
-                                        <a href="#" class="small text-teal text-decoration-none fw-semibold" data-dash-nav="traslados">Traslados</a>
-                                    </div>
-                                    <div id="dash-traslados-list">
-                                        <div class="dash-skeleton-line mb-2"></div>
-                                        <div class="dash-skeleton-line w-75"></div>
-                                    </div>
-                                    <div class="small text-muted py-2 d-none" id="dash-traslados-empty">Sin traslados en tránsito.</div>
+                                    <span>Inventario en niveles adecuados.</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- 5. Últimas 5 ventas -->
-                <div class="card border-0 shadow-sm rounded-4 mb-4" data-dashblock="ultimas-ventas">
-                    <div class="card-body p-4">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                            <h6 class="fw-bold mb-0"><i class="bi bi-receipt-cutoff me-2 text-teal"></i>Últimas ventas</h6>
-                            <a href="#" class="small text-teal text-decoration-none fw-semibold" data-dash-nav="pos">Ir al POS</a>
-                        </div>
-                        <div class="dash-skeleton mb-2 d-block" id="dash-ultimas-skeleton">
-                            <div class="dash-skeleton-line mb-2"></div>
-                            <div class="dash-skeleton-line mb-2"></div>
-                            <div class="dash-skeleton-line"></div>
-                        </div>
-                        <div class="table-responsive d-none" id="dash-ultimas-container">
-                            <table class="table table-sm table-hover align-middle mb-0">
-                                <thead class="thead-cash">
-                                    <tr>
-                                        <th>Folio</th>
-                                        <th>Hora</th>
-                                        <th class="text-end">Total</th>
-                                        <th>Vendedor</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="dash-ultimas-ventas-body"></tbody>
-                            </table>
-                        </div>
-                        <div class="text-center text-muted py-4 d-none" id="dash-ultimas-empty">
-                            <i class="bi bi-receipt fs-1 d-block mb-2 opacity-50"></i>
-                            <span>Aún no hay ventas registradas.</span>
-                            <div class="mt-2">
-                                <a href="#" class="btn btn-sm btn-teal" data-dash-nav="pos"><i class="bi bi-cart-fill me-1"></i>Ir al POS</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 6. Accesos rápidos -->
-                <h6 class="fw-bold mb-3"><i class="bi bi-lightning-charge me-2 text-teal"></i>Accesos rápidos</h6>
-                <div class="row g-4 mb-2" data-dashblock="accesos-rapidos">
-                    <div class="col-6 col-md-3" data-dashblock="qa-venta">
-                        <button type="button" id="dash-qa-venta" class="btn btn-light p-4 w-100 h-100 rounded-4 module-btn border dash-quick-action">
-                            <i class="bi bi-cart-plus fs-2 text-teal d-block mb-2"></i>
-                            <span class="fw-semibold text-dark">Nueva venta</span>
-                            <small class="d-block text-muted mt-1">Cobrar en el POS</small>
-                        </button>
-                    </div>
-                    <div class="col-6 col-md-3" data-dashblock="qa-caja">
-                        <button type="button" id="dash-qa-caja" class="btn btn-light p-4 w-100 h-100 rounded-4 module-btn border dash-quick-action">
-                            <i class="bi bi-piggy-bank fs-2 text-teal d-block mb-2"></i>
-                            <span class="fw-semibold text-dark">Abrir / Cerrar caja</span>
-                            <small class="d-block text-muted mt-1">Gestionar turno de caja</small>
-                        </button>
-                    </div>
-                    <div class="col-6 col-md-3" data-dashblock="qa-merma">
-                        <button type="button" id="dash-qa-merma" class="btn btn-light p-4 w-100 h-100 rounded-4 module-btn border dash-quick-action">
-                            <i class="bi bi-trash3 fs-2 text-danger d-block mb-2"></i>
-                            <span class="fw-semibold text-dark">Registrar merma</span>
-                            <small class="d-block text-muted mt-1">Pérdida o deterioro</small>
-                        </button>
-                    </div>
-                    <div class="col-6 col-md-3" data-dashblock="qa-compra">
-                        <button type="button" id="dash-qa-compra" class="btn btn-light p-4 w-100 h-100 rounded-4 module-btn border dash-quick-action">
-                            <i class="bi bi-bag-plus fs-2 text-verde d-block mb-2"></i>
-                            <span class="fw-semibold text-dark">Nueva compra</span>
-                            <small class="d-block text-muted mt-1">Orden / recepción</small>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Chart.js (UMD pinneado 4.4.1) para el gráfico de barras -->
-                <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
             </div>
-
+            
             <!-- POS / Ventas Module View -->
             <div id="pos-view" class="pos-view flex-grow-1 d-none" data-main-view="pos">
                 <!-- Referencias ocultas para compatibilidad JS -->
@@ -1084,7 +988,7 @@
 
             <!-- Modal: Crear / Editar Tipo de Cliente -->
             <div class="modal fade" id="tipo-cliente-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="tipoClienteModalTitle" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                     <div class="modal-content rounded-4 border-0 shadow">
                         <div class="modal-header border-bottom-0 pb-0">
                             <h5 class="modal-title fw-bold" id="tipoClienteModalTitle">Nuevo Tipo de Cliente</h5>
@@ -1905,7 +1809,7 @@
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <button type="button" id="btn-cash-movement" class="btn btn-sm cash-movement-btn d-none" onclick="openCashMovementModal()">
-                                    <i class="bi bi-plus-slash-minus me-1"></i> ± Registrar Movimiento
+                                    <i class="bi bi-arrow-left-right me-1"></i> Registrar Entrada / Salida
                                 </button>
                                 <span id="cash-status-badge" class="badge bg-secondary px-3 py-2 rounded-pill fs-6">
                                     <i class="bi bi-clock-history me-1"></i> Verificando...
@@ -1914,28 +1818,28 @@
                         </div>
                         <div id="cash-active-details" class="row g-3 d-none">
                             <div class="col-6 col-md-4 col-lg-2">
-                                <span class="text-muted small d-block">Caja asignada</span>
-                                <strong class="text-dark" id="cash-active-caja">-</strong>
+                                <span class="cash-card-label">Caja asignada</span>
+                                <strong class="text-dark d-block text-truncate" id="cash-active-caja">-</strong>
                             </div>
                             <div class="col-6 col-md-4 col-lg-2">
-                                <span class="text-muted small d-block">Cajero a cargo</span>
-                                <strong class="text-dark" id="cash-active-cajero">-</strong>
+                                <span class="cash-card-label">Cajero a cargo</span>
+                                <strong class="text-dark d-block text-truncate" id="cash-active-cajero">-</strong>
                             </div>
                             <div class="col-6 col-md-4 col-lg-2">
-                                <span class="text-muted small d-block">Monto inicial</span>
-                                <strong class="text-verde fs-5" id="cash-active-monto">Q 0.00</strong>
+                                <span class="cash-card-label">Monto inicial</span>
+                                <strong class="text-verde fs-5 d-block font-monospace" style="white-space: nowrap;" id="cash-active-monto">Q 0.00</strong>
                             </div>
                             <div class="col-6 col-md-4 col-lg-2">
-                                <span class="text-muted small d-block">Ventas en Efectivo</span>
-                                <strong class="text-dark fs-5 font-monospace" id="cash-active-ventas">Q 0.00</strong>
+                                <span class="cash-card-label">Ventas en efectivo</span>
+                                <strong class="text-dark fs-5 d-block font-monospace" style="white-space: nowrap;" id="cash-active-ventas">Q 0.00</strong>
                             </div>
                             <div class="col-6 col-md-4 col-lg-2">
-                                <span class="text-muted small d-block">Efectivo Esperado</span>
-                                <strong class="fs-5 font-monospace fw-bold" id="cash-active-esperado" style="color: #065F46 !important;">Q 0.00</strong>
+                                <span class="cash-card-label">Efectivo esperado</span>
+                                <strong class="fs-5 d-block font-monospace fw-bold" style="color: #065F46 !important; white-space: nowrap;" id="cash-active-esperado">Q 0.00</strong>
                             </div>
                             <div class="col-6 col-md-4 col-lg-2">
-                                <span class="text-muted small d-block">Fecha y hora apertura</span>
-                                <strong class="text-dark small" id="cash-active-fecha">-</strong>
+                                <span class="cash-card-label">Fecha y hora apertura</span>
+                                <strong class="text-dark small d-block" id="cash-active-fecha">-</strong>
                             </div>
                         </div>
                         <div id="cash-closed-message" class="text-muted py-2">
@@ -1984,15 +1888,14 @@
                             <table class="table align-middle table-hover mb-0 cash-table" id="cash-table">
                                 <thead class="thead-users">
                                     <tr>
-                                        <th class="sortable" data-sort="id_turno" style="width: 80px;"># <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="caja">Caja <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="usuario">Cajero <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="monto_apertura">Monto Inicial <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="monto_cierre">Monto Cierre <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="fecha_apertura">Fecha Apertura <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="fecha_cierre">Fecha Cierre <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="estado">Estado <span class="sort-icon"></span></th>
-                                        <th>Notas</th>
+                                        <th class="sortable" data-sort="id_turno" style="width: 15%;">Turno / Caja <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="usuario" style="width: 15%;">Cajero <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="fecha_apertura" style="width: 18%;">Apertura / Cierre <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="monto_apertura" style="width: 12%;">Monto Inicial <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="efectivo_esperado" style="width: 12%;">Esperado <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="monto_cierre" style="width: 12%;">Monto Físico <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="diferencia" style="width: 8%;">Diferencia <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="estado" style="width: 8%;">Estado <span class="sort-icon"></span></th>
                                     </tr>
                                 </thead>
                                 <tbody id="cash-table-body"></tbody>
@@ -2007,10 +1910,7 @@
                 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                     <div>
                         <h4 class="fw-bold mb-1">Reportes y Estadísticas</h4>
-                        <p class="text-muted small mb-0">Consolidado general y reportes específicos con fichas descargables</p>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <p class="text-muted small mb-0">Consolidado general y rendimiento operativo del personal</p>
                     </div>
                 </div>
 
@@ -2036,49 +1936,64 @@
                 <div class="tab-content" id="reportes-tab-content">
                     <!-- Tab 1: Consolidado Operativo -->
                     <div class="tab-pane fade show active" id="content-reporte-consolidado" role="tabpanel">
-                        <!-- Filtros Inteligentes -->
+                        <!-- Filtros Inteligentes con Botones Rápidos -->
                         <div class="d-flex gap-2 flex-wrap align-items-center mb-4 p-3 bg-white rounded-4 shadow-sm border-0 filter-toolbar">
-                            <div class="input-group" style="max-width: 250px;">
+                            <div class="btn-group btn-group-sm me-md-2 reportes-quick-filters" role="group">
+                                <button type="button" class="btn btn-outline-secondary" data-quick-filter="hoy">Hoy</button>
+                                <button type="button" class="btn btn-outline-secondary" data-quick-filter="semana">Esta Semana</button>
+                                <button type="button" class="btn btn-outline-secondary active" data-quick-filter="mes">Este Mes</button>
+                                <button type="button" class="btn btn-outline-secondary" data-quick-filter="ano">Este Año</button>
+                            </div>
+                            <div class="input-group" style="max-width: 210px;">
                                 <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Desde</span>
                                 <input type="date" id="filter-reportes-from" class="form-control form-control-sm border-start-0 ps-0" title="Fecha desde">
                             </div>
-                            <div class="input-group" style="max-width: 250px;">
+                            <div class="input-group" style="max-width: 210px;">
                                 <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
                                 <input type="date" id="filter-reportes-to" class="form-control form-control-sm border-start-0 ps-0" title="Fecha hasta">
                             </div>
-                            <button id="btn-filter-reportes" class="btn btn-teal ms-2"><i class="bi bi-funnel"></i> Consultar</button>
+                            <button id="btn-filter-reportes" class="btn btn-teal btn-sm ms-md-2"><i class="bi bi-funnel"></i> Consultar</button>
                             
                             <div class="ms-auto d-flex gap-2 flex-wrap">
-                                <button id="btn-export-excel" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
-                                <button id="btn-export-csv" class="btn btn-outline-secondary"><i class="bi bi-filetype-csv me-1"></i> CSV</button>
+                                <button id="btn-export-pdf" class="btn btn-outline-danger btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i> PDF / Imprimir</button>
+                                <button id="btn-export-excel" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
                             </div>
                         </div>
 
-                        <!-- Resumen Rápido -->
-                        <div class="row g-4 mb-4" id="reportes-summary-cards">
-                            <div class="col-md-4">
+                        <!-- Resumen Rápido: 4 Tarjetas KPI -->
+                        <div class="row g-3 mb-4" id="reportes-summary-cards">
+                            <div class="col-6 col-lg-3">
                                 <div class="card border-0 shadow-sm rounded-4 h-100 reportes-kpi-card">
                                     <div class="card-body">
-                                        <h6 class="text-muted mb-2"><i class="bi bi-graph-up-arrow me-2 text-success"></i>Total Ventas</h6>
-                                        <h3 class="fw-bold mb-0 text-dark" id="reportes-total-ventas">Q 0.00</h3>
+                                        <h6 class="text-muted small mb-2"><i class="bi bi-graph-up-arrow me-1 text-primary"></i>Total Ventas</h6>
+                                        <h4 class="fw-bold mb-0 text-dark" id="reportes-total-ventas">Q 0.00</h4>
                                         <small class="text-muted" id="reportes-count-ventas">0 registros</small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-6 col-lg-3">
+                                <div class="card border-0 shadow-sm rounded-4 h-100 reportes-kpi-card border-start border-4 border-success">
+                                    <div class="card-body">
+                                        <h6 class="text-success small mb-2"><i class="bi bi-cash-stack me-1"></i>Ganancia Estimada</h6>
+                                        <h4 class="fw-bold mb-0 text-success" id="reportes-total-ganancia">Q 0.00</h4>
+                                        <small class="text-muted fw-semibold" id="reportes-margen-ganancia">Margen: 0.0%</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-lg-3">
                                 <div class="card border-0 shadow-sm rounded-4 h-100 reportes-kpi-card">
                                     <div class="card-body">
-                                        <h6 class="text-muted mb-2"><i class="bi bi-graph-down-arrow me-2 text-danger"></i>Total Mermas</h6>
-                                        <h3 class="fw-bold mb-0 text-dark" id="reportes-total-mermas">Q 0.00</h3>
+                                        <h6 class="text-muted small mb-2"><i class="bi bi-graph-down-arrow me-1 text-danger"></i>Total Mermas</h6>
+                                        <h4 class="fw-bold mb-0 text-dark" id="reportes-total-mermas">Q 0.00</h4>
                                         <small class="text-muted" id="reportes-count-mermas">0 registros</small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-6 col-lg-3">
                                 <div class="card border-0 shadow-sm rounded-4 h-100 reportes-kpi-card">
                                     <div class="card-body">
-                                        <h6 class="text-muted mb-2"><i class="bi bi-box-arrow-in-right me-2 text-teal"></i>Total Compras (Ingresos)</h6>
-                                        <h3 class="fw-bold mb-0 text-dark" id="reportes-total-compras">Q 0.00</h3>
+                                        <h6 class="text-muted small mb-2"><i class="bi bi-box-arrow-in-right me-1 text-teal"></i>Total Compras (Ingresos)</h6>
+                                        <h4 class="fw-bold mb-0 text-dark" id="reportes-total-compras">Q 0.00</h4>
                                         <small class="text-muted" id="reportes-count-compras">0 registros</small>
                                     </div>
                                 </div>
@@ -2091,9 +2006,8 @@
                                 <div class="card border-0 shadow-sm rounded-4 h-100 p-3 p-md-4 reportes-chart-card">
                                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
                                         <div class="btn-group btn-group-sm" role="group">
-                                            <button type="button" class="btn reportes-chart-pill active" data-chart="tendencia">📊 Tendencia de Ventas</button>
-                                            <button type="button" class="btn reportes-chart-pill" data-chart="categoria">🍩 Ventas por Categoría</button>
-                                            <button type="button" class="btn reportes-chart-pill" data-chart="hora">⏱ Ventas por Hora</button>
+                                            <button type="button" class="btn reportes-chart-pill active" data-chart="tendencia" data-chart-tab="tendencia"><i class="bi bi-calendar3 me-1"></i> Ventas por Día</button>
+                                            <button type="button" class="btn reportes-chart-pill" data-chart="categoria" data-chart-tab="categoria"><i class="bi bi-tags me-1"></i> Ventas por Categoría</button>
                                         </div>
                                     </div>
                                     <div class="card-body p-0 position-relative">
@@ -2108,48 +2022,19 @@
                             </div>
                             <div class="col-12 col-lg-4" id="reportes-rankings-card">
                                 <div class="card border-0 shadow-sm rounded-4 h-100 p-3 p-md-4 reportes-rank-card">
-                                    <div class="reportes-rank-head mb-2">
-                                        <h6 class="reportes-rank-title">Rankings</h6>
-                                        <div class="reportes-rank-controls">
-                                            <select id="reportes-rank-select" class="reportes-rank-select">
-                                                <option value="productos">🏆 Top 5 Productos</option>
-                                                <option value="clientes">👥 Top 5 Clientes</option>
-                                                <option value="estancados">⏳ Sin movimiento</option>
-                                            </select>
-                                            <select id="reportes-rank-limit" class="reportes-rank-select reportes-rank-limit">
-                                                <option value="5">Top 5</option>
-                                                <option value="10">Top 10</option>
-                                                <option value="20">Top 20</option>
-                                            </select>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="btn-group btn-group-sm w-100" role="group">
+                                            <button type="button" class="btn reportes-rank-pill active" data-rank-tab="productos"><i class="bi bi-trophy me-1 text-warning"></i> Más Vendidos</button>
+                                            <button type="button" class="btn reportes-rank-pill" data-rank-tab="estancados"><i class="bi bi-exclamation-octagon me-1 text-danger"></i> Baja Rotación</button>
                                         </div>
                                     </div>
-                                    <div class="reportes-rank-meta mb-3">
-                                        <i class="bi bi-calendar3 me-1"></i> Basado en el rango de fecha seleccionado superior
+                                    <div class="reportes-rank-meta mb-3 small text-muted">
+                                        <i class="bi bi-calendar3 me-1"></i> <span id="reportes-rank-subtitle">Top 5 en el período seleccionado</span>
                                     </div>
-                                    <ul class="reportes-rank-list list-unstyled mb-0">
+                                    <ul class="reportes-rank-list list-unstyled mb-0" id="reportes-rank-list">
                                         <li class="reportes-rank-item">
                                             <span class="reportes-rank-num">1</span>
-                                            <span class="reportes-rank-name">Producto de ejemplo uno</span>
-                                            <span class="reportes-rank-val">Q 0.00</span>
-                                        </li>
-                                        <li class="reportes-rank-item">
-                                            <span class="reportes-rank-num">2</span>
-                                            <span class="reportes-rank-name">Producto de ejemplo dos</span>
-                                            <span class="reportes-rank-val">Q 0.00</span>
-                                        </li>
-                                        <li class="reportes-rank-item">
-                                            <span class="reportes-rank-num">3</span>
-                                            <span class="reportes-rank-name">Producto de ejemplo tres</span>
-                                            <span class="reportes-rank-val">Q 0.00</span>
-                                        </li>
-                                        <li class="reportes-rank-item">
-                                            <span class="reportes-rank-num">4</span>
-                                            <span class="reportes-rank-name">Producto de ejemplo cuatro</span>
-                                            <span class="reportes-rank-val">Q 0.00</span>
-                                        </li>
-                                        <li class="reportes-rank-item">
-                                            <span class="reportes-rank-num">5</span>
-                                            <span class="reportes-rank-name">Producto de ejemplo cinco</span>
+                                            <span class="reportes-rank-name">Cargando...</span>
                                             <span class="reportes-rank-val">Q 0.00</span>
                                         </li>
                                     </ul>
@@ -2159,20 +2044,21 @@
 
                         <!-- Tabla Responsiva Preview -->
                         <div class="card border-0 shadow-sm rounded-4 mb-4">
-                            <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
-                                <h6 class="fw-bold"><i class="bi bi-table me-2"></i>Vista Previa de Ventas Recientes</h6>
+                            <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-teal"></i>Vista Previa de Ventas Recientes</h6>
+                                <span class="badge bg-light text-muted border">Últimas transacciones</span>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
-                                        <thead class="table-light">
+                                    <table class="table align-middle table-hover mb-0" id="table-reportes-ventas-preview">
+                                        <thead>
                                             <tr>
-                                                <th>Fecha</th>
-                                                <th>Estado</th>
-                                                <th>Vendedor</th>
-                                                <th class="text-end">Subtotal</th>
-                                                <th class="text-end">Descuento</th>
-                                                <th class="text-end">Total</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Fecha y Hora</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Artículos Vendidos</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Vendedor</th>
+                                                <th class="text-center" style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Método de Pago</th>
+                                                <th class="text-end" style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Descuento</th>
+                                                <th class="text-end" style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody id="reportes-table-body">
@@ -2203,33 +2089,32 @@
                                 <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
                                 <input type="date" id="filter-rep-usuarios-hasta" class="form-control form-control-sm border-start-0 ps-0" title="Fecha creación hasta">
                             </div>
-                            <button id="btn-filter-rep-usuarios" class="btn btn-celeste btn-sm ms-2"><i class="bi bi-funnel"></i> Filtrar</button>
+                            <button id="btn-filter-rep-usuarios" class="btn btn-teal btn-sm ms-2"><i class="bi bi-funnel"></i> Filtrar</button>
                             
                             <div class="ms-auto d-flex gap-2">
                                 <button id="btn-export-usuarios-pdf" class="btn btn-outline-danger btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i> PDF</button>
                                 <button id="btn-export-usuarios-excel" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
-                                <button id="btn-export-usuarios-csv" class="btn btn-outline-secondary btn-sm"><i class="bi bi-filetype-csv me-1"></i> CSV</button>
                             </div>
                         </div>
 
                         <!-- Tabla Usuarios -->
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-people me-2"></i>Listado de Usuarios</h6>
+                                <h6 class="fw-bold mb-0"><i class="bi bi-people me-2"></i>Rendimiento por Usuario / Cajero</h6>
                                 <span id="badge-total-usuarios" class="badge bg-light text-dark border">0 usuarios</span>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table align-middle table-hover mb-0" id="table-reporte-usuarios">
-                                        <thead class="table-light">
+                                        <thead>
                                             <tr>
-                                                <th>#</th>
-                                                <th>Usuario</th>
-                                                <th>Nombre Completo</th>
-                                                <th>Rol</th>
-                                                <th>Estado</th>
-                                                <th>Fecha Creación</th>
-                                                <th class="text-center">Acciones</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Usuario / Nombre</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Rol</th>
+                                                <th class="text-center" style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Ventas Realizadas</th>
+                                                <th class="text-end" style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Total Vendido (Q)</th>
+                                                <th class="text-center" style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Turnos Cerrados / Cuadre</th>
+                                                <th class="text-center" style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Ingresos de Bodega</th>
+                                                <th class="text-center" style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody id="reportes-usuarios-tbody">
@@ -2260,12 +2145,11 @@
                                 <span class="input-group-text bg-light text-muted small border-end-0"><i class="bi bi-calendar-event me-1"></i>Hasta</span>
                                 <input type="date" id="filter-rep-clientes-hasta" class="form-control form-control-sm border-start-0 ps-0" title="Fecha creación hasta">
                             </div>
-                            <button id="btn-filter-rep-clientes" class="btn btn-celeste btn-sm ms-2"><i class="bi bi-funnel"></i> Filtrar</button>
+                            <button id="btn-filter-rep-clientes" class="btn btn-teal btn-sm ms-2"><i class="bi bi-funnel"></i> Filtrar</button>
                             
                             <div class="ms-auto d-flex gap-2">
                                 <button id="btn-export-clientes-pdf" class="btn btn-outline-danger btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i> PDF</button>
                                 <button id="btn-export-clientes-excel" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
-                                <button id="btn-export-clientes-csv" class="btn btn-outline-secondary btn-sm"><i class="bi bi-filetype-csv me-1"></i> CSV</button>
                             </div>
                         </div>
 
@@ -2278,15 +2162,15 @@
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table align-middle table-hover mb-0" id="table-reporte-clientes">
-                                        <thead class="table-light">
+                                        <thead>
                                             <tr>
-                                                <th>#</th>
-                                                <th>NIT</th>
-                                                <th>Nombre Comercial / Razón</th>
-                                                <th>Tipo</th>
-                                                <th>Estado</th>
-                                                <th>Fecha Creación</th>
-                                                <th class="text-center">Acciones</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">#</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">NIT</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Nombre Comercial / Razón</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Tipo</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Estado</th>
+                                                <th style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Fecha Creación</th>
+                                                <th class="text-center" style="background-color: #0A5C5E !important; color: #FFFFFF !important; font-weight: 600;">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody id="reportes-clientes-tbody">
@@ -2943,7 +2827,6 @@
                         <p class="text-muted small mb-0">Gestión de órdenes de compra, recepción en bodega y control de costos</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
                         <button id="btn-compras-refresh" class="btn btn-outline-secondary" title="Recargar"><i class="bi bi-arrow-clockwise"></i></button>
                     </div>
                 </div>
@@ -2952,12 +2835,12 @@
                 <ul class="nav nav-pills mb-4" id="pills-compras-tab" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active rounded-pill px-4 fw-semibold" id="pills-ordenes-tab" data-bs-toggle="pill" data-bs-target="#pills-ordenes-pane" type="button" role="tab" aria-selected="true">
-                            <i class="bi bi-card-checklist me-2"></i>Órdenes de Compra
+                            <i class="bi bi-clock-history me-2"></i>Historial de Compras
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link rounded-pill px-4 fw-semibold" id="pills-nueva-orden-tab" data-bs-toggle="pill" data-bs-target="#pills-nueva-orden-pane" type="button" role="tab" aria-selected="false">
-                            <i class="bi bi-plus-circle me-2"></i>Nueva Orden
+                            <i class="bi bi-box-arrow-in-down me-2"></i>Ingresar Mercadería
                         </button>
                     </li>
                 </ul>
@@ -2988,7 +2871,6 @@
                                     <div class="col-12 col-md-3 d-flex gap-2 align-items-end">
                                         <button id="btn-filtro-compras" class="btn btn-sm btn-teal flex-grow-1"><i class="bi bi-funnel"></i> Filtrar</button>
                                         <button id="btn-limpiar-compras" class="btn btn-sm btn-outline-secondary" title="Limpiar filtros"><i class="bi bi-x-circle"></i></button>
-                                        <button id="btn-goto-nueva-orden" class="btn btn-sm btn-outline-teal text-nowrap"><i class="bi bi-plus-lg"></i> Nueva Orden</button>
                                     </div>
                                 </div>
                             </div>
@@ -3033,13 +2915,20 @@
                                                 <input type="text" id="compras-search" class="form-control ps-4" placeholder="Buscar producto por nombre, talla, color o código..." autocomplete="off">
                                             </div>
                                             <button id="btn-compras-filter" class="btn btn-teal"><i class="bi bi-funnel"></i> Filtrar</button>
+                                            <button id="btn-compras-nuevo-prod-top" type="button" class="btn btn-outline-teal text-nowrap">
+                                                <i class="bi bi-plus-lg me-1"></i> Crear Producto Nuevo
+                                            </button>
                                         </div>
 
                                         <div id="compras-products-list" class="d-flex flex-column gap-2 mb-2" style="max-height: 400px; overflow-y: auto;"></div>
 
                                         <div id="compras-products-empty" class="text-center text-muted py-4 d-none">
-                                            <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-50"></i>
-                                            <span>No hay productos que coincidan con la búsqueda</span>
+                                            <i class="bi bi-search fs-2 d-block mb-2 text-muted opacity-50"></i>
+                                            <div class="fw-semibold text-dark mb-1">No se encontró este producto</div>
+                                            <p class="small text-muted mb-3">Si es mercadería nueva que aún no está registrada en el sistema, puedes crearla directamente.</p>
+                                            <button type="button" class="btn btn-sm btn-outline-teal" id="btn-compras-nuevo-producto">
+                                                <i class="bi bi-plus-circle me-1"></i> Crear Producto Nuevo
+                                            </button>
                                         </div>
 
                                         <div class="d-flex justify-content-between align-items-center">
@@ -3053,10 +2942,10 @@
                             <div class="col-12 col-xl-5">
                                 <div class="card border-0 shadow-sm rounded-4 h-100">
                                     <div class="card-body p-3">
-                                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-bag-check me-2 text-teal"></i>Orden en Confección</h6>
+                                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-box-seam me-2 text-teal"></i>Mercadería a Ingresar</h6>
 
                                         <div class="mb-3">
-                                            <label class="form-label small text-muted">Proveedor <span class="text-danger">*</span></label>
+                                            <label class="form-label small text-muted">Proveedor (Opcional)</label>
                                             <select id="compras-proveedor" class="form-select">
                                                 <option value="">Cargando proveedores...</option>
                                             </select>
@@ -3064,18 +2953,18 @@
 
                                         <div id="compras-cart-empty" class="text-center text-muted py-4">
                                             <i class="bi bi-cart3 fs-1 d-block mb-2 opacity-50"></i>
-                                            <span class="small">Agrega productos de la izquierda para confeccionar la orden</span>
+                                            <span class="small">Selecciona productos de la lista izquierda para sumarlos al inventario</span>
                                         </div>
 
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-hover align-middle mb-2 d-none" id="compras-cart-table">
-                                                <thead class="table-light small">
+                                        <div class="table-responsive" style="overflow-x: hidden;">
+                                            <table class="table table-sm table-hover align-middle mb-2 w-100 d-none" id="compras-cart-table" style="table-layout: fixed;">
+                                                <thead class="small">
                                                     <tr>
-                                                        <th>Producto</th>
-                                                        <th class="text-center" style="width: 92px;">Costo (Q)</th>
-                                                        <th class="text-center" style="width: 76px;">Cant.</th>
-                                                        <th class="text-end" style="width: 80px;">Subtotal</th>
-                                                        <th style="width: 30px;"></th>
+                                                        <th class="text-white fw-bold" style="width: 33%; color: #FFFFFF !important;">Producto</th>
+                                                        <th class="text-white fw-bold text-center" style="width: 24%; color: #FFFFFF !important;">Costo (Q)</th>
+                                                        <th class="text-white fw-bold text-center" style="width: 22%; color: #FFFFFF !important;">Cantidad</th>
+                                                        <th class="text-white fw-bold text-end" style="width: 15%; color: #FFFFFF !important;">Subtotal</th>
+                                                        <th style="width: 6%; color: #FFFFFF !important;"></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody id="compras-cart-body"></tbody>
@@ -3083,14 +2972,14 @@
                                         </div>
 
                                         <div class="d-flex justify-content-between py-2 px-3 mb-3 border-top border-bottom">
-                                            <span class="fw-bold">TOTAL ESTIMADO</span>
+                                            <span class="fw-bold">TOTAL DE LA COMPRA</span>
                                             <span class="fw-bold fs-4 text-teal" id="compras-total">Q 0.00</span>
                                         </div>
 
                                         <div class="d-flex gap-2">
                                             <button id="btn-compras-clear" class="btn btn-outline-secondary btn-sm flex-grow-1">Vaciar</button>
                                             <button id="btn-compras-emitir" class="btn btn-teal flex-grow-1 py-2 fw-semibold shadow-sm" disabled>
-                                                <i class="bi bi-send me-1"></i> Emitir Orden
+                                                <i class="bi bi-check-circle me-1"></i> Guardar y Sumar al Inventario
                                             </button>
                                         </div>
                                     </div>
@@ -3678,7 +3567,7 @@
 
     <!-- Modal: Detalle de Usuario (Solo lectura, Defensivo) -->
     <div class="modal fade" id="user-detail-modal" tabindex="-1" aria-labelledby="userDetailModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
                 <div class="modal-header border-0 pb-0">
                     <h5 class="modal-title fw-bold text-dark" id="userDetailModalTitle"><i class="bi bi-person-badge text-teal me-2"></i>Ficha de Usuario</h5>
@@ -3764,7 +3653,7 @@
 
     <!-- Modal: Apertura de Caja (Defensivo) -->
     <div class="modal fade" id="open-cash-modal" tabindex="-1" aria-labelledby="openCashModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
                 <div class="modal-header border-0 pb-0">
                     <h5 class="modal-title fw-bold text-dark" id="openCashModalTitle"><i class="bi bi-door-open-fill text-verde me-2"></i>Apertura de Turno de Caja</h5>
@@ -3804,65 +3693,79 @@
         </div>
     </div>
 
-    <!-- Modal: Cierre de Caja (Defensivo) -->
+    <!-- Modal: Cierre de Turno de Caja (Sobrio, Compacto y Profesional) -->
     <div class="modal fade" id="close-cash-modal" tabindex="-1" aria-labelledby="closeCashModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
             <div class="modal-content border-0 shadow-lg rounded-4">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold text-dark" id="closeCashModalTitle"><i class="bi bi-door-closed-fill text-danger me-2"></i>Cierre de Turno de Caja</h5>
+                <div class="modal-header border-0 pb-1">
+                    <h5 class="modal-title fw-bold text-dark fs-6" id="closeCashModalTitle">
+                        <i class="bi bi-door-closed text-danger me-2"></i>Cierre de Turno de Caja
+                    </h5>
                     <button type="button" class="btn-close" onclick="safeCloseCloseCashModal()" aria-label="Cerrar"></button>
                 </div>
                 <form id="close-cash-form" novalidate>
-                    <div class="modal-body py-3">
-                        <div class="alert alert-danger d-none small mb-3" id="close-cash-alert"></div>
+                    <div class="modal-body py-2">
+                        <div class="alert alert-danger d-none small mb-2" id="close-cash-alert"></div>
 
-                        <!-- Resumen del turno en curso -->
+                        <!-- Resumen superior compacto (4 filas limpias sin signos + ó =) -->
                         <div class="p-3 bg-light rounded-3 mb-3 border">
                             <div class="d-flex justify-content-between mb-1">
-                                <span class="text-muted small">Caja:</span>
-                                <strong class="text-dark small" id="close-summary-caja">-</strong>
+                                <span class="text-muted small">Monto inicial:</span>
+                                <span class="fw-semibold text-dark small font-monospace" id="close-summary-monto">Q 0.00</span>
                             </div>
                             <div class="d-flex justify-content-between mb-1">
-                                <span class="text-muted small">Apertura:</span>
-                                <span class="text-dark small" id="close-summary-fecha">-</span>
+                                <span class="text-muted small">Ventas en efectivo:</span>
+                                <span class="fw-semibold text-dark small font-monospace" id="close-summary-ventas">Q 0.00</span>
                             </div>
-                            <div class="d-flex justify-content-between">
-                                <span class="text-muted small">Monto inicial:</span>
-                                <strong class="text-verde small" id="close-summary-monto">Q 0.00</strong>
+                            <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                                <span class="text-muted small">Entradas / Salidas:</span>
+                                <span class="fw-semibold text-dark small font-monospace" id="close-summary-movimientos">Q 0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center pt-1">
+                                <strong class="text-dark small">Total esperado en caja:</strong>
+                                <strong class="fs-6 font-monospace text-teal" id="close-summary-esperado">Q 0.00</strong>
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label text-dark fw-medium" for="close-cash-monto">Monto Final en Caja / Arqueo (Q) <span class="text-danger">*</span></label>
+                        <!-- Input de efectivo físico con botón rápido alineado a la derecha -->
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label for="close-cash-monto" class="form-label fw-bold text-dark small mb-0">
+                                    Efectivo físico en caja (Q) <span class="text-danger">*</span>
+                                </label>
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 fw-semibold" id="btn-cash-quick-match" style="font-size: 0.76rem; border-radius: 6px;">
+                                    <span id="btn-cash-quick-match-text">Usar monto esperado (Q 0.00)</span>
+                                </button>
+                            </div>
                             <div class="input-group">
-                                <span class="input-group-text bg-white">Q</span>
-                                <input type="number" class="form-control" id="close-cash-monto" min="0" step="0.01" placeholder="0.00" required>
-                                <div class="invalid-feedback" id="error-monto_cierre">Ingrese el monto total contado en caja.</div>
+                                <span class="input-group-text bg-light text-dark fw-bold">Q</span>
+                                <input type="number" step="0.01" min="0" class="form-control fw-bold font-monospace text-dark" id="close-cash-monto" placeholder="0.00" required autofocus autocomplete="off">
                             </div>
-                            <small class="text-muted">Total de efectivo en gaveta al momento de concluir el turno.</small>
+                            <!-- Indicador de diferencia minimalista (solo cuando hay valor) -->
+                            <div id="close-cash-diff-alert" class="small mt-1 mb-1 d-none"></div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label text-dark fw-medium" for="close-cash-notas">Notas u Observaciones (Opcional)</label>
-                            <textarea class="form-control" id="close-cash-notas" rows="2" maxlength="255" placeholder="Observaciones sobre faltantes, sobrantes o incidencias..."></textarea>
-                            <div class="invalid-feedback" id="error-notas"></div>
+                        <!-- Observaciones / Justificación -->
+                        <div class="mb-2">
+                            <label for="close-cash-notas" class="form-label text-secondary small fw-semibold mb-1">Notas u observaciones (Opcional):</label>
+                            <textarea class="form-control" id="close-cash-notas" rows="2" maxlength="300" placeholder="Observaciones sobre faltantes, sobrantes o incidencias..."></textarea>
                         </div>
                     </div>
-                    <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-outline-secondary" onclick="safeCloseCloseCashModal()">Cancelar</button>
-                        <button type="submit" class="btn btn-danger" id="btn-submit-close-cash">
+                    <div class="modal-footer border-0 pt-0 pb-3 d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary flex-grow-1 py-2 fw-semibold" onclick="safeCloseCloseCashModal()">Cancelar</button>
+                        <button type="submit" class="btn btn-danger flex-grow-1 py-2 fw-bold" id="btn-submit-close-cash">
                             <span class="spinner-border spinner-border-sm me-1 d-none" id="close-cash-spinner" role="status" aria-hidden="true"></span>
-                            <span id="close-cash-btn-text">Cerrar Caja</span>
+                            <span id="close-cash-btn-text"><i class="bi bi-door-closed me-1"></i> Cerrar Caja</span>
                         </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-
+    
     <!-- Modal: Registrar Movimiento de Caja (Gastos Menores / Entrada) -->
     <div class="modal fade" id="cash-movement-modal" tabindex="-1" aria-labelledby="cashMovementModalTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
                 <div class="modal-header border-0 pb-0">
                     <h5 class="modal-title fw-bold text-dark" id="cashMovementModalTitle">
@@ -4045,7 +3948,7 @@
 
     <!-- Modal: Escáner de Código de Barras (Cámara + Entrada Rápida) -->
     <div class="modal fade" id="pos-scanner-modal" tabindex="-1" aria-labelledby="posScannerModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
                 <div class="modal-header border-0 pb-2">
                     <div>
@@ -4169,7 +4072,7 @@
 
     <!-- Modal: Formulario Rol (crear/editar) -->
     <div class="modal fade" id="role-modal" tabindex="-1" aria-labelledby="role-modal-title" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <form id="role-form" novalidate>
                     <div class="modal-header">
@@ -4260,8 +4163,8 @@
     <script src="js/clients.js?v=2.0"></script>
     <!-- Catálogos: rediseño visual (tabs agrupadas, miniaturas y soft badges). -->
     <script src="js/catalog.js?v=3.9"></script>
-    <script src="js/cash_register.js?v=2.4"></script>
-    <script src="js/reportes.js?v=3.3"></script>
+    <script src="js/cash_register.js?v=2.6"></script>
+    <script src="js/reportes.js?v=5.0"></script>
 
     <!-- REDISEÑO UI/UX · REPORTES: lógica del selector de rango de fechas.
          Solo manipula el DOM (etiqueta del rango + inputs ocultos). No altera
@@ -4292,7 +4195,7 @@
                 var to = document.getElementById('filter-reportes-to');
                 var label = document.getElementById('reportes-date-range-label');
                 if (!from || !to || !label) { return; }
-                label.textContent = '📅 ' + formatDateLabel(from.value) + ' - ' + formatDateLabel(to.value);
+                label.textContent = formatDateLabel(from.value) + ' - ' + formatDateLabel(to.value);
             };
 
             // Aplica un atajo del panel (solo UI: actualiza inputs y etiqueta).
@@ -4394,7 +4297,7 @@
     <script src="js/pos.js?v=2.7"></script>
     <!-- Inventario: versión con miniaturas, zoom, soft badges y ghost button (cache-busting) -->
     <script src="js/inventory.js?v=3.8"></script>
-    <script src="js/compras.js?v=1.0"></script>
+    <script src="js/compras.js?v=2.2?v=1.0"></script>
     <script src="js/roles.js?v=1.0"></script>
     <script src="js/bitacora.js?v=1.0"></script>
     <script src="js/historial.js?v=1.0"></script>
@@ -4405,7 +4308,7 @@
     <!-- Modales Bloque 2: Sucursales, Áreas, Subcategorías, Unidades -->
     <!-- Modal: Formulario Sucursal -->
     <div class="modal fade" id="sucursal-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="sucursalModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header border-bottom-0 pb-0">
                     <h5 class="modal-title fw-bold" id="sucursalModalTitle">Nueva Sucursal</h5>
@@ -4440,7 +4343,7 @@
 
     <!-- Modal: Ficha Sucursal (Solo Lectura) -->
     <div class="modal fade" id="sucursal-detail-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header bg-light border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-building text-teal me-2"></i>Ficha de Sucursal</h5>
@@ -4473,7 +4376,7 @@
 
     <!-- Modal: Formulario Área de Bodega -->
     <div class="modal fade" id="area-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="areaModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header border-bottom-0 pb-0">
                     <h5 class="modal-title fw-bold" id="areaModalTitle">Nueva Área de Bodega</h5>
@@ -4506,7 +4409,7 @@
 
     <!-- Modal: Ficha Área de Bodega -->
     <div class="modal fade" id="area-detail-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header bg-light border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-geo-alt text-teal me-2"></i>Ficha de Área de Bodega</h5>
@@ -4539,7 +4442,7 @@
 
     <!-- Modal: Formulario Subcategoría -->
     <div class="modal fade" id="subcat-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="subcatModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header border-bottom-0 pb-0">
                     <h5 class="modal-title fw-bold" id="subcatModalTitle">Nueva Subcategoría</h5>
@@ -4572,7 +4475,7 @@
 
     <!-- Modal: Ficha Subcategoría -->
     <div class="modal fade" id="subcat-detail-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header bg-light border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-diagram-2 text-teal me-2"></i>Ficha de Subcategoría</h5>
@@ -4605,7 +4508,7 @@
 
     <!-- Modal: Formulario Unidad de Medida -->
     <div class="modal fade" id="unidad-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="unidadModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header border-bottom-0 pb-0">
                     <h5 class="modal-title fw-bold" id="unidadModalTitle">Nueva Unidad de Medida</h5>
@@ -4636,7 +4539,7 @@
 
     <!-- Modal: Ficha Unidad de Medida -->
     <div class="modal fade" id="unidad-detail-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header bg-light border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-rulers text-teal me-2"></i>Ficha de Unidad de Medida</h5>
@@ -4674,7 +4577,7 @@
 
     <!-- Modal: Formulario Motivo de Merma -->
     <div class="modal fade" id="motivo-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="motivoModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header border-bottom-0 pb-0">
                     <h5 class="modal-title fw-bold" id="motivoModalTitle">Nuevo Motivo de Merma</h5>
@@ -4700,7 +4603,7 @@
 
     <!-- Modal: Ficha Motivo de Merma -->
     <div class="modal fade" id="motivo-detail-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header bg-light border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-bandaid text-teal me-2"></i>Ficha de Motivo de Merma</h5>
@@ -4733,7 +4636,7 @@
 
     <!-- Modal: Formulario Método de Pago -->
     <div class="modal fade" id="metodo-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="metodoModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header border-bottom-0 pb-0">
                     <h5 class="modal-title fw-bold" id="metodoModalTitle">Nuevo Método de Pago</h5>
@@ -4759,7 +4662,7 @@
 
     <!-- Modal: Ficha Método de Pago -->
     <div class="modal fade" id="metodo-detail-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header bg-light border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-cash-coin text-teal me-2"></i>Ficha de Método de Pago</h5>
@@ -4841,7 +4744,7 @@
 
     <!-- Modal: Ficha Proveedor -->
     <div class="modal fade" id="proveedor-detail-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header bg-light border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-truck text-teal me-2"></i>Ficha de Proveedor</h5>
@@ -4874,7 +4777,7 @@
 
     <!-- Modal: Formulario Departamento -->
     <div class="modal fade" id="departamento-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="departamentoModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header border-bottom-0 pb-0">
                     <h5 class="modal-title fw-bold" id="departamentoModalTitle">Nuevo Departamento</h5>
@@ -4900,7 +4803,7 @@
 
     <!-- Modal: Ficha Departamento -->
     <div class="modal fade" id="departamento-detail-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header bg-light border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-map text-teal me-2"></i>Ficha de Departamento</h5>
@@ -4933,7 +4836,7 @@
 
     <!-- Modal: Formulario Municipio -->
     <div class="modal fade" id="municipio-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="municipioModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header border-bottom-0 pb-0">
                     <h5 class="modal-title fw-bold" id="municipioModalTitle">Nuevo Municipio</h5>
@@ -4966,7 +4869,7 @@
 
     <!-- Modal: Ficha Municipio -->
     <div class="modal fade" id="municipio-detail-modal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content rounded-4 border-0 shadow">
                 <div class="modal-header bg-light border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-geo text-teal me-2"></i>Ficha de Municipio</h5>
@@ -5147,7 +5050,7 @@
 
     <!-- Modal Cancelar Orden de Compra -->
     <div class="modal fade" id="modal-cancelar-compra" tabindex="-1" aria-labelledby="modalCancelarCompraLabel" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
                 <div class="modal-header border-0 bg-danger-subtle rounded-top-4 px-4 py-3">
                     <h5 class="modal-title fw-bold text-danger" id="modalCancelarCompraLabel">
@@ -5217,7 +5120,7 @@
 
     <!-- Modal Nuevo Traslado -->
     <div class="modal fade" id="modal-nuevo-traslado" tabindex="-1" aria-labelledby="modalNuevoTrasladoLabel" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
                 <div class="modal-header border-0 bg-light rounded-top-4 px-4 py-3">
                     <h5 class="modal-title fw-bold" id="modalNuevoTrasladoLabel">
@@ -5276,7 +5179,7 @@
 
     <!-- Modal Recibir Traslado -->
     <div class="modal fade" id="modal-recibir-traslado" tabindex="-1" aria-labelledby="modalRecibirTrasladoLabel" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
                 <div class="modal-header border-0 bg-light rounded-top-4 px-4 py-3">
                     <h5 class="modal-title fw-bold" id="modalRecibirTrasladoLabel">
@@ -5304,7 +5207,7 @@
 
     <!-- Modal Cancelar Traslado -->
     <div class="modal fade" id="modal-cancelar-traslado" tabindex="-1" aria-labelledby="modalCancelarTrasladoLabel" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
                 <div class="modal-header border-0 bg-danger-subtle rounded-top-4 px-4 py-3">
                     <h5 class="modal-title fw-bold text-danger" id="modalCancelarTrasladoLabel">
@@ -5331,43 +5234,77 @@
 
     <!-- Modal Ficha de Usuario -->
     <div class="modal fade" id="modal-reporte-ficha-usuario" tabindex="-1" aria-labelledby="modalReporteFichaUsuarioLabel" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
-                <div class="modal-header border-0 bg-primary-subtle rounded-top-4 px-4 py-3">
-                    <h5 class="modal-title fw-bold text-primary" id="modalReporteFichaUsuarioLabel">
-                        <i class="bi bi-person-badge-fill me-2"></i>Ficha del Usuario
+                <div class="modal-header border-0 bg-light rounded-top-4 px-4 py-3">
+                    <h5 class="modal-title fw-bold text-dark" id="modalReporteFichaUsuarioLabel">
+                        <i class="bi bi-person-check me-2 text-teal"></i>Desglose de Rendimiento del Empleado
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body px-4 py-3">
                     <input type="hidden" id="ficha-usuario-id">
-                    <div class="list-group list-group-flush">
-                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
-                            <span class="text-muted small">Nombre de Usuario:</span>
-                            <span class="fw-semibold" id="ficha-usuario-username">-</span>
-                        </div>
-                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                    <div class="list-group list-group-flush mb-3">
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
                             <span class="text-muted small">Nombre Completo:</span>
-                            <span class="fw-semibold" id="ficha-usuario-nombre">-</span>
+                            <span class="fw-bold text-dark" id="ficha-usuario-nombre">-</span>
                         </div>
-                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">Nombre de Usuario:</span>
+                            <span class="fw-semibold text-secondary" id="ficha-usuario-username">-</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
                             <span class="text-muted small">Rol Asignado:</span>
                             <span class="badge bg-secondary" id="ficha-usuario-rol">-</span>
                         </div>
-                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
-                            <span class="text-muted small">Estado:</span>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">Estado Operativo:</span>
                             <span class="badge bg-success" id="ficha-usuario-estado">-</span>
                         </div>
-                        <div class="list-group-item px-0 py-2 d-flex justify-content-between">
-                            <span class="text-muted small">Fecha de Creación:</span>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">Fecha de Registro:</span>
                             <span class="fw-medium text-dark" id="ficha-usuario-fecha">-</span>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-speedometer2 me-1 text-teal"></i> Métricas Operativas en el Período</h6>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="p-2 border rounded-3 bg-light">
+                                <small class="text-muted d-block">Ventas Realizadas</small>
+                                <span class="fw-bold text-dark" id="ficha-usuario-ventas">0 ventas</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-2 border rounded-3 bg-light">
+                                <small class="text-muted d-block">Total Vendido</small>
+                                <span class="fw-bold text-success" id="ficha-usuario-total-vendido">Q 0.00</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-2 border rounded-3 bg-light">
+                                <small class="text-muted d-block">Turnos Cerrados</small>
+                                <span class="fw-bold text-dark" id="ficha-usuario-turnos">0 turnos</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-2 border rounded-3 bg-light">
+                                <small class="text-muted d-block">Diferencia Caja</small>
+                                <span class="fw-bold text-dark" id="ficha-usuario-diferencia">Q 0.00</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="p-2 border rounded-3 bg-light">
+                                <small class="text-muted d-block">Ingresos a Bodega (Compras)</small>
+                                <span class="fw-bold text-teal" id="ficha-usuario-compras">0 ingresos</span>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer border-0 px-4 py-3">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="button" class="btn btn-danger" id="btn-ficha-usuario-pdf">
-                        <i class="bi bi-file-earmark-pdf me-1"></i> Exportar a PDF
+                    <button type="button" class="btn btn-teal" id="btn-ficha-usuario-pdf">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Descargar Ficha PDF
                     </button>
                 </div>
             </div>
@@ -5376,7 +5313,7 @@
 
     <!-- Modal Ficha de Cliente -->
     <div class="modal fade" id="modal-reporte-ficha-cliente" tabindex="-1" aria-labelledby="modalReporteFichaClienteLabel" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg rounded-4">
                 <div class="modal-header border-0 bg-info-subtle rounded-top-4 px-4 py-3">
                     <h5 class="modal-title fw-bold text-dark" id="modalReporteFichaClienteLabel">

@@ -63,6 +63,14 @@ class IngresoMercaderiaCreate(BaseModel):
     detalles: List[DetalleIngresoCreate] = Field(..., min_length=1)
 
 
+class IngresoDirectoCreate(BaseModel):
+    id_proveedor: Optional[int] = None
+    numero_factura_proveedor: Optional[str] = None
+    gasto_flete: Decimal = Field(default=Decimal("0.00"), ge=0)
+    gasto_cargadores: Decimal = Field(default=Decimal("0.00"), ge=0)
+    detalles: List[DetalleIngresoCreate] = Field(..., min_length=1)
+
+
 class DetalleIngresoOut(BaseModel):
     id_detalle_compra: int
     id_compra: int

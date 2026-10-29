@@ -68,6 +68,28 @@ class ReportesService:
             elif getattr(v, "id_usuario", None):
                 vendedor = f"Usuario #{v.id_usuario}"
 
+            # Construcción de resumen legible de artículos
+            detalles_list = getattr(v, "detalles", []) or []
+            item_strs = []
+            for d in detalles_list:
+                cant = getattr(d, "cantidad", 1)
+                p_nom = "Artículo"
+                if getattr(d, "variante", None) and getattr(d.variante, "producto", None):
+                    p_nom = d.variante.producto.nombre
+                    if getattr(d.variante, "color", None) or getattr(d.variante, "talla", None):
+                        extra = " / ".join([x for x in (d.variante.color, d.variante.talla) if x])
+                        p_nom = f"{p_nom} ({extra})"
+                item_strs.append(f"{cant}x {p_nom}")
+            articulos_resumen = ", ".join(item_strs) if item_strs else "Venta de mostrador"
+
+            # Método de pago (Efectivo / Transferencia)
+            pagos_list = getattr(v, "pagos", []) or []
+            metodos = []
+            for p in pagos_list:
+                if getattr(p, "metodo_pago", None) and getattr(p.metodo_pago, "nombre", None):
+                    metodos.append(p.metodo_pago.nombre)
+            metodo_pago = ", ".join(set(metodos)) if metodos else "Efectivo"
+
             dt = v.fecha_venta
             if dt and dt.tzinfo is None:
                 dt_aware = dt.replace(tzinfo=timezone.utc)
@@ -86,6 +108,8 @@ class ReportesService:
                     fecha_venta=dt_aware,
                     estado=v.estado or "Completada",
                     vendedor=vendedor,
+                    articulos=articulos_resumen,
+                    metodo_pago=metodo_pago,
                     subtotal=subtotal,
                     descuento=descuento,
                     total=total,
@@ -212,6 +236,79 @@ class ReportesService:
                 content=output.getvalue().encode("utf-8-sig"),
                 media_type="text/csv",
             )
+        elif formato.lower() == "pdf":
+            buf = io.BytesIO()
+            doc = SimpleDocTemplate(buf, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+            styles = getSampleStyleSheet()
+
+            title_style = ParagraphStyle("CTitle", parent=styles["Heading1"], fontSize=15, leading=18, textColor=colors.HexColor("#0f172a"), alignment=1)
+            sub_style = ParagraphStyle("CSub", parent=styles["Normal"], fontSize=9, leading=12, textColor=colors.HexColor("#64748b"), alignment=1, spaceAfter=8)
+            cell_bold = ParagraphStyle("CBold", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=colors.HexColor("#0f172a"))
+            cell_text = ParagraphStyle("CText", parent=styles["Normal"], fontSize=7.5, leading=9, textColor=colors.HexColor("#334155"))
+
+            elements = []
+            elements.append(Paragraph("TIENDA EL REGALITO", title_style))
+            elements.append(Paragraph("REPORTE OFICIAL - CONSOLIDADO OPERATIVO", sub_style))
+            elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#0d7377"), spaceAfter=8))
+
+            # Resumen KPI
+            kpi_data = [
+                [
+                    Paragraph(f"<b>Desde:</b> {fecha_inicio}", cell_text),
+                    Paragraph(f"<b>Hasta:</b> {fecha_fin}", cell_text),
+                    Paragraph(f"<b>Total Ventas:</b> Q {float(consolidado.totales.ventas):,.2f}", cell_bold),
+                    Paragraph(f"<b>Total Compras:</b> Q {float(consolidado.totales.compras):,.2f}", cell_text),
+                ]
+            ]
+            t_kpi = Table(kpi_data, colWidths=[135, 135, 135, 135])
+            t_kpi.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            elements.append(t_kpi)
+            elements.append(Spacer(1, 10))
+
+            # Ventas Recientes
+            elements.append(Paragraph("<b>VENTAS REGISTRADAS EN EL PERÍODO</b>", cell_bold))
+            elements.append(Spacer(1, 4))
+            ventas_table = [
+                [
+                    Paragraph("<b>ID</b>", cell_bold),
+                    Paragraph("<b>Fecha/Hora</b>", cell_bold),
+                    Paragraph("<b>Artículos</b>", cell_bold),
+                    Paragraph("<b>Vendedor</b>", cell_bold),
+                    Paragraph("<b>Método Pago</b>", cell_bold),
+                    Paragraph("<b>Total</b>", cell_bold),
+                ]
+            ]
+            for v in consolidado.ventas:
+                dt_str = v.fecha_venta.strftime("%d/%m/%Y %H:%M") if v.fecha_venta else "-"
+                ventas_table.append([
+                    Paragraph(str(v.id_venta), cell_text),
+                    Paragraph(dt_str, cell_text),
+                    Paragraph(v.articulos or "Venta general", cell_text),
+                    Paragraph(v.vendedor or "-", cell_text),
+                    Paragraph(v.metodo_pago or "Efectivo", cell_text),
+                    Paragraph(f"Q {float(v.total_venta):,.2f}", cell_bold),
+                ])
+            t_v = Table(ventas_table, colWidths=[30, 80, 210, 80, 70, 70])
+            t_v.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]))
+            elements.append(t_v)
+
+            doc.build(elements)
+            return ReporteExportadoDTO(
+                filename=f"reporte_consolidado_{fecha_inicio}_{fecha_fin}.pdf",
+                content=buf.getvalue(),
+                media_type="application/pdf",
+            )
         else:
             raise HTTPException(status_code=400, detail="Formato de exportación no soportado")
 
@@ -234,22 +331,30 @@ class ReportesService:
     ) -> GraficaResponse:
         """Devuelve los datos listos para Chart.js según la pestaña activa.
 
-        - 'tendencia' -> línea: totales agrupados por día (o mes si el rango
-          abarca más de 31 días).
-        - 'categoria' -> dona: ingresos por categoría.
+        - 'tendencia' -> barras: agrupadas por mes si el rango > 60 días (temporadas)
+          o por día (DD/MM) si es menor.
+        - 'categoria' -> barras horizontales: ingresos por categoría.
         - 'hora'      -> barras: nº de transacciones por franja horaria.
         """
         await self._check_permission(user_id)
 
         if tipo == "tendencia":
             puntos = await self.uow.reportes.get_tendencia_ventas(fecha_inicio, fecha_fin)
-            # Si el rango es largo, se agrupa por mes "YYYY-MM" para no saturar
-            # el eje X con decenas de puntos diarios.
-            agrupar_mes = (fecha_fin - fecha_inicio).days > 31
+            dias_rango = (fecha_fin - fecha_inicio).days
+            MESES_ES = [
+                "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+            ]
             acum: dict = {}
-            for dia, total in puntos:
-                clave = f"{dia.year:04d}-{dia.month:02d}" if agrupar_mes else dia.isoformat()
-                acum[clave] = acum.get(clave, Decimal("0.00")) + total
+            if dias_rango > 60:
+                for dia, total in puntos:
+                    clave = MESES_ES[dia.month] if fecha_inicio.year == fecha_fin.year else f"{MESES_ES[dia.month]} {dia.year}"
+                    acum[clave] = acum.get(clave, Decimal("0.00")) + total
+            else:
+                for dia, total in puntos:
+                    clave = dia.strftime("%d/%m")
+                    acum[clave] = acum.get(clave, Decimal("0.00")) + total
+
             return GraficaResponse(
                 tipo=tipo,
                 etiquetas=list(acum.keys()),
@@ -316,7 +421,8 @@ class ReportesService:
     # Reporte de Usuarios
     # ---------------------------------------------------------------------------
 
-    def _map_usuario(self, u) -> UsuarioReporteDTO:
+    def _map_usuario(self, u, m: Optional[dict] = None) -> UsuarioReporteDTO:
+        m = m or {}
         rol_nombre = u.rol.nombre if getattr(u, "rol", None) else "Sin rol"
         return UsuarioReporteDTO(
             id_usuario=u.id_usuario,
@@ -326,6 +432,11 @@ class ReportesService:
             rol_nombre=rol_nombre,
             estado=u.estado,
             fecha_creacion=u.fecha_creacion,
+            ventas_count=m.get("ventas_count", 0),
+            total_vendido=m.get("total_vendido", Decimal("0.00")),
+            turnos_cerrados=m.get("turnos_cerrados", 0),
+            diferencia_caja=m.get("diferencia_caja", Decimal("0.00")),
+            ingresos_bodega=m.get("ingresos_bodega", 0),
         )
 
     async def obtener_reporte_usuarios(
@@ -339,14 +450,18 @@ class ReportesService:
         usuarios = await self.uow.reportes.get_usuarios_reporte(
             estado=estado, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta
         )
-        return [self._map_usuario(u) for u in usuarios]
+        metricas = await self.uow.reportes.get_usuarios_metricas_operativas(
+            fecha_desde=fecha_desde, fecha_hasta=fecha_hasta
+        )
+        return [self._map_usuario(u, metricas.get(u.id_usuario)) for u in usuarios]
 
     async def obtener_ficha_usuario(self, id_usuario: int, user_id: int) -> UsuarioReporteDTO:
         await self._check_permission(user_id)
         u = await self.uow.reportes.get_usuario_by_id(id_usuario)
         if not u:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        return self._map_usuario(u)
+        metricas = await self.uow.reportes.get_usuarios_metricas_operativas(None, None)
+        return self._map_usuario(u, metricas.get(id_usuario))
 
     async def exportar_usuarios(
         self,
@@ -362,17 +477,27 @@ class ReportesService:
         if formato.lower() == "excel":
             wb = openpyxl.Workbook()
             ws = wb.active
-            ws.title = "Reporte de Usuarios"
-            ws.append(["ID", "Nombre Completo", "Usuario", "Rol", "Estado", "Fecha Creación"])
+            ws.title = "Rendimiento Usuarios"
+            ws.append(["ID", "Usuario", "Nombre Completo", "Rol", "Ventas Realizadas", "Total Vendido (Q)", "Turnos Cerrados", "Diferencia Caja (Q)", "Ingresos Bodega", "Estado"])
             for u in usuarios:
-                fc = u.fecha_creacion.strftime("%Y-%m-%d %H:%M") if u.fecha_creacion else "-"
-                ws.append([u.id_usuario, u.nombre_completo, u.username, u.rol_nombre, u.estado, fc])
+                ws.append([
+                    u.id_usuario,
+                    u.username,
+                    u.nombre_completo,
+                    u.rol_nombre,
+                    u.ventas_count,
+                    float(u.total_vendido),
+                    u.turnos_cerrados,
+                    float(u.diferencia_caja),
+                    u.ingresos_bodega,
+                    u.estado,
+                ])
 
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
             return ReporteExportadoDTO(
-                filename=f"reporte_usuarios_{fecha_str}.xlsx",
+                filename=f"rendimiento_usuarios_{fecha_str}.xlsx",
                 content=buf.read(),
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
@@ -380,13 +505,23 @@ class ReportesService:
         elif formato.lower() == "csv":
             output = io.StringIO()
             writer = csv.writer(output)
-            writer.writerow(["ID", "Nombre Completo", "Usuario", "Rol", "Estado", "Fecha Creacion"])
+            writer.writerow(["ID", "Usuario", "Nombre Completo", "Rol", "Ventas Realizadas", "Total Vendido (Q)", "Turnos Cerrados", "Diferencia Caja (Q)", "Ingresos Bodega", "Estado"])
             for u in usuarios:
-                fc = u.fecha_creacion.strftime("%Y-%m-%d %H:%M") if u.fecha_creacion else "-"
-                writer.writerow([u.id_usuario, u.nombre_completo, u.username, u.rol_nombre, u.estado, fc])
+                writer.writerow([
+                    u.id_usuario,
+                    u.username,
+                    u.nombre_completo,
+                    u.rol_nombre,
+                    u.ventas_count,
+                    float(u.total_vendido),
+                    u.turnos_cerrados,
+                    float(u.diferencia_caja),
+                    u.ingresos_bodega,
+                    u.estado,
+                ])
 
             return ReporteExportadoDTO(
-                filename=f"reporte_usuarios_{fecha_str}.csv",
+                filename=f"rendimiento_usuarios_{fecha_str}.csv",
                 content=output.getvalue().encode("utf-8-sig"),
                 media_type="text/csv",
             )
@@ -394,7 +529,7 @@ class ReportesService:
         elif formato.lower() == "pdf":
             content = self._generar_pdf_usuarios_listado(usuarios, estado, fecha_desde, fecha_hasta)
             return ReporteExportadoDTO(
-                filename=f"reporte_usuarios_{fecha_str}.pdf",
+                filename=f"rendimiento_usuarios_{fecha_str}.pdf",
                 content=content,
                 media_type="application/pdf",
             )
@@ -566,8 +701,8 @@ class ReportesService:
 
         elements = []
         elements.append(Paragraph("TIENDA EL REGALITO", title_style))
-        elements.append(Paragraph("REPORTE OFICIAL DE USUARIOS Y PERSONAL", sub_style))
-        elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563eb"), spaceAfter=10))
+        elements.append(Paragraph("REPORTE OPERATIVO DE RENDIMIENTO POR USUARIO / CAJERO", sub_style))
+        elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#0d7377"), spaceAfter=10))
 
         # Metadatos
         filtros_info = [
@@ -575,7 +710,7 @@ class ReportesService:
                 Paragraph("<b>Estado:</b> " + (estado or "Todos"), cell_text),
                 Paragraph("<b>Fecha Desde:</b> " + (str(fecha_desde) if fecha_desde else "Inicio"), cell_text),
                 Paragraph("<b>Fecha Hasta:</b> " + (str(fecha_hasta) if fecha_hasta else "Hoy"), cell_text),
-                Paragraph("<b>Total Registros:</b> " + str(len(usuarios)), cell_text),
+                Paragraph("<b>Total Usuarios:</b> " + str(len(usuarios)), cell_text),
             ]
         ]
         t_meta = Table(filtros_info, colWidths=[135, 135, 135, 135])
@@ -588,36 +723,36 @@ class ReportesService:
         elements.append(t_meta)
         elements.append(Spacer(1, 10))
 
-        # Tabla de usuarios
+        # Tabla de rendimiento operativo
         table_data = [
             [
-                Paragraph("<b>ID</b>", cell_bold),
-                Paragraph("<b>Nombre Completo</b>", cell_bold),
-                Paragraph("<b>Usuario</b>", cell_bold),
-                Paragraph("<b>Rol Asignado</b>", cell_bold),
-                Paragraph("<b>Estado</b>", cell_bold),
-                Paragraph("<b>Fecha Registro</b>", cell_bold),
+                Paragraph("<b>Usuario / Nombre</b>", cell_bold),
+                Paragraph("<b>Rol</b>", cell_bold),
+                Paragraph("<b>Ventas</b>", cell_bold),
+                Paragraph("<b>Total (Q)</b>", cell_bold),
+                Paragraph("<b>Turnos / Cuadre</b>", cell_bold),
+                Paragraph("<b>Ingresos Bodega</b>", cell_bold),
             ]
         ]
 
         for u in usuarios:
-            fc = u.fecha_creacion.strftime("%Y-%m-%d %H:%M") if u.fecha_creacion else "-"
+            cuadre_str = f"{u.turnos_cerrados} turnos (Q {float(u.diferencia_caja):,.2f} dif)"
             table_data.append([
-                Paragraph(str(u.id_usuario), cell_text),
-                Paragraph(u.nombre_completo, cell_text),
-                Paragraph(u.username, cell_text),
+                Paragraph(f"<b>{u.nombre_completo}</b><br/>@{u.username}", cell_text),
                 Paragraph(u.rol_nombre, cell_text),
-                Paragraph(u.estado, cell_text),
-                Paragraph(fc, cell_text),
+                Paragraph(f"{u.ventas_count} ventas", cell_text),
+                Paragraph(f"Q {float(u.total_vendido):,.2f}", cell_text),
+                Paragraph(cuadre_str, cell_text),
+                Paragraph(f"{u.ingresos_bodega} ingresos", cell_text),
             ])
 
-        t_data = Table(table_data, colWidths=[35, 160, 95, 95, 65, 90])
+        t_data = Table(table_data, colWidths=[140, 75, 75, 80, 100, 70])
         t_data.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
             ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
             ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
         elements.append(t_data)
 
@@ -636,16 +771,21 @@ class ReportesService:
 
         elements = []
         elements.append(Paragraph("TIENDA EL REGALITO", title_style))
-        elements.append(Paragraph(f"FICHA TÉCNICA DE USUARIO #{u.id_usuario}", sub_style))
-        elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563eb"), spaceAfter=16))
+        elements.append(Paragraph(f"FICHA DE RENDIMIENTO OPERATIVO - {u.nombre_completo.upper()}", sub_style))
+        elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#0d7377"), spaceAfter=16))
 
         fc = u.fecha_creacion.strftime("%Y-%m-%d %H:%M") if u.fecha_creacion else "No registrada"
         data_card = [
             [Paragraph("ID Usuario:", label_style), Paragraph(str(u.id_usuario), val_style)],
             [Paragraph("Nombre Completo:", label_style), Paragraph(u.nombre_completo, val_style)],
-            [Paragraph("Nombre de Usuario (Login):", label_style), Paragraph(u.username, val_style)],
+            [Paragraph("Nombre de Usuario (Login):", label_style), Paragraph(f"@{u.username}", val_style)],
             [Paragraph("Rol Asignado:", label_style), Paragraph(u.rol_nombre, val_style)],
             [Paragraph("Estado Operativo:", label_style), Paragraph(u.estado, val_style)],
+            [Paragraph("Ventas Realizadas:", label_style), Paragraph(f"{u.ventas_count} ventas registradas", val_style)],
+            [Paragraph("Total Vendido:", label_style), Paragraph(f"Q {float(u.total_vendido):,.2f}", val_style)],
+            [Paragraph("Turnos de Caja Cerrados:", label_style), Paragraph(f"{u.turnos_cerrados} turnos finalizados", val_style)],
+            [Paragraph("Diferencia Acumulada de Caja:", label_style), Paragraph(f"Q {float(u.diferencia_caja):,.2f}", val_style)],
+            [Paragraph("Ingresos de Mercadería (Bodega):", label_style), Paragraph(f"{u.ingresos_bodega} compras/ingresos procesados", val_style)],
             [Paragraph("Fecha de Registro:", label_style), Paragraph(fc, val_style)],
         ]
 

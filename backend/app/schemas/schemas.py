@@ -284,6 +284,24 @@ class TurnoCierre(BaseModel):
     notas: Optional[str] = Field(default=None, max_length=255)
 
 
+class MovimientoCajaCreate(BaseModel):
+    id_tipo_movimiento: int = Field(..., description="1=Entrada/Sencillo, 2=Salida/Gasto")
+    monto: Decimal = Field(..., max_digits=10, decimal_places=2, gt=0)
+    justificacion: str = Field(..., min_length=2, max_length=255)
+
+
+class MovimientoCajaResponse(BaseModel):
+    id_movimiento: int
+    id_turno: int
+    id_tipo_movimiento: int
+    id_usuario: int
+    monto: Decimal
+    justificacion: str
+    fecha_hora: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TurnoResponse(BaseModel):
     id_turno: int
     id_caja: int
@@ -296,6 +314,13 @@ class TurnoResponse(BaseModel):
     estado: str
     caja: Optional[CajaOut] = None
     usuario: Optional[TurnoUsuarioOut] = None
+
+    # Métricas calculadas para cuadre híbrido y accesibilidad
+    ventas_efectivo: Optional[Decimal] = Decimal("0.00")
+    entradas_efectivo: Optional[Decimal] = Decimal("0.00")
+    salidas_efectivo: Optional[Decimal] = Decimal("0.00")
+    efectivo_esperado: Optional[Decimal] = Decimal("0.00")
+    diferencia: Optional[Decimal] = None
 
     model_config = ConfigDict(from_attributes=True)
 

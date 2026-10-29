@@ -2,11 +2,13 @@ from typing import Optional, List
 from decimal import Decimal
 from datetime import date, datetime
 from fastapi import HTTPException
+from sqlalchemy import select
 from app.db.models import (
-    OrdenCompra, DetalleOrdenCompra, Compra, DetalleCompra, BitacoraAuditoria, Usuario
+    OrdenCompra, DetalleOrdenCompra, Compra, DetalleCompra, BitacoraAuditoria, Usuario,
+    Proveedor, InventarioSucursal
 )
 from app.schemas.compras_schema import (
-    OrdenCompraCreate, IngresoMercaderiaCreate
+    OrdenCompraCreate, IngresoMercaderiaCreate, IngresoDirectoCreate
 )
 from app.core.permissions import check_user_permission
 from app.services.audit_service import log_action
@@ -232,3 +234,116 @@ class ConcreteComprasService:
 
         await self.uow.commit()
         return self._enrich_orden(orden)
+
+    async def ingreso_directo(self, data: IngresoDirectoCreate, user_id: int) -> OrdenCompra:
+        """Registra ingreso directo de mercadería a bodega en 1 solo paso:
+        - Aumenta automáticamente el stock de cada producto.
+        - Actualiza el precio de costo del producto si fue modificado.
+        - Asigna proveedor general por defecto si no se especificó.
+        - Guarda orden directamente en estado 'Recibida' y registra la compra."""
+        await self._validar_algun_permiso(user_id, ["COMPRA_EMITIR_ORDEN", "INV_INGRESAR_MERCADERIA"])
+
+        # 1. Determinar proveedor: si no viene o es inválido, buscar Proveedor General
+        id_prov = data.id_proveedor
+        proveedor = None
+        if id_prov and id_prov > 0:
+            proveedor = await self.uow.compras.get_proveedor(id_prov)
+        
+        if not proveedor:
+            stmt = select(Proveedor).where(Proveedor.distribuidora.ilike("%general%"))
+            res = await self.uow.db.execute(stmt)
+            proveedor = res.scalars().first()
+            if not proveedor:
+                stmt_first = select(Proveedor).order_by(Proveedor.id_proveedor.asc())
+                res_first = await self.uow.db.execute(stmt_first)
+                proveedor = res_first.scalars().first()
+            if not proveedor:
+                raise HTTPException(status_code=404, detail="No se encontró un proveedor válido en el sistema")
+
+        subtotal_mercaderia = Decimal("0.00")
+        detalles_orden = []
+        detalles_compra = []
+
+        # 2. Procesar cada producto ingresado
+        for item in data.detalles:
+            if item.cantidad_recibida <= 0:
+                raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
+            if item.costo_unitario < 0:
+                raise HTTPException(status_code=400, detail="El costo unitario no puede ser negativo")
+
+            subtotal_linea = Decimal(str(item.cantidad_recibida)) * Decimal(str(item.costo_unitario))
+            subtotal_mercaderia += subtotal_linea
+
+            # Sumar existencias al inventario de forma inmediata
+            inventario = await self.uow.compras.get_inventario(item.id_variante, getattr(item, "id_sucursal", 1) or 1)
+            if not inventario:
+                inventario = InventarioSucursal(
+                    id_variante=item.id_variante,
+                    id_sucursal=1,
+                    stock_actual=item.cantidad_recibida,
+                    stock_minimo=5
+                )
+                self.uow.db.add(inventario)
+            else:
+                inventario.stock_actual += item.cantidad_recibida
+
+            # Si el usuario modificó el costo unitario (> 0), actualizar el costo en base de datos
+            variante = await self.uow.compras.get_variante(item.id_variante)
+            if variante and item.costo_unitario > Decimal("0.00"):
+                variante.costo_promedio = Decimal(str(item.costo_unitario))
+
+            detalles_orden.append(
+                DetalleOrdenCompra(
+                    id_variante=item.id_variante,
+                    cantidad_pedida=item.cantidad_recibida,
+                    costo_pactado=Decimal(str(item.costo_unitario))
+                )
+            )
+            detalles_compra.append(
+                DetalleCompra(
+                    id_variante=item.id_variante,
+                    cantidad_recibida=item.cantidad_recibida,
+                    costo_unitario=Decimal(str(item.costo_unitario)),
+                    subtotal=subtotal_linea
+                )
+            )
+
+        # 3. Guardar orden de compra directamente como 'Recibida'
+        orden = OrdenCompra(
+            id_proveedor=proveedor.id_proveedor,
+            id_usuario=user_id,
+            fecha_emision=date.today(),
+            total_estimado=subtotal_mercaderia,
+            estado="Recibida"
+        )
+        orden_creada = await self.uow.compras.create_orden(orden, detalles_orden)
+
+        # 4. Crear registro en tabla compra
+        factura_num = data.numero_factura_proveedor.strip() if data.numero_factura_proveedor else f"ING-{orden_creada.id_orden}"
+        total_compra = subtotal_mercaderia + Decimal(str(data.gasto_flete)) + Decimal(str(data.gasto_cargadores))
+
+        compra = Compra(
+            id_orden=orden_creada.id_orden,
+            id_proveedor=proveedor.id_proveedor,
+            id_usuario=user_id,
+            numero_factura_proveedor=factura_num,
+            fecha_ingreso=date.today(),
+            subtotal_mercaderia=subtotal_mercaderia,
+            gasto_flete=Decimal(str(data.gasto_flete)),
+            gasto_cargadores=Decimal(str(data.gasto_cargadores)),
+            total_compra=total_compra
+        )
+        await self.uow.compras.add_compra(compra, detalles_compra)
+
+        # 5. Auditoría
+        await log_action(
+            self.uow.db, id_usuario=user_id, accion="CREAR", tabla="compra",
+            descripcion=f"Ingreso directo de mercadería (Orden #{orden_creada.id_orden}, Factura {factura_num}) por Q{total_compra}"
+        )
+        await log_action(
+            self.uow.db, id_usuario=user_id, accion="CREAR", tabla="orden_compra",
+            descripcion=f"Ingreso directo de orden de compra #{orden_creada.id_orden} por Q{total_compra}"
+        )
+
+        await self.uow.commit()
+        return self._enrich_orden(orden_creada)

@@ -3,6 +3,227 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-28] Simplificación del Módulo de Compras (Ingreso Directo a Inventario en 1 Solo Paso)
+
+### 1. Requerimiento y Alcance
+- **Flujo en 1 Solo Paso (Ingreso Directo)**:
+  - Eliminar el flujo burocrático de emisión de órdenes y recepción diferida en días posteriores.
+  - Al presionar **Guardar y Sumar al Inventario**, el sistema aumenta inmediatamente las existencias físicas en el inventario de la tienda.
+  - Si el usuario modifica el costo unitario de algún producto en la lista, actualiza el costo de ese producto (`costo_promedio`) en la base de datos.
+  - La compra queda registrada de forma directa como `Ingresada` (`Recibida` en BD) en el historial de compras.
+- **Lenguaje Claro y Profesional (Cero Emojis)**:
+  - Pestañas superiores: `Historial de Compras` e `Ingresar Mercadería`.
+  - Panel derecho: `Mercadería a Ingresar`, `TOTAL DE LA COMPRA` y botón sólido `Guardar y Sumar al Inventario`.
+  - Texto vacío: `Selecciona productos de la lista izquierda para sumarlos al inventario`.
+  - Cero emojis en toda la interfaz.
+- **Proveedor Opcional**:
+  - El campo proveedor deja de ser obligatorio (sin asterisco).
+  - Por defecto se selecciona automáticamente `Proveedor General / Sin especificar`.
+- **Edición Intuitiva de Mercadería a Ingresar**:
+  - Steppers claros (`-` y `+`) para cantidad a ingresar sin flechas nativas y sin scroll de mouse accidental.
+  - Vista previa de stock: `Stock actual: X -> Nuevo: Y`.
+  - Input editable con costo actual precargado en Quetzales.
+  - Subtotal automático en tiempo real y botón de papelera para descartar.
+- **Enlace para Productos Nuevos**:
+  - Si la búsqueda de productos no encuentra coincidencias, se despliega el mensaje `No se encontró este producto` con botón directo `Registrar Producto Nuevo` para abrir el modal del catálogo.
+
+---
+
+### 2. Modificaciones en Backend (FastAPI / SQLAlchemy)
+- [`backend/app/schemas/compras_schema.py`](../backend/app/schemas/compras_schema.py):
+  - Nuevo esquema `IngresoDirectoCreate` con `id_proveedor` opcional, número de factura opcional y lista de variantes con cantidad y costo unitario.
+- [`backend/app/services/compra_service.py`](../backend/app/services/compra_service.py):
+  - Nuevo método `ingreso_directo`:
+    - Resuelve automáticamente el `Proveedor General` si no se especifica proveedor.
+    - Incrementa el stock en `inventario_sucursal.stock_actual` atómicamente.
+    - Actualiza `variante_producto.costo_promedio` si el costo especificado es mayor a cero.
+    - Crea la `OrdenCompra` en estado `Recibida` y registra el comprobante en la tabla `compra`.
+    - Registra bitácora de auditoría.
+- [`backend/app/api/compras.py`](../backend/app/api/compras.py):
+  - Nuevo endpoint `POST /api/compras/ingreso-directo` accesible para usuarios autorizados.
+- [`database/init.sql`](../database/init.sql):
+  - Se agregó la semilla del `Proveedor General / Sin especificar` (ID 4).
+
+---
+
+### 3. Modificaciones en Frontend (HTML / CSS / JS)
+- [`frontend/index.html`](../frontend/index.html):
+  - Actualización de textos en pestañas y botones a `Historial de Compras` e `Ingresar Mercadería`.
+  - Panel derecho con título `Mercadería a Ingresar`, proveedor opcional y botón `Guardar y Sumar al Inventario`.
+  - Estado vacío en catálogo con botón `Registrar Producto Nuevo`.
+- [`frontend/css/style.css`](../frontend/css/style.css):
+  - Supresión de spinners nativos en `.compras-cant` y `.compras-costo`.
+  - Estilización de botones stepper `.btn-cant-minus` y `.btn-cant-plus`.
+- [`frontend/js/compras.js`](../frontend/js/compras.js):
+  - Precarga de `Proveedor General / Sin especificar` en el selector de proveedores.
+  - Incorporación de stock en memoria en el carrito.
+  - Renderizado de filas con steppers táctiles, vista previa en tiempo real `Stock actual -> Nuevo`, input de costo y subtotales dinámicos.
+  - Función `emitirOrden` adaptada para llamar a `POST /api/compras/ingreso-directo`, vaciar el carrito, refrescar el catálogo y redirigir al historial con badge verde `Ingresada`.
+
+---
+
+### 4. Verificación
+- Pruebas E2E automáticas con Playwright Chromium:
+  - Verificación de pestañas y títulos actualizados.
+  - Proveedor opcional con `Proveedor General / Sin especificar` preseleccionado.
+  - Búsqueda sin resultados mostrando `No se encontró este producto` y botón para crear nuevo producto.
+  - Incremento con botón `+` de cantidad, cálculo en vivo de subtotal y cálculo dinámico de `Stock actual: 16 -> Nuevo: 18`.
+  - Guardado en un solo paso: orden guardada como `Ingresada`, stock verificado en base de datos PostgreSQL (aumentó a 18) y costo actualizado a Q 60.00.
+
+---
+
+## [2026-10-28] Simplificación y Refinamiento Minimalista del Módulo de Caja
+
+### 1. Requerimiento y Alcance
+- **Diseño Sobrio, Compacto y Profesional**:
+  - Eliminar la sobrecarga visual, cajas excesivas y textos redundantes del Módulo de Caja.
+  - Eliminar absolutamente todos los emojis en botones, etiquetas, alertas y modales.
+  - Ajustar la vista principal de caja para que el layout no sufra cortes ni desbordes.
+  - Eliminar el scroll horizontal en la tabla de historial de turnos haciéndola caber al 100% del ancho.
+  - Reducir la altura del modal de cierre de turno para que quepa verticalmente en cualquier pantalla sin necesidad de hacer scroll y manteniendo los botones visibles.
+
+---
+
+### 2. Modificaciones en Frontend (UI/UX)
+
+1. **Tarjeta "Caja Abierta" (Vista Principal)** ([`frontend/index.html`](../frontend/index.html) y [`frontend/css/style.css`](../frontend/css/style.css)):
+   - **Corrección de salto de línea:** Se reestructuró cada métrica en bloque vertical estricto:
+     - Etiqueta superior en gris oscuro con `display: block` y `white-space: nowrap`.
+     - Valor numérico inferior en `display: block` y `white-space: nowrap !important`, asegurando que el símbolo `Q` y la cifra queden siempre juntos en un solo renglón sin partirse.
+   - **Botón de movimientos sobrio:** Se actualizó a `Registrar Entrada / Salida` con ícono SVG Bootstrap (`bi-arrow-left-right`) eliminando los emojis y nombres informales.
+
+2. **Tabla "Historial de Turnos" (Eliminación de Scroll Horizontal)** ([`frontend/index.html`](../frontend/index.html) y [`frontend/js/cash_register.js`](../frontend/js/cash_register.js)):
+   - Reducción estricta a **8 columnas esenciales**:
+     1. `Turno / Caja`: ID del turno y nombre de la caja.
+     2. `Cajero`: Nombre del usuario asignado.
+     3. `Apertura / Cierre`: Fecha de apertura y fecha de cierre apiladas verticalmente en la misma celda.
+     4. `Monto Inicial`: Fondo de apertura en quetzales.
+     5. `Esperado`: Total proyectado que debía haber al cierre.
+     6. `Monto Físico`: Efectivo real contado al cerrar el turno.
+     7. `Diferencia`: Badge limpio sin íconos ni emojis (`Q 0.00` verde, `-Q X.XX` rojo, `+Q X.XX` azul, o `En curso` gris).
+     8. `Estado`: Badge de turno abierto o cerrado.
+   - Eliminación de la columna redundante de notas para garantizar 100% de visibilidad horizontal.
+
+3. **Modal "Cierre de Turno de Caja" Compacto** ([`frontend/index.html`](../frontend/index.html) y [`frontend/js/cash_register.js`](../frontend/js/cash_register.js)):
+   - **Resumen superior minimalista:** Resumen limpio de 4 líneas sin símbolos confusos:
+     - `Monto inicial`
+     - `Ventas en efectivo`
+     - `Entradas / Salidas`
+     - `Total esperado en caja` (resaltado con línea divisoria).
+   - **Eliminación de elementos redundantes:**
+     - Se eliminó el subtítulo `"Cuenta los billetes y monedas..."`.
+     - Se eliminó el recuadro informativo `(i) Ingresa el dinero físico...`.
+     - Se eliminó el acordeón desplegable de la calculadora de billetes para mantener el modal liviano y directo.
+   - **Botón de coincidencia rápida integrado:**
+     - Botón secundario compacto al lado derecho de la etiqueta: `Usar monto esperado (Q X.XX)` sin emojis.
+   - **Indicador de diferencia minimalista:**
+     - Una sola línea discreta de texto debajo del input (oculta cuando el campo está vacío):
+       - Cuadre exacto: `Cuadre exacto (Diferencia: Q 0.00)` (verde).
+       - Faltante: `Faltante en caja: -Q X.XX` (rojo).
+       - Sobrante: `Sobrante en caja: +Q X.XX` (azul).
+   - **Visibilidad total de acciones:** Altura optimizada a ~360px. Los botones `Cancelar` y `Cerrar Caja` permanecen siempre visibles al pie del modal sin requerir scroll.
+
+---
+
+### 3. Verificación
+- Pruebas E2E automáticas con Playwright Chromium:
+  - Estructura vertical y `white-space: nowrap` de métricas de caja abierta.
+  - Tabla de 8 columnas al 100% del ancho sin scroll horizontal.
+  - 0 emojis presentes en el código y la interfaz del módulo de caja.
+  - Comportamiento del modal de cierre: llenado rápido, alertas de cuadre exacto, faltante y sobrante en una sola línea limpia.
+
+---
+
+## [2026-10-28] Rediseño del Módulo de Caja (Accesibilidad para Adultos Mayores y Cuadre Híbrido)
+
+### 1. Requerimiento y Alcance
+- **Accesibilidad para Adultos Mayores y Personal con Poca Experiencia Técnica**:
+  - Evitar que los cajeros realicen cálculos mentales o restas del fondo de caja en el momento del cierre.
+  - Diseñar interfaces con textos grandes, contrastados y sin elementos técnicos confusos.
+  - Proteger contra errores de digitación comunes (flechas arriba/abajo de teclado, scroll accidental de ratón).
+- **Lógica Híbrida de Cierre de Caja**:
+  - El sistema calcula y proyecta el **Efectivo Esperado** con la fórmula:
+    `Efectivo Esperado = Monto Inicial + Ventas en Efectivo (id_metodo_pago=1) + Entradas de Dinero Extra - Salidas/Gastos`.
+  - El usuario únicamente cuenta e ingresa el dinero físico presente en la gaveta. El sistema calcula en vivo la diferencia (`Monto Físico - Efectivo Esperado`).
+- **Regla Estricta de Alcance**:
+  - Modificaciones limitadas **única y exclusivamente** al Módulo de Caja (backend de caja, frontend de caja, esquemas de caja y estilos específicos de caja). Cero cambios en ventas, inventario, usuarios u otros módulos.
+
+---
+
+### 2. Modificaciones en Backend (FastAPI / SQLAlchemy)
+
+1. **Esquemas Pydantic** ([`backend/app/schemas/schemas.py`](../backend/app/schemas/schemas.py)):
+   - `MovimientoCajaCreate`: Esquema de entrada con validación estricta para registrar entradas y salidas de caja (`id_caja`, `id_tipo_movimiento`, `monto > 0`, `descripcion` de 3 a 300 caracteres).
+   - `MovimientoCajaResponse`: Esquema de salida serializando movimientos de caja con `id_movimiento`, fecha, tipo y usuario.
+   - `TurnoResponse`: Se agregaron los campos numéricos calculados para la conciliación híbrida: `ventas_efectivo`, `entradas_efectivo`, `salidas_efectivo`, `efectivo_esperado` y `diferencia`.
+
+2. **Repositorio de Caja** ([`backend/app/repositories/cash_repository.py`](../backend/app/repositories/cash_repository.py) y [`backend/app/interfaces/repositories.py`](../backend/app/interfaces/repositories.py)):
+   - `create_movimiento`: Implementado para persistir registros en la tabla `movimiento_caja`.
+   - Ajuste en `stmt_out`: Se corrigió la consulta de salidas de caja para sumar todas aquellas con `id_tipo_movimiento != 1` (gastos, vales de caja chica, fletes, etc.), asegurando un balance fidedigno de los egresos.
+
+3. **Servicio de Caja** ([`backend/app/services/cash_service.py`](../backend/app/services/cash_service.py) y [`backend/app/interfaces/services.py`](../backend/app/interfaces/services.py)):
+   - `registrar_movimiento`: Registra movimientos de efectivo dentro del turno activo de la caja especificada.
+   - `get_estado_actual`: Ahora retorna el desglose completo del turno activo: `ventas_efectivo`, `entradas_efectivo`, `salidas_efectivo` y `efectivo_esperado`.
+   - `list_turnos`: Calcula en tiempo de ejecución o desde auditoría el `efectivo_esperado` y la `diferencia` (`monto_cierre - efectivo_esperado`) de cada turno cerrado en el historial.
+   - `cerrar_caja`: Implementa la conciliación híbrida. Recibe el `monto_cierre` (efectivo físico), calcula el `efectivo_esperado`, determina si faltó o sobró dinero y añade una traza de auditoría clara en el campo `notas` (ej: `[CUADRE: Esperado Q 2,085.00 | Físico Q 2,085.00 | Exacto (Q 0.00)]`).
+
+4. **API Router** ([`backend/app/api/cash_register.py`](../backend/app/api/cash_register.py)):
+   - Nuevo endpoint: `POST /api/caja/movimiento` para registrar gastos menores o ingresos de sencillo con autenticación JWT y rol cajero/admin.
+
+---
+
+### 3. Rediseño de Experiencia de Usuario (Frontend / UI / UX)
+
+1. **Modal "Cierre de Turno de Caja" (`#close-cash-modal`)** ([`frontend/index.html`](../frontend/index.html)):
+   - **Resumen desglosado visual**: Tarjeta superior con fondo suave que detalla:
+     - `(+) Monto inicial de apertura`
+     - `(+) Ventas cobradas en efectivo`
+     - `(+) Entradas / (-) Salidas de caja`
+     - `(=) Total que debería haber (Esperado)` en tipografía destacada color Teal.
+   - **Etiqueta amigable y directa**: Reemplazo de términos técnicos por la pregunta conversacional:
+     `¿Cuánto dinero en efectivo hay en la caja ahorita? (Q) *`
+   - **Botón de coincidencia rápida ("Tengo exactos")**:
+     Botón `✅ Tengo Q [Esperado] exactos`, que rellena el valor con un solo clic para turnos sin novedades, ahorrando tiempo y evitando digitación errónea.
+   - **Blindaje contra errores de entrada**:
+     - Eliminación de flechas incrementales (spinners) mediante CSS (`-moz-appearance: textfield`, `::-webkit-inner-spin-button: none`).
+     - Bloqueo de la rueda del mouse (`wheel` event con `e.preventDefault()`) para evitar cambios accidentales al hacer scroll.
+   - **Alerta Dinámica de Cuadre en Vivo (`#close-cash-diff-alert`)**:
+     - *Verde*: `✅ ¡La caja cuadra perfecto! (Diferencia: Q 0.00)`
+     - *Rojo*: `⚠️ Faltan Q [Monto] - Verifica que hayas contado y escrito bien el monto.`
+     - *Azul/Naranja*: `ℹ️ Sobran Q [Monto] en la caja - Hay más dinero físico en gaveta del esperado.`
+   - **Asistente / Calculadora Desplegable de Conteo (`#cash-calculator-collapse`)**:
+     - Acordeón colapsable con la pregunta `¿Prefieres contar billete por billete? (Ayuda)`.
+     - Desglose oficial de la moneda de Guatemala: Billetes de **Q200, Q100, Q50, Q20, Q10, Q5, Q1** y campo para monedas en total.
+     - Multiplicación automática por denominación y suma total en vivo (`calc-total-display`).
+     - Sincronización bidireccional inmediata con el campo principal `#close-cash-monto` y disparo de la alerta de cuadre.
+
+2. **Vista Principal del Módulo de Caja (`#cash-view`)**:
+   - **Renombrado del botón de movimiento**: Actualizado a `💸 Sacar / Meter Dinero (Gastos o Sencillo)` con mayor claridad visual.
+   - **Alto contraste en etiquetas de estado**: Clases `.cash-card-label` con color `#374151` y peso tipográfico de alta legibilidad para usuarios con vista cansada.
+   - **Historial de Turnos Mejorado**: Se agregaron dos nuevas columnas en la tabla:
+     - `Efectivo Esperado`: Monto calculado que debía haber al momento del cierre.
+     - `Diferencia / Cuadre`: Badge con código de color (verde para cuadre exacto `Q 0.00`, rojo para faltantes `Faltan Q X.XX` y azul para sobrantes `Sobran Q X.XX`).
+
+3. **Controladores JavaScript y Estilos** ([`frontend/js/cash_register.js`](../frontend/js/cash_register.js) y [`frontend/css/style.css`](../frontend/css/style.css)):
+   - Matriz de denominaciones `GT_BILL_DENOMINATIONS`.
+   - Funciones `renderCashCalculator()`, `updateCalculatorTotal()`, `resetCashCalculator()` y `updateCashDifferenceIndicator()`.
+   - Estilos dedicados: `.cash-diff-alert-match`, `.cash-diff-alert-shortage`, `.cash-diff-alert-surplus`, `.cash-calc-row`, `.badge-cuadre-exact`, `.badge-cuadre-shortage`, `.badge-cuadre-surplus`.
+
+---
+
+### 4. Verificación y Pruebas Automatizadas
+- Pruebas E2E automáticas ejecutadas con Playwright Chromium contra el entorno Docker en vivo:
+  - Verificación del botón `💸 Sacar / Meter Dinero (Gastos o Sencillo)`.
+  - Verificación de etiquetas de contraste y cálculo de `Q 2,085.00` en tarjeta activa.
+  - Verificación del modal de cierre y botón de coincidencia rápida ("Tengo Q 2085.00 exactos").
+  - Prueba de cuadre exacto (alerta verde `Q 0.00`).
+  - Prueba de faltante ingresando `Q 2,000.00` (alerta roja `⚠️ Faltan Q 85.00`).
+  - Prueba de sobrante ingresando `Q 2,100.00` (alerta azul `ℹ️ Sobran Q 15.00`).
+  - Prueba de calculadora desplegable: conteo de billetes (10xQ200 + 1xQ50 + Q35 en monedas = Q2,085.00) y sincronización con el campo principal.
+  - Verificación de cabeceras de tabla de 11 columnas con "Efectivo Esperado" y "Diferencia / Cuadre".
+
+---
+
 ## [2026-10-28] Implementación de Escaneo y Generación Automática de Códigos de Barras (POS y Catálogo)
 
 ### 1. Requerimiento
@@ -3791,3 +4012,295 @@ Se desarrolló el módulo de **Productos** y el mantenimiento de **Categorías**
   - Clic en hamburguesa: Sidebar colapsa a **76px** (modo compacto con íconos).
   - Segundo clic en hamburguesa: Sidebar se expande nuevamente a **272px**.
   - Móvil (390px ancho): Main = 390px, menú lateral en modo drawer deslizable, catálogo a 520px y panel de cobro visible y accesible.
+
+
+---
+
+## Ajustes de Usabilidad y Creación de Producto Nuevo en Compras (Frontend UX)
+
+### Fecha: 28 de Octubre de 2026
+
+### Objetivo
+1. Eliminar el botón redundante "<- Panel" del encabezado superior del módulo de compras.
+2. Eliminar el botón duplicado "+ Ingresar Mercadería" de la barra de filtros del historial, conservando únicamente la pestaña principal superior.
+3. Permitir la creación de nuevos productos directamente desde el módulo de compras reutilizando el modal exacto de Catálogo/Inventario, agregándolo automáticamente al carrito de compras sin recargar la vista ni alterar la posición del usuario.
+
+### Modificaciones Realizadas
+
+#### 1. Limpieza de Interfaz (`frontend/index.html`)
+- **Encabezado del módulo:** Se eliminó el botón `<button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')">` ("<- Panel") dejando únicamente el botón de recarga `#btn-compras-refresh`.
+- **Filtros del Historial:** Se eliminó el botón duplicado `#btn-goto-nueva-orden` (`+ Ingresar Mercadería`) de la barra de filtros en la pestaña de historial (`#pills-ordenes-pane`).
+- **Barra de Búsqueda de Productos:** Se añadió el botón `#btn-compras-nuevo-prod-top` (`+ Crear Producto Nuevo`) con estilo outline-teal junto al botón de filtrar.
+- **Estado de Búsqueda Sin Resultados:** Se actualizó `#btn-compras-nuevo-producto` con el texto `Crear Producto Nuevo` para que invoque el flujo de creación sin saltar a otra vista.
+
+#### 2. Reutilización del Modal de Catálogo (`frontend/js/catalog.js`)
+- Se expuso globalmente `window.openCreateProductModal` para su reutilización desde otros módulos.
+- En `saveProduct`, se implementó un hook que detecta si existe un callback en `window.onProductCreatedSuccess`. Al guardar un producto nuevo exitosamente:
+  - Cierra el modal silenciosamente.
+  - Ejecuta el callback pasando los datos del producto creado.
+  - Evita recargar vistas o navegar a catálogos.
+- Se agregó limpieza defensiva del callback en el evento `hidden.bs.modal` de `#product-modal`.
+
+#### 3. Integración en Flujo de Compras (`frontend/js/compras.js`)
+- Se implementó la función `openProductModalFromCompras()`:
+  - Define `window.onProductCreatedSuccess` para:
+    1. Recargar el catálogo local en memoria (`await loadProducts()`).
+    2. Identificar la variante creada (`variantes[0].id_variante` o match por ID).
+    3. Añadir el nuevo ítem al carrito de compras (`addToCart(varianteId)`) conservando los productos previamente seleccionados.
+    4. Limpiar el filtro de búsqueda y refrescar la lista.
+    5. Mostrar toast de confirmación sobrio y sin emojis.
+  - Invoca `window.openCreateProductModal()`.
+- Se enlazaron los botones `#btn-compras-nuevo-prod-top` y `#btn-compras-nuevo-producto` a este flujo.
+
+### Verificación Automatizada (Playwright)
+- Verificado con test de integración en navegador real (`scratch/test_compras_modal.py` y `scratch/test_empty_search.py`):
+  - Botón "<- Panel" ausente en encabezado.
+  - Botón "+ Ingresar Mercadería" ausente en filtros del historial.
+  - Apertura del modal oficial de creación de producto desde barra de herramientas y desde búsqueda vacía.
+  - Creación de producto con categoría, precios y stock.
+  - Cierre automático del modal e incorporación inmediata al carrito de compras activo.
+  - La vista permanece 100% en el módulo de compras sin recargas ni pérdida de contexto.
+
+
+---
+
+## Mejoras de UI/UX en Compras: Miniatura con Zoom y Ajuste de Tabla Mercadería a Ingresar
+
+### Fecha: 28 de Octubre de 2026
+
+### Objetivo
+1. Clonar de forma idéntica la miniatura de producto con zoom flotante desde el Módulo de Inventario al Módulo de Compras (buscador izquierdo).
+2. Mejorar el contraste del encabezado en "Mercadería a Ingresar" cambiando el color del texto a blanco puro (`#FFFFFF`) en negrita.
+3. Eliminar la barra de scroll horizontal en la tabla de productos a ingresar, ajustando las proporciones y estilos de entrada para que todo encaje al 100% del ancho de la tarjeta sin desbordes.
+
+### Modificaciones Realizadas
+
+#### 1. Miniatura con Zoom Flotante (`frontend/js/compras.js` y `frontend/css/style.css`)
+- **Captura de Imagen en Datos:** En `loadProducts()`, se incluyó `imagen_url: p.imagen_url || ''` en la estructura aplanada de cada variante.
+- **Clonación de Componente de Inventario:** Se integraron las funciones `getProductThumbHtml`, `getComprasImageZoom`, `positionComprasImageZoom`, `showComprasImageZoom`, `hideComprasImageZoom` y `setupComprasImageZoom`, idénticas a las de `inventory.js`.
+- **Estructura HTML en Fila Horizontal:** En `renderList()`, se insertó la miniatura a la izquierda de cada fila (`thumb` -> `info` -> `cost` -> `btn`), manteniendo el formato de lista horizontal.
+- **Soporte de Fallback y Zoom:** Si el producto no tiene foto, muestra el contenedor redondeado con `📦`; si tiene foto, muestra la imagen (40x40px, bordes de 10px) y al posar el cursor o recibir foco se despliega la vista previa flotante de 200x200px (`#inventory-image-zoom`).
+- **Compartición de Estilos CSS:** En `frontend/css/style.css`, se extendieron las reglas de `.inventory-product-thumb` para abarcar `#compras-view`.
+
+#### 2. Encabezado Blanco y Eliminación de Scroll Horizontal (`frontend/index.html`, `frontend/css/style.css` y `frontend/js/compras.js`)
+- **Contraste de Encabezado:**
+  - En `frontend/index.html` y `frontend/css/style.css`, se forzó el color del texto de `<thead>` a blanco puro `color: #FFFFFF !important; font-weight: 700 !important;` sobre el fondo verde oscuro (`var(--color-teal-dark)`).
+- **Eliminación de Scroll Horizontal:**
+  - Se sobreescribió la regla global que asignaba `min-width: 680px` a `.table-responsive > .table`, fijando `min-width: 0 !important; width: 100% !important; table-layout: fixed !important;`.
+  - Se reestructuró la fila en `renderCart()` con anchos porcentuales (33% Producto, 24% Costo, 22% Cantidad, 15% Subtotal, 6% Eliminar), reduciendo paddings internos a `0.4rem 0.2rem` y optimizando los grupos de entrada (`input-group-sm flex-nowrap`).
+  - Se configuró `overflow-x: hidden !important` en el contenedor `.table-responsive` del carrito.
+  - Resultado: `scrollWidth = 395px == clientWidth = 395px`, eliminando al 100% la barra de scroll horizontal sin cortar el botón `+`.
+
+### Verificación
+- Prueba automatizada end-to-end con Playwright (`scratch/verify_compras_ui.py`):
+  - 8 productos con miniaturas renderizadas en el panel izquierdo.
+  - Despliegue correcto del zoom flotante `#inventory-image-zoom.is-visible` con imagen ampliada en hover.
+  - Encabezados de tabla (`Producto`, `Costo (Q)`, `Cantidad`, `Subtotal`) verificados con color `rgb(255, 255, 255)` y `font-weight: 700`.
+  - Verificación matemática de desbordamiento horizontal: `scrollWidth (395) <= clientWidth (395)`, overflow = False.
+  - Interacción con botón `+` probada e incremento de cantidad registrado.
+
+
+---
+
+## Simplificación y Rediseño de Reportes y Estadísticas (Accesibilidad y Rendimiento Operativo)
+
+### Fecha: 28 de Octubre de 2026
+
+### Objetivo
+1. **Simplificar Gráficas (Consolidado Operativo):** Reemplazar líneas confusas por gráficas de barras con etiquetas de valores visibles arriba/a un lado en Quetzales y porcentajes. Eliminar la pestaña innecesaria "Ventas por Hora". Dejar solo "Ventas por Día" y "Ventas por Categoría".
+2. **Rankings Limpio:** Eliminar selectores desplegables redundantes y fijar título sobrio "Productos Más Vendidos (Top 5)".
+3. **Rendimiento Operativo por Usuario:** Transformar "Reporte de Usuarios" de un simple listado de cuentas a un reporte con métricas reales de trabajo (Ventas Realizadas, Total Vendido en Q, Turnos Cerrados / Cuadre de Caja con diferencias, e Ingresos de Bodega / Compras) con modal de desglose operativo.
+4. **Cero Emojis y Alto Contraste:** Eliminar emojis en todo el módulo usando iconos SVG limpios. Encabezados de tabla con texto blanco puro (`#FFFFFF`) y fondo teal institucional (`#0A5C5E`).
+5. **Eliminar botón redundant "<- Panel" y botón de exportación CSV** (manteniendo Excel y PDF).
+
+### Modificaciones Realizadas
+
+#### 1. Backend (`backend/app/schemas/reportes_schema.py`, `backend/app/repositories/reporte_repository.py`, `backend/app/services/reporte_service.py`)
+- **DTO de Rendimiento Operativo:** Se agregaron al esquema `UsuarioReporteDTO` los campos `ventas_count: int`, `total_vendido: Decimal`, `turnos_cerrados: int`, `diferencia_caja: Decimal` e `ingresos_bodega: int`.
+- **Cálculo Agregado en Base de Datos:** En `ReporteRepositoryImpl`, se implementó `get_usuarios_metricas_operativas(fecha_desde, fecha_hasta)` para consultar y agrupar en una sola pasada:
+  - Ventas no anuladas por usuario (`func.count`, `func.sum(Venta.total_venta)`).
+  - Turnos cerrados por usuario (`func.count(TurnoCaja.id_turno)`).
+  - Diferencias de cuadre acumuladas (`func.sum(CierreCajaCiegas.diferencia)`).
+  - Ingresos/compras a bodega registrados por usuario (`func.count(Compra.id_compra)`).
+- **Servicio y Reportes PDF/Excel:**
+  - `obtener_reporte_usuarios` y `obtener_ficha_usuario` ahora adjuntan las métricas operativas al DTO.
+  - Generación de PDF de listado y ficha técnica actualizada con el formato operativo sobrio institucional.
+  - Sincronización en contenedor de producción `regalito_backend_prod`.
+
+#### 2. Frontend (`frontend/index.html`, `frontend/css/style.css`, `frontend/js/reportes.js`)
+- **Limpieza de Cabecera y Exportación:**
+  - Se eliminó el botón redundant `<- Panel` en la cabecera superior.
+  - Se removieron los botones `CSV`, dejando únicamente `Excel` y `PDF`.
+- **Gráficas Simplificadas para Adultos Mayores:**
+  - Se eliminó la pestaña "Ventas por Hora".
+  - Se definieron dos botones limpios: `Ventas por Día` y `Ventas por Categoría` sin emojis.
+  - Se desarrolló el plugin `barValueLabelsPlugin` en Chart.js para dibujar sobre cada barra vertical el monto exacto en Quetzales (`Q 1,085.00`) y en cada barra horizontal el monto y porcentaje (`Q 680.00 (62.7%)`).
+  - Se corrigió el bug de categorías donde salían fechas en lugar del nombre de la categoría.
+- **Card de Rankings:**
+  - Se eliminaron los dos selects desplegables; ahora muestra encabezado limpio `Productos Más Vendidos (Top 5)` basado en el rango activo.
+- **Tabla de Rendimiento por Usuario / Cajero:**
+  - Encabezado con 7 columnas: `Usuario / Nombre`, `Rol`, `Ventas Realizadas`, `Total Vendido (Q)`, `Turnos Cerrados / Cuadre`, `Ingresos de Bodega`, `Acciones`.
+  - Enlaces de acción "Ver Detalle" con modal de desglose operativo (`modal-reporte-ficha-usuario`) que visualiza tarjetas resumidas de ventas, montos en Q, turnos, diferencia de caja y compras procesadas.
+- **Contraste y Estilos CSS:**
+  - Reglas aplicadas a `#reportes-view thead th`, `#table-reporte-usuarios thead th` y `#table-reporte-clientes thead th` con fondo `#0A5C5E` y texto blanco `#FFFFFF !important; font-weight: 600 !important;`.
+
+### Verificación
+- Prueba automatizada end-to-end con Playwright (`scratch/verify_reportes_ui.py`):
+  - Ausencia confirmada del botón "<- Panel" (0 encontrados).
+  - Ausencia confirmada de botones CSV (0 encontrados).
+  - Ausencia confirmada de botón "Ventas por Hora" (0 encontrados).
+  - Captura y verificación de barras verticales en "Ventas por Día" con etiquetas numéricas legibles.
+  - Captura y verificación de barras horizontales en "Ventas por Categoría" con nombres y porcentajes.
+  - Verificación del color de encabezado de tabla: `rgb(255, 255, 255)`.
+  - Apertura del modal de detalle de usuario con título `Desglose de Rendimiento del Empleado` y métricas operativas cargadas.
+
+
+---
+
+## Enriquecimiento del Consolidado Operativo: Ganancia Estimada, Temporadas, Stock Crítico y Detalle de Ventas
+
+### Fecha: 28 de Octubre de 2026
+
+### Objetivo
+1. **Filtros Rápidos por Temporada:** Incorporar botones de un solo clic (`Hoy`, `Esta Semana`, `Este Mes`, `Este Año`) para actualización inmediata del rango de fechas sin manipulación manual de calendarios.
+2. **Agrupación Inteligente por Mes:** Configurar la gráfica de ventas para agrupar por mes en español (`Enero`, `Febrero`, `Octubre`...) cuando el rango consultado supere los 60 días (ej. `Este Año`), facilitando la identificación de temporadas altas y bajas.
+3. **Tarjeta de Ganancia Estimada (Utilidad):** Añadir métrica destacada de utilidad calculada en tiempo real como `Ventas Netas - Costo de los Productos Vendidos`, mostrando además el porcentaje de margen (`Margen: XX.X%`) y el costo total de lo vendido.
+4. **Pestaña de Inventario Crítico / Baja Rotación:** Agregar alternancia en la tarjeta derecha entre `Más Vendidos` (con unidades vendidas y monto) y `Baja Rotación / Stock Bajo` (con stock actual y valor en inventario para reposición u ofertas).
+5. **Detalle Exhaustivo en Ventas Recientes:** Reestructurar la tabla inferior con columnas operativas: `Fecha y Hora`, `Artículos Vendidos` (resumen de productos y variantes compradas), `Vendedor`, `Método de Pago` (badge SVG de Efectivo o Transferencia), `Descuento` y `Total`.
+6. **Exportación PDF / Imprimir:** Habilitar botón de descarga de informe consolidado en formato PDF maquetado con ReportLab.
+
+### Modificaciones Realizadas
+
+#### 1. Backend (`backend/app/schemas/reportes_schema.py`, `backend/app/repositories/reporte_repository.py`, `backend/app/services/reporte_service.py`, `backend/app/api/reportes.py`)
+- **Esquemas:**
+  - `KPITotalesDTO`: Se añadieron `ganancia_estimada: Decimal`, `costo_vendido: Decimal` y `margen_ganancia: Decimal`.
+  - `VentaReporteDTO`: Se añadieron `articulos: str` y `metodo_pago: str`.
+- **Cálculo de Utilidad y Relaciones:**
+  - En `ReporteRepositoryImpl.get_kpi_totales()`, se integró la consulta agregada de costo: `SUM(DetalleVenta.cantidad * VarianteProducto.costo_promedio)` para deducir la ganancia y calcular el margen porcentual exacto.
+  - En `ReporteRepositoryImpl.get_ventas_by_date()`, se configuró eager loading jerárquico (`DetalleVenta -> VarianteProducto -> Producto` y `PagoVenta -> MetodoPago`).
+  - En `ReporteRepositoryImpl.get_ranking_estancados()`, se ordenó por menor stock disponible (`stock_total.asc()`) para priorizar inventario crítico y sin rotación.
+- **Servicio:**
+  - `obtener_consolidado()`: Construye para cada venta el desglose legible de artículos (ej. `1x Juego de Vasos (Transparente), 1x Muñeca...`) y el método de pago utilizado.
+  - `obtener_grafica()`: Aplica agrupación estacional por meses en español (`MESES_ES`) cuando el intervalo excede los 60 días.
+  - `exportar_reporte()`: Añadido generador ReportLab para PDF consolidado con cabecera institucional, resumen KPI y tabla completa de ventas.
+- **Ruta de API:**
+  - Se habilitó `formato: pattern="^(excel|csv|pdf)$"` en el endpoint `/api/reportes/exportar`.
+- **Sincronización:**
+  - Archivos copiados al contenedor de producción `regalito_backend_prod` y servicio reiniciado.
+
+#### 2. Frontend (`frontend/index.html`, `frontend/css/style.css`, `frontend/js/reportes.js`)
+- **Barra de Herramientas y Exportación:**
+  - Se agregó grupo de botones `.reportes-quick-filters`: `Hoy`, `Esta Semana`, `Este Mes` y `Este Año`.
+  - Se incorporó el botón `#btn-export-pdf` ("PDF / Imprimir") junto al botón `#btn-export-excel`.
+- **Fila de 4 Tarjetas KPI:**
+  - Rediseño responsive en `col-6 col-lg-3` integrando la tarjeta destacada con borde verde `Ganancia Estimada` (`#reportes-total-ganancia` y `#reportes-margen-ganancia`).
+- **Tarjeta Derecha de Productos:**
+  - Cabecera convertida en dos pestañas tipo pill: `Más Vendidos` y `Baja Rotación`.
+  - En `Más Vendidos` se muestra el badge de unidades vendidas (ej. `8 uds vendidas · Q 680.00`).
+  - En `Baja Rotación` se muestra el badge de stock crítico (ej. `Stock actual: 10 uds · Q 250.00`).
+- **Tabla de Ventas Recientes:**
+  - Columnas actualizadas con contraste institucional `#0A5C5E` y texto blanco puro: `Fecha y Hora`, `Artículos Vendidos`, `Vendedor`, `Método de Pago`, `Descuento`, `Total`.
+  - Visualización limpia con insignias SVG para Efectivo y Transferencia.
+- **Estilos CSS:**
+  - Reglas aplicadas a `.reportes-quick-filters .btn` y `.reportes-rank-pill`.
+
+### Verificación Automatizada (Playwright)
+- Ejecución de `scratch/verify_reportes_enrichment.py`:
+  - Activación del filtro rápido `Este Año`: fechas actualizadas automáticamente del `01/01/2026` a hoy y gráfica agrupada por mes (`Octubre`).
+  - Ganancia Estimada calculada en `Q 377.00` con `Margen: 34.7%` y `Costo: Q 708.00` sobre `Total Ventas: Q 1,085.00`.
+  - Pestaña `Baja Rotación` desplegando los 5 artículos con menor stock o sin ventas con insignia `Stock actual: X uds`.
+  - Tabla de ventas recientes renderizando el detalle exacto de artículos comprados y método de pago en cada fila.
+  - Capturas registradas: `reportes_consolidado_enriquecido.png`, `reportes_baja_rotacion.png`, `reportes_tabla_ventas_recientes.png`.
+
+
+## [2026-10-28] Ajuste del Menú Hamburguesa (Colapso Menos Ancho) y Adaptabilidad Móvil
+
+### Causa Raíz
+1. **Sidebar Sobredimensionado sin Texto en Ventanas Redimensionadas o Intermedias**:
+   - Al hacer clic en el botón de la hamburguesa (`#btn-sidebar-toggle`), en pantallas intermedias o al cambiar el tamaño de ventana por debajo del breakpoint previo (`1024px`), la regla `@media (max-width: 1023.98px) { #system-module > .sidebar { width: 280px; max-width: 85vw; } }` tenía mayor especificidad que `.sidebar-collapsed .sidebar { width: 76px; }`.
+   - Por esta razón, el menú no se hacía estrecho sino que permanecía con un ancho de hasta 430px (85vw), pero las reglas que ocultaban el texto se aplicaban, resultando en una franja gigante vacía con los íconos flotando solos a la izquierda.
+2. **Requerimiento Específico de Usuario**:
+   - Al presionar el botón de tres líneas / hamburguesa, el menú debe **hacerse menos ancho** (modo barra compacta de 72-76px con íconos centrados y legibles).
+   - El menú **únicamente** debe cambiar de tamaño cuando el usuario presiona el botón hamburguesa, no automáticamente ni de forma destructiva al redimensionar la ventana.
+   - Todo el sistema debe acoplarse y verse limpio en dispositivos móviles y al cambiar el tamaño de la ventana (sin scroll horizontal indeseado).
+
+### Solución Implementada
+1. **Reglas Universales de Alta Especificidad para Sidebar Colapsado (`frontend/css/style.css`)**:
+   - Se estableció `#system-module.sidebar-collapsed > .sidebar` con especificidad estricta y ancho exacto de `72px` (`min-width: 72px; max-width: 72px; flex: 0 0 72px; padding: 0.85rem 0.4rem;`).
+   - El área de contenido principal se expande limpiamente a `width: calc(100% - 72px); flex: 1 1 calc(100% - 72px);`.
+   - Los íconos se centran con tamaño `1.25rem` y la marca muestra solo el isotipo de regalo centrado.
+   - En dispositivos móviles (< 768px), al abrirse el drawer off-canvas con el menú completo, se asegura explícitamente que todo el texto y títulos de sección permanezcan 100% visibles (`display: inline-block !important; font-size: 0.95rem;`).
+2. **Lógica de Conmutación en JavaScript (`frontend/js/app.js`)**:
+   - Se estandarizó el breakpoint móvil a `768px` (Bootstrap `md`).
+   - En pantallas `>= 768px` (escritorios, laptops y tablets), pulsar el botón hamburguesa conmuta `.sidebar-collapsed`, haciéndolo menos ancho (`72px`) y guardando la preferencia en `localStorage`. Al volver a pulsarlo, se expande a su ancho normal (`272px`).
+   - Al cambiar el tamaño de la ventana (`resize`), se respeta la preferencia guardada y no se colapsa/rompe la interfaz automáticamente.
+   - En móviles (< 768px), el botón hamburguesa abre y cierra el drawer lateral con backdrop oscuro y botón de cierre `[X]`.
+3. **Adaptabilidad Móvil del Encabezado (`frontend/css/style.css`)**:
+   - En resoluciones móviles (< 576px), se optimizó el encabezado superior `.main-topbar`:
+     - Ocultamiento de la etiqueta textual de "Historial" en el botón de turno POS, mostrando únicamente el ícono `bi-clock-history`, ahorrando 65px de ancho.
+     - Ajuste ergonómico de padding y tipografía del título y badge de turno para eliminar cualquier desbordamiento horizontal (`scrollWidth === clientWidth`).
+
+### Verificación
+- Pruebas automatizadas en Playwright en múltiples resoluciones (1280px, 900px, 600px, 525px, 412px y 375px):
+  - **Escritorio**: Ancho expandido `272px` -> Hamburguesa pulsada -> Ancho reducido a `76px` ("menos ancho") -> Hamburguesa pulsada -> Ancho expandido `272px`.
+  - **Ventana Redimensionada (525px)**: El menú se abre con ancho correcto de `280px` mostrando texto íntegro ("El Regalito", "Panel Principal", etc.) y botón de cierre táctil `[X]`.
+  - **Móvil 375px**: Sin desbordamiento horizontal (`HasOverflow: False`). Drawer abre con texto completo y se cierra limpiamente al pulsar `X` o seleccionar una vista.
+
+
+## [2026-10-29] Rediseño Minimalista del Panel Principal (Dashboard) Estilo Square / Loyverse
+
+### Causa Raíz
+- El Panel Principal se encontraba sobrecargado visualmente con gráficas duplicadas que pertenecen exclusivamente al módulo de Reportes ("Ventas de los últimos 7 días" y "Top 5 productos de la semana").
+- Contenía tarjetas redundantes ("Pendientes por atender" con órdenes de compra y traslados) que ya no son necesarias gracias al flujo de compras directo en 1 paso.
+- Los accesos rápidos se encontraban al fondo de la página, obligando al usuario a desplazarse para realizar las operaciones más frecuentes.
+- Se utilizaban siglas y términos técnicos como "Ir al POS", "Cobrar en el POS" o "Ticket promedio".
+- El contraste del encabezado de la tabla de últimas ventas requería fondo corporativo teal con texto blanco en negrita para cumplir estándares de accesibilidad para adultos mayores.
+
+### Solución Implementada
+1. **Eliminación de Secciones Redundantes**:
+   - Se removió por completo la sección de gráficas `Ventas de los últimos 7 días` y el leaderboard `Top 5 productos de la semana`.
+   - Se eliminó la tarjeta `Pendientes por atender` (`Órdenes de compra por recibir` y `Traslados en tránsito`).
+2. **Reubicación y Optimización de Accesos Rápidos y Estado de Caja**:
+   - En la tarjeta superior de `Estado de caja`, se actualizó el botón a **`Ir a Vender`** (en sustitución de "Ir al POS").
+   - Se movió el bloque **`Accesos rápidos`** a la parte superior, inmediatamente debajo de `Estado de caja`.
+   - 4 accesos rápidos en tarjetas ergonómicas:
+     1. **`Nueva Venta`** (`Cobrar en mostrador`) -> navega a ventas/POS.
+     2. **`Ingresar Mercadería`** (`Sumar compra al inventario`) -> navega a compras.
+     3. **`Control de Caja`** (`Abrir, cerrar o registrar gastos`) -> navega a caja.
+     4. **`Registrar Merma`** (`Dar de baja producto dañado`) -> navega a mermas.
+3. **Métricas Diarias de Control ("HOY")**:
+   - **`Ventas de hoy`**: Total en Quetzales y número de ventas realizadas (se eliminó el término técnico "Ticket promedio"). Enlace de estado vacío: **`Realizar Venta`**.
+   - **`Ingresos por método de pago (Hoy)`**: Desglose claro de Efectivo y Transferencia con total recaudado.
+   - **`Efectivo esperado en caja`**: Total esperado en gaveta física (`Fondo inicial + Ventas en efectivo de hoy`), sustituyendo a "Mermas del mes".
+4. **Fila Inferior en 2 Columnas**:
+   - **Columna Izquierda (`Últimas ventas`)**:
+     - Encabezado con fondo `#0A5C5E` y texto en **blanco (`#FFFFFF`)** en negrita.
+     - Columnas: **`No. Venta`** | **`Hora`** | **`Artículos`** | **`Total`**.
+     - Enlace superior: **`Ver todas las ventas`**.
+     - Eliminación de scroll horizontal forzado adaptando ancho al 100% de la tarjeta.
+   - **Columna Derecha (`Productos por agotarse`)**:
+     - Renombrada desde "Stock crítico" con enlace a **`Ver inventario`**.
+     - Indicador claro de inventario en niveles adecuados o lista de productos con stock bajo.
+
+### Archivos Modificados
+- [`frontend/index.html`](../frontend/index.html): Reestructuración de `#dashboard-content` (reubicación de accesos rápidos, KPIs diarios, fila inferior de 2 columnas y eliminación de gráficos y pendientes).
+- [`frontend/js/dashboard.js`](../frontend/js/dashboard.js): Adaptación del controlador, cálculo de efectivo esperado en caja, simplificación de textos y soporte de columnas de ventas recientes.
+- [`frontend/css/style.css`](../frontend/css/style.css): Regla de encabezado de tabla de últimas ventas (`#0A5C5E` con texto `#FFFFFF`) y ajuste de ancho sin scroll forzado (`min-width: 100%`).
+- [`backend/app/schemas/dashboard_schema.py`](../backend/app/schemas/dashboard_schema.py): Inclusión de `articulos` en `VentaReciente` y `efectivo_esperado` en `DashboardResumenResponse`.
+- [`backend/app/repositories/dashboard_repository.py`](../backend/app/repositories/dashboard_repository.py): Carga eagerly de `Venta.detalles` en `get_ultimas_ventas`.
+- [`backend/app/services/dashboard_service.py`](../backend/app/services/dashboard_service.py): Mapeo de cantidad de artículos y cálculo de efectivo esperado en caja.
+- [`documentacion/cambios.md`](cambios.md): Registro histórico del rediseño.
+
+
+## [2026-10-29] Eliminación de Accesos Rápidos del Dashboard
+
+### Causa / Requerimiento
+- Solicitud explícita del usuario para remover la sección de accesos rápidos del Panel Principal (Dashboard), logrando una interfaz aún más limpia y compacta que encaje en una sola vista sin necesidad de desplazamiento.
+
+### Solución Implementada
+- [`frontend/index.html`](../frontend/index.html): Se eliminó el bloque `<div data-dashblock="accesos-rapidos">` que contenía los 4 botones de acceso rápido.
+- [`frontend/js/dashboard.js`](../frontend/js/dashboard.js): Se removieron los permisos de bloque `accesos-rapidos`, `qa-venta`, `qa-compra`, `qa-caja`, `qa-merma` y sus listeners asociados en `bindDashboardActions()`.
+
+### Verificación
+- Verificación automatizada con Playwright: Se confirmó que el elemento `[data-dashblock='accesos-rapidos']` y los botones `#dash-qa-*` ya no existen en el DOM (`qa_block is None: True`).
+- El Dashboard carga de forma inmediata y todas las tarjetas métricas y tablas se visualizan limpiamente en una sola pantalla.

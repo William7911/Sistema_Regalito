@@ -224,11 +224,17 @@ class TurnoCajaRepositoryImpl(TurnoCajaRepository):
         stmt_out = (
             select(func.coalesce(func.sum(MovimientoCaja.monto), 0))
             .select_from(MovimientoCaja)
-            .where(MovimientoCaja.id_turno == id_turno, MovimientoCaja.id_tipo_movimiento == 2)
+            .where(MovimientoCaja.id_turno == id_turno, MovimientoCaja.id_tipo_movimiento != 1)
         )
         res_in = await self.db.execute(stmt_in)
         res_out = await self.db.execute(stmt_out)
         return Decimal(str(res_in.scalar_one())), Decimal(str(res_out.scalar_one()))
+
+    async def create_movimiento(self, movimiento: MovimientoCaja) -> MovimientoCaja:
+        self.db.add(movimiento)
+        await self.db.flush()
+        await self.db.refresh(movimiento)
+        return movimiento
 
     async def create_cierre_ciegas(
         self, cierre: CierreCajaCiegas, detalles: List[DetalleArqueoEfectivo]

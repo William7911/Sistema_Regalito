@@ -311,6 +311,18 @@ class TurnoCajaRepository(ABC):
     async def update(self, turno: TurnoCaja) -> TurnoCaja:
         ...
 
+    @abstractmethod
+    async def get_efectivo_ventas_turno(self, id_turno: int) -> Decimal:
+        ...
+
+    @abstractmethod
+    async def get_movimientos_caja_turno(self, id_turno: int) -> Tuple[Decimal, Decimal]:
+        ...
+
+    @abstractmethod
+    async def create_movimiento(self, movimiento: Any) -> Any:
+        ...
+
 
 class SyncRepository(ABC):
     """Contrato de acceso a datos para sincronización y réplica de datos maestros a SQLite local."""
