@@ -105,6 +105,12 @@
 
         setupSorting();
         updateSortIcons();
+
+        window.addEventListener('scroll', hideMermasImageZoom, true);
+        window.addEventListener('resize', hideMermasImageZoom);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') hideMermasImageZoom();
+        });
     }
 
     window.showMermasModule = async function() {
@@ -172,7 +178,7 @@
 
     async function loadCatalogoVariantes() {
         try {
-            const data = await apiFetch('/api/productos?limit=1000&is_active=true');
+            const data = await apiFetch('/api/productos?limit=1000');
             const flat = [];
             (data.items || []).forEach(p => {
                 (p.variantes || []).forEach(v => {
@@ -494,41 +500,114 @@
         return `<span class="badge-soft-secondary" title="Motivo de salida"><i class="bi bi-tag me-1"></i>${desc}</span>`;
     }
 
-    /**
-     * getProductCellHtml(d)
-     * ---------------------
-     * Renderiza contenedor 40x40px para la miniatura/avatar (o ícono 📦)
-     * a la izquierda del nombre del producto para escaneo visual rápido.
-     */
-    function getProductCellHtml(d) {
-        const prodStr = d.nombre_producto ? escapeHtml(d.nombre_producto) : `Variante #${d.id_variante}`;
-        const varInfo = d.variante_info ? `<span class="badge bg-light text-secondary border ms-1" style="font-size: 0.75rem;">${escapeHtml(d.variante_info)}</span>` : '';
+    function escapeAttribute(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
 
-        const catVar = state.catalogoVariantes.find(v => v.id_variante === d.id_variante);
-        const imgUrl = (catVar && catVar.imagen_url) || '';
+    function getProductThumbHtml(item) {
+        const imageUrl = item && item.imagen_url ? String(item.imagen_url).trim() : '';
+        const safeImageUrl = escapeAttribute(imageUrl);
 
-        let thumbHtml = '';
-        if (imgUrl) {
-            const safeImg = escapeHtml(imgUrl);
-            thumbHtml = `
-                <div class="merma-product-thumb" title="${prodStr}">
-                    <img src="${safeImg}" alt="" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'merma-thumb-icon\'>📦</span>';">
-                </div>
-            `;
-        } else {
-            thumbHtml = `
-                <div class="merma-product-thumb" title="${prodStr}">
-                    <span class="merma-thumb-icon">📦</span>
-                </div>
-            `;
+        if (!imageUrl) {
+            return '<span class="inventory-product-thumb inventory-product-thumb--placeholder" aria-hidden="true"><i class="bi bi-box-seam"></i></span>';
         }
 
         return `
-            <div class="d-flex align-items-center gap-2">
-                ${thumbHtml}
-                <div class="min-w-0">
-                    <div class="fw-semibold text-dark text-truncate" style="max-width: 260px;" title="${prodStr}">${prodStr}</div>
-                    ${varInfo ? `<div class="mt-1">${varInfo}</div>` : ''}
+            <span class="inventory-product-thumb-wrap inventory-product-thumb-wrap--zoomable" data-zoom-src="${safeImageUrl}" tabindex="0" aria-label="Vista previa ampliada de la imagen del producto">
+                <img src="${safeImageUrl}" alt="" class="inventory-product-thumb" loading="lazy" onerror="this.parentElement.classList.add('is-placeholder'); this.parentElement.removeAttribute('data-zoom-src'); this.parentElement.removeAttribute('tabindex'); this.parentElement.removeAttribute('aria-label'); this.remove();">
+                <span class="inventory-product-thumb-fallback" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
+            </span>`;
+    }
+
+    /* ----------------------------------------------------------------------
+       ZOOM FLOTANTE DE LA MINIATURA DEL PRODUCTO (CLONADO DE INVENTARIO)
+       ---------------------------------------------------------------------- */
+    const IMAGE_ZOOM_SIZE = 200;
+    const IMAGE_ZOOM_GAP = 12;
+    const IMAGE_ZOOM_MARGIN = 8;
+
+    function getMermasImageZoom() {
+        return document.getElementById('inventory-image-zoom');
+    }
+
+    function positionMermasImageZoom(trigger) {
+        const zoom = getMermasImageZoom();
+        if (!zoom || !trigger) return;
+
+        const rect = trigger.getBoundingClientRect();
+        const width = zoom.offsetWidth || IMAGE_ZOOM_SIZE;
+        const height = zoom.offsetHeight || IMAGE_ZOOM_SIZE;
+        const maxLeft = window.innerWidth - width - IMAGE_ZOOM_MARGIN;
+
+        let left = rect.right + IMAGE_ZOOM_GAP;
+        if (left > maxLeft) {
+            left = rect.left - width - IMAGE_ZOOM_GAP;
+        }
+        left = Math.max(IMAGE_ZOOM_MARGIN, Math.min(left, maxLeft));
+
+        const halfHeight = height / 2;
+        let top = rect.top + rect.height / 2;
+        top = Math.max(halfHeight + IMAGE_ZOOM_MARGIN, Math.min(top, window.innerHeight - halfHeight - IMAGE_ZOOM_MARGIN));
+
+        zoom.style.left = `${left}px`;
+        zoom.style.top = `${top}px`;
+    }
+
+    function showMermasImageZoom(trigger) {
+        const zoom = getMermasImageZoom();
+        const image = document.getElementById('inventory-image-zoom-img');
+        const src = trigger && trigger.getAttribute('data-zoom-src');
+        if (!zoom || !image || !src) return;
+
+        if (image.getAttribute('src') !== src) {
+            image.src = src;
+        }
+        zoom.classList.add('is-visible');
+        zoom.setAttribute('aria-hidden', 'false');
+        positionMermasImageZoom(trigger);
+    }
+
+    function hideMermasImageZoom() {
+        const zoom = getMermasImageZoom();
+        if (!zoom) return;
+        zoom.classList.remove('is-visible');
+        zoom.setAttribute('aria-hidden', 'true');
+    }
+
+    function setupMermasImageZoom(trigger) {
+        if (!trigger) return;
+        trigger.addEventListener('mouseenter', () => showMermasImageZoom(trigger));
+        trigger.addEventListener('mouseleave', hideMermasImageZoom);
+        trigger.addEventListener('focus', () => showMermasImageZoom(trigger));
+        trigger.addEventListener('blur', hideMermasImageZoom);
+    }
+
+    /**
+     * getProductCellHtml(d)
+     * ---------------------
+     * Renderiza miniatura idéntica a Inventario con zoom flotante
+     * y nombre del producto sin badges redundantes de variantes.
+     */
+    function getProductCellHtml(d) {
+        const prodStr = d.nombre_producto ? d.nombre_producto : `Producto #${d.id_producto || d.id_variante}`;
+        const catVar = state.catalogoVariantes.find(v => v.id_variante === d.id_variante);
+        const imgUrl = (catVar && catVar.imagen_url) || (d.imagen_url || '');
+
+        const itemData = {
+            imagen_url: imgUrl,
+            producto_nombre: prodStr,
+        };
+
+        return `
+            <div class="d-flex align-items-center gap-2 inventory-product-cell">
+                ${getProductThumbHtml(itemData)}
+                <div>
+                    <span class="fw-semibold inventory-product-name" title="${escapeAttribute(prodStr)}">${escapeHtml(prodStr)}</span>
                 </div>
             </div>
         `;
@@ -539,6 +618,7 @@
         const emptyState = document.getElementById('mermas-empty');
         if (!tbody) return;
 
+        hideMermasImageZoom();
         updateMermasKPIs(items);
 
         if (!items || items.length === 0) {
@@ -566,7 +646,7 @@
                     html += `<tr>
                         <td><span class="badge bg-secondary-subtle text-secondary border">#${m.id_merma}</span></td>
                         <td><small class="fw-semibold text-dark">${fechaStr}</small></td>
-                        <td><span class="badge bg-light text-dark border">${escapeHtml(sucursalStr)}</span></td>
+                        <td>${escapeHtml(sucursalStr)}</td>
                         <td><small class="text-muted"><i class="bi bi-person me-1"></i>${escapeHtml(usuarioStr)}</small></td>
                         <td>${prodCell}</td>
                         <td>${motivoBadge}</td>
@@ -579,7 +659,7 @@
                 html += `<tr>
                     <td><span class="badge bg-secondary-subtle text-secondary border">#${m.id_merma}</span></td>
                     <td><small class="fw-semibold text-dark">${fechaStr}</small></td>
-                    <td><span class="badge bg-light text-dark border">${escapeHtml(sucursalStr)}</span></td>
+                    <td>${escapeHtml(sucursalStr)}</td>
                     <td><small class="text-muted">${escapeHtml(usuarioStr)}</small></td>
                     <td colspan="3" class="text-muted fst-italic">Sin detalles</td>
                     <td class="text-end merma-costo-perdida">Q ${costoTotal.toFixed(2)}</td>
@@ -589,6 +669,9 @@
         });
 
         tbody.innerHTML = html;
+        tbody.querySelectorAll('.inventory-product-thumb-wrap[data-zoom-src]').forEach(wrap => {
+            setupMermasImageZoom(wrap);
+        });
     }
 
 

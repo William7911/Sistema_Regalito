@@ -27,8 +27,12 @@ class InventoryResponse(InventoryBase):
     fecha_actualizacion: datetime
     
     # Datos adicionales para presentación (opcional)
+    id_producto: Optional[int] = None
     producto_nombre: Optional[str] = None
+    producto_estado: Optional[str] = None
     variante_sku: Optional[str] = None
+    talla: Optional[str] = None
+    color: Optional[str] = None
     sucursal_nombre: Optional[str] = None
     # Imagen del producto: el frontend la usa para la miniatura y el zoom.
     imagen_url: Optional[str] = None

@@ -62,6 +62,7 @@
             btnNewClient: document.getElementById('btn-new-client'),
             btnExcel: document.getElementById('btn-report-clients-excel'),
             btnCsv: document.getElementById('btn-report-clients-csv'),
+            btnPdf: document.getElementById('btn-report-clients-pdf'),
 
             // Tabla Clientes & Paginación
             tableBody: document.getElementById('clients-table-body'),
@@ -293,6 +294,14 @@
         if (DOM.btnCsv && !DOM.btnCsv.dataset.bound) {
             DOM.btnCsv.dataset.bound = 'true';
             DOM.btnCsv.addEventListener('click', () => exportReport('csv'));
+        }
+        if (DOM.btnPdf && !DOM.btnPdf.dataset.bound) {
+            DOM.btnPdf.dataset.bound = 'true';
+            DOM.btnPdf.addEventListener('click', () => {
+                if (window.ReportExporter) {
+                    window.ReportExporter.exportTableToPdf('.clients-table', 'Reporte de Clientes', 'reporte_clientes');
+                }
+            });
         }
 
         // Formulario Cliente

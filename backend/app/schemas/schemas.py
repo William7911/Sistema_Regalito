@@ -18,6 +18,19 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
+class PasswordRecoverRequest(BaseModel):
+    identifier: str = Field(..., min_length=1, max_length=100, description="Correo electrónico o nombre de usuario")
+
+class CodeVerifyRequest(BaseModel):
+    email: str = Field(..., min_length=1, max_length=100)
+    codigo: str = Field(..., min_length=6, max_length=6)
+
+class PasswordResetRequest(BaseModel):
+    reset_token: Optional[str] = None
+    email: Optional[str] = None
+    codigo: Optional[str] = None
+    nueva_password: str = Field(..., min_length=6, max_length=128)
+
 # ---------------------------------------------------------------------------
 # Roles
 # ---------------------------------------------------------------------------
@@ -66,12 +79,14 @@ class Department(BaseModel):
 class UserCreate(BaseModel):
     nombre_completo: str = Field(..., min_length=1, max_length=100)
     username: str = Field(..., min_length=1, max_length=50)
+    email: Optional[str] = Field(default=None, max_length=100)
     password: str = Field(..., min_length=6, max_length=128)
     id_rol: int
 
 class UserUpdate(BaseModel):
     nombre_completo: Optional[str] = Field(default=None, min_length=1, max_length=100)
     username: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    email: Optional[str] = Field(default=None, max_length=100)
     password: Optional[str] = Field(default=None, min_length=6, max_length=128)
     id_rol: Optional[int] = None
     estado: Optional[str] = Field(default=None, max_length=20)
@@ -81,6 +96,7 @@ class UserResponse(BaseModel):
     id_rol: int
     nombre_completo: str
     username: str
+    email: Optional[str] = None
     estado: str
     fecha_creacion: Optional[datetime] = None
     rol: Optional[Role] = None
@@ -167,6 +183,17 @@ class InventarioCreate(BaseModel):
     stock_actual: int = Field(default=0, ge=0)
     stock_minimo: int = Field(default=0, ge=0)
 
+class VarianteExtraItem(BaseModel):
+    id_variante: Optional[int] = None
+    codigo_barras: Optional[str] = Field(default=None, max_length=50)
+    nombre: Optional[str] = Field(default=None, max_length=50)
+    talla: Optional[str] = Field(default=None, max_length=20)
+    color: Optional[str] = Field(default=None, max_length=30)
+    stock_actual: int = Field(default=0, ge=0)
+    precio_detalle: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2, gt=0)
+    precio_mayoreo: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2, gt=0)
+    costo_promedio: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2, ge=0)
+
 class ProductoCreate(BaseModel):
     id_subcategoria: int
     id_unidad: int
@@ -175,6 +202,7 @@ class ProductoCreate(BaseModel):
     imagen_url: Optional[str] = Field(default=None, max_length=255)
     variante: VarianteCreate
     inventario: InventarioCreate
+    variantes_extra: Optional[List[VarianteExtraItem]] = Field(default=None)
 
 class VarianteUpdate(BaseModel):
     codigo_barras: Optional[str] = Field(default=None, max_length=50)
@@ -199,6 +227,7 @@ class ProductoUpdate(BaseModel):
     estado: Optional[str] = Field(default=None, max_length=20)
     variante: Optional[VarianteUpdate] = None
     inventario: Optional[InventarioUpdate] = None
+    variantes_extra: Optional[List[VarianteExtraItem]] = Field(default=None)
 
 class InventarioOut(BaseModel):
     id_inventario: int

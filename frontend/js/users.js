@@ -422,21 +422,16 @@ async function loadUsers() {
                 const rol = u.rol ? u.rol.nombre : '-';
                 const activo = u.estado === 'Activo';
                 const fecha = u.fecha_creacion ? formatDate(u.fecha_creacion) : '-';
-                // Mejora visual (solo estética): se conservan los datos y el condicional
-                // de estado original. Los colores finales viven en css/style.css.
+                const emailHtml = u.email ? `<span class="small">${u.email}</span>` : '<span class="text-muted small fst-italic">Sin correo</span>';
                 return `
                 <tr>
                     <td>${u.id_usuario}</td>
                     <td>${u.nombre_completo}</td>
                     <td>${u.username}</td>
+                    <td>${emailHtml}</td>
                     <td>${rol}</td>
-                    <!-- Corrección 3 (Badge "Activo"): se retira bg-success (verde sólido)
-                         y se usan clases Soft Badge: fondo #DCFCE7 y texto #166534. -->
                     <td><span class="badge users-status-badge ${activo ? 'users-status-badge--active' : 'users-status-badge--inactive'}">${activo ? 'Activo' : 'Inactivo'}</span></td>
                     <td>${fecha}</td>
-                    <!-- Inicio: Corrección 1 y Corrección 2 de la columna de acciones -->
-                    <!-- Corrección 1: botones sin borde (ghost); Corrección 2: ícono de papelera. -->
-                    <!-- Se mantienen exactamente los mismos onclick y condiciones de negocio. -->
                     <td class="text-end users-actions-cell">
                         <button class="btn btn-sm users-action-btn users-action-btn--view" onclick="viewUserDetail(${u.id_usuario})" title="Ver detalle" aria-label="Ver detalle"><i class="bi bi-eye"></i></button>
                         <button class="btn btn-sm users-action-btn users-action-btn--edit" onclick="editUser(${u.id_usuario})" title="Editar" aria-label="Editar"><i class="bi bi-pencil"></i></button>
@@ -559,6 +554,8 @@ async function resetUserForm() {
     const form = document.getElementById('user-form');
     if (form) form.reset();
     document.getElementById('user-id').value = '';
+    const emailInput = document.getElementById('user-email');
+    if (emailInput) emailInput.value = '';
     document.getElementById('password').required = true;
     document.getElementById('user-modal-title').textContent = 'Nuevo Usuario';
     baseSaveText = 'Guardar';
@@ -589,6 +586,8 @@ async function editUser(userId) {
         document.getElementById('user-id').value = u.id_usuario;
         document.getElementById('nombre_completo').value = u.nombre_completo;
         document.getElementById('username').value = u.username;
+        const emailInput = document.getElementById('user-email');
+        if (emailInput) emailInput.value = u.email || '';
         document.getElementById('password').value = '';
         document.getElementById('password').required = false;
         const estadoSel = document.getElementById('estado');
@@ -618,6 +617,8 @@ async function viewUserDetail(userId) {
         document.getElementById('detail-id').textContent = u.id_usuario;
         document.getElementById('detail-nombre').textContent = u.nombre_completo || '-';
         document.getElementById('detail-username').textContent = u.username || '-';
+        const detailEmail = document.getElementById('detail-email');
+        if (detailEmail) detailEmail.textContent = u.email || 'No registrado';
         document.getElementById('detail-rol').textContent = (u.rol && u.rol.nombre) ? u.rol.nombre : '-';
         document.getElementById('detail-estado').textContent = u.estado || '-';
         document.getElementById('detail-fecha').textContent = u.fecha_creacion
@@ -639,6 +640,7 @@ async function saveUser(event) {
     const id = document.getElementById('user-id').value;
     const nombreCompleto = document.getElementById('nombre_completo')?.value?.trim() || '';
     const username = document.getElementById('username')?.value?.trim() || '';
+    const emailVal = document.getElementById('user-email')?.value?.trim().toLowerCase() || '';
     const password = document.getElementById('password')?.value || '';
     const rolVal = document.getElementById('id_rol')?.value || '';
     const estadoSel = document.getElementById('estado');
@@ -661,6 +663,10 @@ async function saveUser(event) {
 
     if (!username) {
         markInvalid('username', 'Este campo es obligatorio.');
+    }
+
+    if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+        markInvalid('user-email', 'Ingrese un formato de correo electrónico válido.');
     }
 
     if (!id) {
@@ -696,6 +702,7 @@ async function saveUser(event) {
     const payload = {
         nombre_completo: nombreCompleto,
         username: username,
+        email: emailVal || null,
         id_rol: idRol,
     };
     if (estadoVal) payload.estado = estadoVal;
@@ -826,6 +833,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnExcel) btnExcel.addEventListener('click', (e) => { e.preventDefault(); downloadReport('excel'); });
     const btnCsv = document.getElementById('btn-report-csv');
     if (btnCsv) btnCsv.addEventListener('click', (e) => { e.preventDefault(); downloadReport('csv'); });
+    const btnPdf = document.getElementById('btn-report-users-pdf');
+    if (btnPdf) btnPdf.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (window.ReportExporter) {
+            window.ReportExporter.exportTableToPdf('#users-view table', 'Reporte de Usuarios y Personal', 'reporte_usuarios');
+        }
+    });
 });
 
 // ---------------------------------------------------------------------------

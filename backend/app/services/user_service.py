@@ -60,10 +60,17 @@ class ConcreteUserService(UserService):
         if await self.uow.users.get_by_username(data.username.strip()):
             raise HTTPException(status_code=400, detail="Ya existe un usuario con ese nombre de usuario")
 
+        email = data.email.strip().lower() if (data.email and data.email.strip()) else None
+        if email:
+            existing_email = await self.uow.users.get_by_email(email)
+            if existing_email:
+                raise HTTPException(status_code=400, detail="Ya existe un usuario con ese correo electrónico")
+
         user = Usuario(
             id_rol=data.id_rol,
             nombre_completo=data.nombre_completo.strip(),
             username=data.username.strip(),
+            email=email,
             password_hash=security.get_password_hash(data.password),
             estado="Activo",
         )
@@ -104,6 +111,15 @@ class ConcreteUserService(UserService):
                     status_code=400, detail="Ya existe un usuario con ese nombre de usuario"
                 )
             user.username = username
+        if data.email is not None:
+            email = data.email.strip().lower() if data.email.strip() else None
+            if email:
+                duplicate_email = await self.uow.users.get_by_email(email)
+                if duplicate_email and duplicate_email.id_usuario != user_id:
+                    raise HTTPException(
+                        status_code=400, detail="Ya existe un usuario con ese correo electrónico"
+                    )
+            user.email = email
         if data.nombre_completo is not None:
             user.nombre_completo = data.nombre_completo.strip()
         if data.password:

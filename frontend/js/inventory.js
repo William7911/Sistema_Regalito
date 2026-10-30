@@ -217,7 +217,7 @@
             if (DOM.tableBody && typeof window.renderSkeletonTable === 'function') {
                 DOM.tableBody.innerHTML = window.renderSkeletonTable(8, 6);
             }
-            const token = localStorage.getItem('jwt_token');
+            const token = (typeof window.getToken === 'function' ? window.getToken() : null) || sessionStorage.getItem('jwt_token') || localStorage.getItem('jwt_token') || '';
             const res = await fetch(`/api/inventory/?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -244,13 +244,15 @@
     function applyFilters() {
         let data = [...inventoryData];
         
-        // Filter by SKU
+        // Filter by SKU, Name or Variant attributes
         if (DOM.filterSku) {
             const skuTerm = DOM.filterSku.value.trim().toLowerCase();
             if (skuTerm) {
                 data = data.filter(item => 
                     (item.producto_nombre && item.producto_nombre.toLowerCase().includes(skuTerm)) ||
-                    (item.variante_sku && item.variante_sku.toLowerCase().includes(skuTerm))
+                    (item.variante_sku && item.variante_sku.toLowerCase().includes(skuTerm)) ||
+                    (item.talla && item.talla.toLowerCase().includes(skuTerm)) ||
+                    (item.color && item.color.toLowerCase().includes(skuTerm))
                 );
             }
         }
@@ -336,13 +338,13 @@
         const safeImageUrl = escapeAttribute(imageUrl);
 
         if (!imageUrl) {
-            return '<span class="inventory-product-thumb inventory-product-thumb--placeholder" aria-hidden="true">📦</span>';
+            return '<span class="inventory-product-thumb inventory-product-thumb--placeholder" aria-hidden="true"><i class="bi bi-box-seam"></i></span>';
         }
 
         return `
             <span class="inventory-product-thumb-wrap inventory-product-thumb-wrap--zoomable" data-zoom-src="${safeImageUrl}" tabindex="0" aria-label="Vista previa ampliada de la imagen del producto">
                 <img src="${safeImageUrl}" alt="" class="inventory-product-thumb" loading="lazy" onerror="this.parentElement.classList.add('is-placeholder'); this.parentElement.removeAttribute('data-zoom-src'); this.parentElement.removeAttribute('tabindex'); this.parentElement.removeAttribute('aria-label'); this.remove();">
-                <span class="inventory-product-thumb-fallback" aria-hidden="true">📦</span>
+                <span class="inventory-product-thumb-fallback" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
             </span>`;
     }
 
@@ -421,7 +423,7 @@
        ---------------------------------------------------------------------- */
     function updateInventoryKpis() {
         const uniqueProducts = new Set(
-            inventoryData.map(item => item.id_variante || item.variante_sku || item.id_inventario)
+            inventoryData.map(item => item.id_producto || item.producto_nombre || item.id_variante)
         ).size;
 
         const lowStock = inventoryData.filter(item => {
@@ -468,31 +470,47 @@
         const start = (currentPage - 1) * pageSize;
         const pageData = filteredData.slice(start, start + pageSize);
 
+        const canAdjust = (typeof window.isAdmin === 'function' && window.isAdmin()) || (typeof window.hasPermission === 'function' && window.hasPermission('INV_INGRESAR_MERCADERIA'));
+
         pageData.forEach(item => {
             const tr = document.createElement('tr');
 
             // Theme global: soft badge unificado con el estado "Activo" de Usuarios.
             const stockMeta = getStockBadgeMeta(item.stock_actual, item.stock_minimo);
 
-            // Rediseño: miniatura del producto, badge semántico y acción fantasma.
+            // Indicador de estado del producto
+            const inactivoBadge = item.producto_estado === 'Inactivo'
+                ? `<span class="badge bg-secondary ms-1 fw-normal" title="Producto inactivo en catálogo">Inactivo</span>`
+                : '';
+
+            const actionCell = canAdjust ? `
+                    <button class="btn btn-sm inventory-action-btn" onclick="window.openInventoryModal(${item.id_inventario})" title="Ajustar stock" aria-label="Ajustar stock">
+                        <i class="bi bi-sliders"></i>
+                    </button>
+            ` : `
+                    <span class="text-muted small" title="Solo lectura" aria-label="Solo lectura"><i class="bi bi-eye text-muted"></i></span>
+            `;
+
+            // Renderizado independiente: cada fila es un producto completo directo
             tr.innerHTML = `
                 <td>${item.id_inventario}</td>
                 <td>
                     <div class="d-flex align-items-center gap-2 inventory-product-cell">
                         ${getProductThumbHtml(item)}
-                        <span class="fw-semibold inventory-product-name">${item.producto_nombre || 'N/A'}</span>
+                        <div>
+                            <span class="fw-semibold inventory-product-name">${escapeAttribute(item.producto_nombre || 'N/A')}</span>
+                            ${inactivoBadge}
+                        </div>
                     </div>
                 </td>
-                <td class="font-monospace">${item.variante_sku || 'N/A'}</td>
-                <td>${item.sucursal_nombre || 'N/A'}</td>
+                <td class="font-monospace">${escapeAttribute(item.variante_sku || 'N/A')}</td>
+                <td>${escapeAttribute(item.sucursal_nombre || 'N/A')}</td>
                 <td>
                     <span class="stock-badge ${stockMeta.className}" title="${stockMeta.label}">${item.stock_actual}</span>
                 </td>
                 <td>${item.stock_minimo}</td>
                 <td class="text-end">
-                    <button class="btn btn-sm inventory-action-btn" onclick="window.openInventoryModal(${item.id_inventario})" title="Ajustar stock" aria-label="Ajustar stock">
-                        <i class="bi bi-sliders"></i>
-                    </button>
+                    ${actionCell}
                 </td>
             `;
             DOM.tableBody.appendChild(tr);
@@ -501,6 +519,13 @@
     }
 
     window.openInventoryModal = function(id) {
+        const canAdjust = (typeof window.isAdmin === 'function' && window.isAdmin()) || (typeof window.hasPermission === 'function' && window.hasPermission('INV_INGRESAR_MERCADERIA'));
+        if (!canAdjust) {
+            if (typeof window.showToast === 'function') {
+                window.showToast('No tiene permisos para ajustar stock de inventario.', 'warning');
+            }
+            return;
+        }
         const item = inventoryData.find(i => i.id_inventario === id);
         if (!item) return;
 
@@ -551,7 +576,7 @@
         };
 
         try {
-            const token = localStorage.getItem('jwt_token');
+            const token = (typeof window.getToken === 'function' ? window.getToken() : null) || sessionStorage.getItem('jwt_token') || localStorage.getItem('jwt_token') || '';
             const res = await fetch(`/api/inventory/${id}/adjust`, {
                 method: 'POST',
                 headers: {
@@ -608,7 +633,7 @@
 
         container.innerHTML = typeof window.renderSkeletonCard === 'function' ? window.renderSkeletonCard(3) : '<div class="text-center py-4 text-muted">Cargando alertas...</div>';
 
-        const token = localStorage.getItem('jwt_token');
+        const token = (typeof window.getToken === 'function' ? window.getToken() : null) || sessionStorage.getItem('jwt_token') || localStorage.getItem('jwt_token') || '';
         try {
             const res = await fetch('/api/inventario/alertas', {
                 headers: { 'Authorization': `Bearer ${token}` }

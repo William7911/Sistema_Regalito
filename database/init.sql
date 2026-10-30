@@ -19,10 +19,22 @@ CREATE TABLE usuario (
     id_rol INT NOT NULL REFERENCES rol(id_rol),
     nombre_completo VARCHAR(100) NOT NULL,
     username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     estado VARCHAR(20) NOT NULL CHECK (estado IN ('Activo', 'Inactivo')),
     fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE codigo_recuperacion (
+    id_codigo SERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+    codigo VARCHAR(6) NOT NULL,
+    expira_en TIMESTAMP NOT NULL,
+    usado BOOLEAN NOT NULL DEFAULT FALSE,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_codigo_recuperacion_usuario ON codigo_recuperacion(id_usuario);
+CREATE INDEX idx_codigo_recuperacion_codigo ON codigo_recuperacion(codigo);
 
 CREATE TABLE permiso (
     id_permiso SERIAL PRIMARY KEY,
@@ -554,10 +566,10 @@ INSERT INTO rol (id_rol, nombre, descripcion, estado) VALUES
 (3, 'Bodeguero', 'Gestiona inventario, mermas y traslados', 'Activo');
 
 -- Contraseña por defecto: admin123 (hash bcrypt)
-INSERT INTO usuario (id_usuario, id_rol, nombre_completo, username, password_hash, estado) VALUES
-(1, 1, 'Propietaria Regalito', 'admin', '$2b$12$igeDz03pyYibOqQO3WJCY.a/XKMHvAAZ2sfh13w.YT7hurdmKFlpG', 'Activo'),
-(2, 2, 'María Xicay', 'cajera', '$2b$12$igeDz03pyYibOqQO3WJCY.a/XKMHvAAZ2sfh13w.YT7hurdmKFlpG', 'Activo'),
-(3, 3, 'Pedro Tzoc', 'bodega', '$2b$12$igeDz03pyYibOqQO3WJCY.a/XKMHvAAZ2sfh13w.YT7hurdmKFlpG', 'Activo');
+INSERT INTO usuario (id_usuario, id_rol, nombre_completo, username, email, password_hash, estado) VALUES
+(1, 1, 'Propietaria Regalito', 'admin', 'abimaely3@gmail.com', '$2b$12$igeDz03pyYibOqQO3WJCY.a/XKMHvAAZ2sfh13w.YT7hurdmKFlpG', 'Activo'),
+(2, 2, 'María Xicay', 'cajera', 'cajera@tiendaelregalito.gt', '$2b$12$igeDz03pyYibOqQO3WJCY.a/XKMHvAAZ2sfh13w.YT7hurdmKFlpG', 'Activo'),
+(3, 3, 'Pedro Tzoc', 'bodega', 'bodega@tiendaelregalito.gt', '$2b$12$igeDz03pyYibOqQO3WJCY.a/XKMHvAAZ2sfh13w.YT7hurdmKFlpG', 'Activo');
 
 INSERT INTO permiso (id_permiso, modulo, codigo, descripcion) VALUES
 (1, 'Ventas', 'VENTA_COBRAR', 'Registrar cobros en mostrador'),
@@ -575,8 +587,8 @@ INSERT INTO permiso (id_permiso, modulo, codigo, descripcion) VALUES
 
 INSERT INTO rol_permiso (id_rol, id_permiso) VALUES
 (1,1),(1,2),(1,3),(1,4),(1,5),(1,6),(1,7),(1,8),(1,9),(1,10),(1,11),(1,12),
-(2,1),(2,2),
-(3,3);
+(2,1),(2,2),(2,4),
+(3,3),(3,5),(3,9);
 
 INSERT INTO parametro_sistema (id_parametro, clave, valor) VALUES
 (1, 'NIT_EMPRESA', '12345678-9'),

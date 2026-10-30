@@ -3,7 +3,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from app.api import auth, cash_register, catalogos, catalogos_generales, categories, compras, dashboard, departments, mermas, products, roles, sales, users, sync, health, reportes, configuracion, inventory, facturacion, clientes, tipos_cliente, bitacora, historial_precios, traslados, visitas
+from app.api import auth, cash_register, catalogos, catalogos_generales, categories, compras, dashboard, departments, mermas, products, roles, sales, users, health, reportes, configuracion, inventory, facturacion, clientes, tipos_cliente, bitacora, historial_precios, traslados, visitas
 from app.db.database import engine, Base
 import logging
 import os
@@ -15,15 +15,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from contextlib import asynccontextmanager
-from app.core.sync_daemon import sync_daemon
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: iniciar el daemon de sincronizacion
-    await sync_daemon.start()
     yield
-    # Shutdown: detener el daemon limpiamente
-    await sync_daemon.stop()
 
 from app.core.config import settings
 
@@ -85,7 +80,6 @@ app.include_router(users.router, prefix="/api/usuarios", tags=["usuarios"])
 app.include_router(clientes.router, prefix="/api/clientes", tags=["clientes"])
 app.include_router(tipos_cliente.router, prefix="/api/tipos-cliente", tags=["tipos-cliente"])
 app.include_router(compras.router, prefix="/api/compras", tags=["compras"])
-app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(health.router, prefix="/api/health", tags=["health"])
 app.include_router(reportes.router)
 app.include_router(configuracion.router)

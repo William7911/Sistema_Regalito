@@ -427,13 +427,12 @@
         DOM.tbodyRecibirDetalles.innerHTML = '';
 
         detalles.forEach(d => {
-            const variantTxt = [d.talla, d.color].filter(Boolean).join(' · ');
             const tr = document.createElement('tr');
             tr.dataset.idVariante = d.id_variante;
             tr.innerHTML = `
                 <td>
-                    <div class="fw-semibold small text-dark">${d.nombre_producto || `Variante ${d.id_variante}`}</div>
-                    <div class="text-muted small">${variantTxt ? `${variantTxt} · ` : ''}${d.codigo_barras || ''}</div>
+                    <div class="fw-semibold small text-dark">${d.nombre_producto || `Producto #${d.id_producto || d.id_variante}`}</div>
+                    <div class="text-muted small font-monospace">${d.codigo_barras || ''}</div>
                 </td>
                 <td class="text-center font-monospace small">${d.cantidad_pedida}</td>
                 <td>
@@ -609,12 +608,10 @@
             if (DOM.tbodyVerDetalles) {
                 DOM.tbodyVerDetalles.innerHTML = '';
                 (orden.detalles || []).forEach(d => {
-                    const variantTxt = [d.talla, d.color].filter(Boolean).join(' · ');
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>
-                            <div class="fw-semibold small text-dark">${d.nombre_producto || `Variante ${d.id_variante}`}</div>
-                            <div class="text-muted small">${variantTxt || '—'}</div>
+                            <div class="fw-semibold small text-dark">${d.nombre_producto || `Producto #${d.id_producto || d.id_variante}`}</div>
                         </td>
                         <td class="font-monospace small text-muted">${d.codigo_barras || '—'}</td>
                         <td class="text-center font-monospace small">${d.cantidad_pedida}</td>
@@ -673,7 +670,7 @@
 
     async function loadProducts() {
         try {
-            const data = await apiGet('/api/productos?limit=1000&is_active=true');
+            const data = await apiGet('/api/productos?limit=1000');
             const flat = [];
             (data.items || []).forEach(p => {
                 (p.variantes || []).forEach(v => {
@@ -682,6 +679,7 @@
                         id_variante: v.id_variante,
                         id_producto: p.id_producto,
                         nombre: p.nombre,
+                        estado: p.estado,
                         imagen_url: p.imagen_url || '',
                         talla: v.talla || '',
                         color: v.color || '',
@@ -730,13 +728,13 @@
         const safeImageUrl = escapeAttribute(imageUrl);
 
         if (!imageUrl) {
-            return '<span class="inventory-product-thumb inventory-product-thumb--placeholder" aria-hidden="true">📦</span>';
+            return '<span class="inventory-product-thumb inventory-product-thumb--placeholder" aria-hidden="true"><i class="bi bi-box-seam"></i></span>';
         }
 
         return `
             <span class="inventory-product-thumb-wrap inventory-product-thumb-wrap--zoomable" data-zoom-src="${safeImageUrl}" tabindex="0" aria-label="Vista previa ampliada de la imagen del producto">
                 <img src="${safeImageUrl}" alt="" class="inventory-product-thumb" loading="lazy" onerror="this.parentElement.classList.add('is-placeholder'); this.parentElement.removeAttribute('data-zoom-src'); this.parentElement.removeAttribute('tabindex'); this.parentElement.removeAttribute('aria-label'); this.remove();">
-                <span class="inventory-product-thumb-fallback" aria-hidden="true">📦</span>
+                <span class="inventory-product-thumb-fallback" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
             </span>`;
     }
 
@@ -805,28 +803,31 @@
         if (!DOM.list) return;
         const items = filteredCatalog();
         if (DOM.listInfo) {
-            DOM.listInfo.textContent = `${items.length} productos${items.length > MAX_RESULTS ? ` · mostrando ${MAX_RESULTS}` : ''}`;
+            DOM.listInfo.textContent = `${items.length} productos disponibles${items.length > MAX_RESULTS ? ` · mostrando ${MAX_RESULTS}` : ''}`;
         }
         if (DOM.listEmpty) DOM.listEmpty.classList.toggle('d-none', items.length > 0);
         DOM.list.classList.toggle('d-none', items.length === 0);
         DOM.list.innerHTML = '';
 
         items.slice(0, MAX_RESULTS).forEach(item => {
-            const variant = [item.talla, item.color].filter(Boolean).join(' · ');
             const row = document.createElement('div');
             row.className = 'border rounded-3 p-2 d-flex align-items-center gap-2 bg-white';
 
-            // Miniatura idéntica a Inventario (con fallback 📦 y zoom flotante)
+            // Miniatura idéntica a Inventario (con fallback icono y zoom flotante)
             const thumb = document.createElement('div');
             thumb.className = 'flex-shrink-0 d-flex align-items-center';
             thumb.innerHTML = getProductThumbHtml(item);
 
+            const inactivoBadge = item.estado === 'Inactivo'
+                ? ' <span class="badge bg-secondary ms-1 fw-normal">Inactivo</span>'
+                : '';
+
             const info = document.createElement('div');
             info.className = 'flex-grow-1 overflow-hidden';
             info.innerHTML = `
-                <div class="fw-semibold text-dark small text-truncate" title="${escapeAttribute(item.nombre)}">${escapeAttribute(item.nombre)}</div>
+                <div class="fw-semibold text-dark small text-truncate" title="${escapeAttribute(item.nombre)}">${escapeAttribute(item.nombre)}${inactivoBadge}</div>
                 <div class="text-muted small text-truncate">
-                    ${variant ? `${escapeAttribute(variant)} · ` : ''}<span class="font-monospace">${escapeAttribute(item.codigo_barras || '—')}</span>
+                    <span class="font-monospace">${escapeAttribute(item.codigo_barras || '—')}</span>
                     <span class="badge bg-light text-dark ms-1">Stock: ${item.stock}</span>
                 </div>
             `;

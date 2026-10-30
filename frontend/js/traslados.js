@@ -532,7 +532,7 @@
         if (lblId) lblId.textContent = traslado.id_traslado;
         if (lblProd) lblProd.textContent = prodNombre + (traslado.codigo_barras ? ` (${traslado.codigo_barras})` : '');
         if (lblCant) lblCant.textContent = `${traslado.cantidad} unidades`;
-        if (lblRuta) lblRuta.textContent = `${origen} ➔ ${destino}`;
+        if (lblRuta) lblRuta.textContent = `${origen} -> ${destino}`;
 
         if (modals.recibir) modals.recibir.show();
     }

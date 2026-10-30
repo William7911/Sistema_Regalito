@@ -3,6 +3,622 @@
 ## Regla de documentación (obligatoria)
 Cualquier cambio futuro en el proyecto debe quedar documentado en esta carpeta `/documentacion`. Agrega una entrada en este archivo (`cambios.md`) cada vez que modifiques, crees o destruyas componentes.
 
+## [2026-10-30] Rediseño del Login con Fondo Panorámico Completo del Lago de Atitlán (Sololá)
+
+### 1. Requerimiento y Objetivo
+- Disponer la fotografía real del **Lago de Atitlán, Sololá, Guatemala** como fondo de pantalla completa en el módulo de acceso, ubicando la tarjeta de inicio de sesión de forma simple, limpia y centrada en pantalla sin elementos ni textos distractores adicionales.
+
+### 2. Implementación Visual y Estructural
+1. **Fondo de Pantalla Completa (`auth-bg`)**:
+   - En [`frontend/css/style.css`](../frontend/css/style.css):
+     - La fotografía [`frontend/img/lago-atitlan.jpg`](../frontend/img/lago-atitlan.jpg) cubre el 100% de la pantalla (`background-size: cover; background-position: center; background-attachment: fixed`).
+     - Gradiente sutil y balanceado (`rgba(15, 23, 42, 0.40)` a `rgba(15, 23, 42, 0.60)`) que garantiza la contemplación de las aguas, los volcanes y el paisaje a la vez que maximiza el contraste de la tarjeta.
+     - En modo oscuro (`data-theme="dark"`), el filtro nocturno se profundiza suavemente (`rgba(10, 15, 26, 0.60)` a `0.80`).
+2. **Tarjeta de Autenticación Centrada (`auth-card`)**:
+   - En [`frontend/index.html`](../frontend/index.html):
+     - Estructura limpia y directa sin divisiones laterales: `#auth-module` centra directamente la tarjeta `#view-login` (y los formularios de recuperación) en el punto medio de la pantalla.
+     - Tarjeta con esquinas redondeadas (24px), sombra difusa elevada y tipografía legible.
+
+### 3. Verificación
+- Pruebas automatizadas con Playwright (`scratch/test_clean_login.py`):
+  - `login_fullscreen_light.png`: Vista completa de escritorio con fondo panorámico y login centrado (modo claro).
+  - `login_fullscreen_dark.png`: Vista completa de escritorio con fondo panorámico y login centrado (modo oscuro).
+  - `login_fullscreen_mobile.png`: Vista móvil con tarjeta centrada sobre el paisaje del lago.
+
+## [2026-10-30] Corrección de Permisos y Acceso a Inventario para Roles Bodega y Caja
+
+### 1. Diagnóstico del Problema
+- **Usuario Bodega (`bodega` / `Pedro Tzoc`, Rol: `Bodeguero`)**:
+  - Al ingresar al módulo de Inventario (`#inventory`), la tabla no cargaba productos y arrojaba error `403 Forbidden: No tiene permisos para realizar esta acción (INV_VER)`.
+  - **Causa Raíz**: En `backend/app/api/inventory.py`, los endpoints requerían permisos con códigos inexistentes (`INV_VER`, `INV_MODIFICAR`, `INV_AJUSTAR_STOCK`, `INV_VER_ALERTAS`). En la base de datos PostgreSQL (`permiso`), el código oficial para operaciones de inventario es `INV_INGRESAR_MERCADERIA` (id 3). El usuario Administrador no experimentaba el error debido a la excepción de superusuario en `check_user_permission()`.
+- **Usuario Caja (`cajera` / `María Xicay`, Rol: `Cajero`)**:
+  - En `backend/app/api/cash_register.py`, el cierre ciego de caja requiere `CAJA_CIERRE_CIEGAS` (id 4), el cual no estaba asignado al rol Cajero en la tabla de asignación inicial `rol_permiso`.
+  - Se requería además asegurar que el rol de caja pueda consultar existencias en inventario en modo de solo lectura para soporte a ventas, sin permisos para alterar o ajustar stock.
+
+### 2. Cambios Implementados
+1. **Soporte Variádico de Permisos en Dependencias FastAPI**:
+   - En [`backend/app/api/deps.py`](../backend/app/api/deps.py), se actualizó `require_permission(*permission_codes: str)` para evaluar uno o múltiples códigos de permiso con operador OR lógico.
+2. **Alineación de Permisos en Endpoints de Inventario**:
+   - En [`backend/app/api/inventory.py`](../backend/app/api/inventory.py):
+     - `list_inventory` y `list_alerts`: autorizan `INV_INGRESAR_MERCADERIA`, `INV_VER` y `VENTA_COBRAR`.
+     - `update_inventory` y `adjust_stock`: autorizan estrictamente `INV_INGRESAR_MERCADERIA` e `INV_MODIFICAR`.
+3. **Actualización de Permisos en Base de Datos y Semilla Inicial**:
+   - En [`database/init.sql`](../database/init.sql) y en la base activa de PostgreSQL:
+     - Asignado `CAJA_CIERRE_CIEGAS` (id 4) al rol `Cajero` (id 2).
+     - Asignados `COMPRA_EMITIR_ORDEN` (id 5) y `CATALOGO_ADMIN` (id 9) al rol `Bodeguero` (id 3).
+4. **Control de Token y Permisos en el Frontend**:
+   - En [`frontend/js/app.js`](../frontend/js/app.js):
+     - Implementada la función global `window.getToken()` con resolución prioritaria en `sessionStorage` y respaldo en `localStorage`.
+     - Actualizados `canAccessView` y `applyRoleRestrictions` para permitir vista de existencias a `Bodeguero` y `Cajero`.
+   - En [`frontend/js/inventory.js`](../frontend/js/inventory.js):
+     - Unificada la obtención del token mediante `window.getToken()`.
+     - Diferenciación en tabla de inventario: los usuarios con `INV_INGRESAR_MERCADERIA` o `Administradora` visualizan el botón interactivo de ajuste de existencias (`bi-sliders`); usuarios de consulta como `Cajero` visualizan un indicador sutil de solo lectura (`bi-eye`) y la apertura del modal queda bloqueada.
+
+### 3. Verificación Automatizada (Playwright)
+- Ejecución del script `scratch/test_roles_bodega_and_caja.py`:
+  - **Bodega (`bodega` / `bodega123`)**:
+    - Acceso exitoso a `#inventory` con carga completa de 10 productos, insignias de stock y métricas KPI.
+    - Apertura exitosa del modal de ajuste de existencias (`#inventory-modal`).
+    - Acceso confirmado a módulos operativos: `#compras`, `#mermas` y `#catalog`.
+    - Capturas generadas: `verify_role_bodega_inventory.png`, `verify_role_bodega_mermas.png`.
+  - **Caja (`cajera` / `admin123`)**:
+    - Acceso exitoso a `#pos` (Punto de Venta) y `#cash` (Apertura y Cierre de Caja).
+    - Acceso a `#inventory` en modo de solo lectura (10 productos cargados, 0 botones de ajuste accesibles).
+    - Capturas generadas: `verify_role_cajera_pos.png`, `verify_role_cajera_cash.png`, `verify_role_cajera_inventory_readonly.png`.
+  - **Administrador (`admin` / `admin123`)**:
+    - Acceso total a todos los módulos y tabla de inventario con privilegios completos.
+    - Captura generada: `verify_role_admin_inventory.png`.
+
+## [2026-10-30] Seguridad de Inicio: Arranque Obligatorio en Pantalla de Login y Sesión por Pestaña
+
+### 1. Diagnóstico del Problema de Seguridad
+- **Causa Raíz**: Anteriormente, el token de autenticación (`jwt_token`) y los datos del usuario se almacenaban indefinidamente en `localStorage`. Al levantar los contenedores o abrir una nueva ventana del navegador, `hasActiveSession()` leía `localStorage.getItem('jwt_token')` y redirigía directamente al Panel de Control (`showDashboard()`) sin solicitar credenciales.
+- **Riesgo en Punto de Venta (POS)**: Cualquier empleado, cliente o tercero que abriera el navegador tras encender la máquina o reiniciar el servidor tenía acceso inmediato al sistema como Administrador o último usuario sin ingresar contraseña.
+
+### 2. Solución y Mejoras Implementadas
+1. **Aislamiento de Sesión Activa (`sessionStorage`)**:
+   - `hasActiveSession()` ahora evalúa estrictamente `sessionStorage.getItem('jwt_token')`.
+   - Al abrir el navegador, encender la máquina o levantar el sistema, `sessionStorage` inicia completamente vacío, forzando a que la aplicación inicie siempre en la pantalla de **Login** (`#view-login`).
+   - El módulo del sistema (`#system-module`) permanece oculto y bloqueado hasta que se produzca una autenticación válida.
+2. **Preservación de Turno en Pestaña Activa (F5)**:
+   - Durante la jornada de trabajo, si el cajero o administrador actualiza la pestaña activa (`F5` o reload), `sessionStorage` preserva el token y estado, evitando interrupciones molestas en el turno operativo.
+3. **Manejo Seguro de "Recordarme"**:
+   - La casilla *"Recordarme"* ahora recuerda exclusivamente el nombre de usuario (`remember_user`), prellenando el campo de usuario y enfocando el campo de contraseña en visitas futuras.
+   - En ningún caso guarda contraseñas ni elude la pantalla de inicio de sesión.
+4. **Protección contra Deep Linking y Manipulación de URL**:
+   - Los manejadores de enrutamiento (`hashchange`, `popstate`, `pageshow`, `navigateTo`) interceptan cualquier intento de acceso directo mediante URL (ej. `/#pos`, `/#dashboard`) sin sesión activa, limpiando el hash y redirigiendo al login.
+
+### 3. Archivos Modificados
+- [`frontend/js/app.js`](../frontend/js/app.js):
+  - Actualización de `hasActiveSession()`, `showLogin()`, `getUserRole()`, `getUserPermissions()`, `updateUserInfoUI()`.
+  - Sincronización dual `sessionStorage` / `localStorage` para compatibilidad de sub-módulos durante la sesión activa.
+  - Almacenamiento seguro del usuario recordado en `remember_user`.
+- [`frontend/index.html`](../frontend/index.html):
+  - Incremento de versión de cache-busting a `app.js?v=4.5`.
+
+### 4. Verificación
+- Pruebas automatizadas en Playwright (`scratch/test_login_on_startup.py`):
+  - `verify_startup_always_login.png`: Al abrir el sistema con token previo en localStorage, la aplicación abre en el Login y oculta el sistema.
+  - `verify_tamper_deeplink_blocked.png`: Intento de ingreso forzado a `/#pos` sin sesión activa bloqueado hacia el Login.
+  - `verify_shift_f5_preserved.png`: Recarga de página con F5 durante un turno activo conserva el Dashboard.
+  - `verify_next_day_startup_login.png`: Apertura de nueva ventana tras cerrar el navegador muestra el Login con el usuario recordado y el campo de contraseña vacío y enfocado.
+
+## [2026-10-30] Implementación de Recuperación de Contraseña por Código OTP y Gestión de Correos Electrónicos
+
+### 1. Requerimiento y Alcance
+A solicitud del usuario:
+1. **Flujo Completo de Recuperación de Contraseña**:
+   - Habilitar el flujo de recuperación seguro: Solicitud con correo o usuario -> Envío de código OTP de 6 dígitos con expiración de 15 minutos -> Verificación del código con emisión de token temporal (`reset_token`) -> Restablecimiento seguro de contraseña y redirección al inicio de sesión.
+2. **Incorporación de Correo Electrónico en Usuarios**:
+   - Agregar el campo `email` a la tabla `usuario` en la base de datos (con restricción única e índice).
+   - Configurar el correo del administrador principal: `admin` -> `abimaely3@gmail.com`.
+   - Asignar correos predeterminados a los demás usuarios existentes (`cajera`, `bodega`).
+   - Permitir capturar y editar el correo electrónico desde el formulario de usuarios y visualizarlo en la tabla y en la ficha de detalle.
+
+### 2. Base de Datos y Migraciones
+- **Tabla `usuario`**:
+  - Se agregó la columna `email VARCHAR(100) UNIQUE NULL`.
+  - Se configuró el correo del usuario `admin` a `abimaely3@gmail.com`.
+- **Nueva Tabla `codigo_recuperacion`**:
+  - `id_codigo` (SERIAL PRIMARY KEY)
+  - `id_usuario` (INT REFERENCES usuario(id_usuario) ON DELETE CASCADE)
+  - `codigo` (VARCHAR(6) NOT NULL)
+  - `expira_en` (TIMESTAMP WITH TIME ZONE NOT NULL)
+  - `usado` (BOOLEAN DEFAULT FALSE)
+  - `fecha_creacion` (TIMESTAMP WITH TIME ZONE DEFAULT NOW())
+  - Índices en `id_usuario` y `codigo`.
+- **Migración Alembic**:
+  - `backend/alembic/versions/0017_usuario_email_y_recuperacion_password.py`.
+- **Esquema Inicial**:
+  - Actualizado en `database/init.sql` para nuevas instalaciones.
+
+### 3. Backend (FastAPI, SQLAlchemy, Seguridad y Correo)
+- **Modelos y Schemas**:
+  - `backend/app/db/models.py`: Se agregó la propiedad `email` al modelo `Usuario` y el modelo `CodigoRecuperacion`.
+  - `backend/app/schemas/schemas.py`: Se extendieron `UserCreate`, `UserUpdate` y `UserResponse` con el campo `email`. Se crearon los esquemas `PasswordRecoverRequest`, `CodeVerifyRequest` y `PasswordResetRequest`.
+- **Servicio de Envío de Correo (`backend/app/services/email_service.py`)**:
+  - Implementación con `smtplib` de la biblioteca estándar de Python ejecutada de forma asíncrona mediante `asyncio.to_thread`.
+  - Plantilla de correo HTML institucional en colores corporativos teal (`#0D7377`) con el código de 6 dígitos en tipografía grande y destacada.
+  - Modo de simulación/registro seguro si las variables SMTP no están configuradas en el entorno.
+- **Seguridad (`backend/app/core/security.py`)**:
+  - Función `create_password_reset_token()` para generar tokens JWT con caducidad de 15 minutos y tipo específico `password_reset`.
+- **Endpoints de Autenticación (`backend/app/api/auth.py`)**:
+  - `POST /api/auth/recuperar-password`: Validación estricta que rechaza correos arbitrarios o no registrados ("un correo cualquiera"). Solo genera código si el correo coincide con un usuario activo en el sistema. Despacha el correo real mediante SMTP y devuelve error honesto (503/502) si el servidor de correo no está configurado o falla, eliminando simulaciones y auto-llenados ficticios.
+  - `POST /api/auth/verificar-codigo`: Valida el código de 6 dígitos no expirado ni reutilizado, generando el token de restablecimiento.
+  - `POST /api/auth/reset-password`: Valida el token o la tupla (email, código), hashea la nueva contraseña con bcrypt, invalida los códigos usados y registra la acción en la bitácora de auditoría.
+- **Repositorios y Servicios de Usuarios (`backend/app/repositories/user_repository.py` y `user_service.py`)**:
+  - Soporte para búsqueda por email (`get_by_email`), validación de duplicados y filtros de búsqueda por nombre, username o email.
+
+### 4. Frontend (UI / UX)
+- **Vistas de Autenticación (`frontend/index.html` y `frontend/js/app.js`)**:
+  - `view-recover`: Formulario para solicitar código ingresando usuario o correo, con retroalimentación clara y botón reactivo.
+  - `view-verify`: Interfaz con 6 casillas independientes de un solo dígito con auto-avance numérico, soporte para borrado (`Backspace`) y pegado (`Paste`) directo, más botón para reenviar código.
+  - `view-reset`: Formulario para ingresar y confirmar la nueva contraseña con validación de requisitos de seguridad y redirección automática al login con el nombre de usuario prellenado.
+- **Módulo de Gestión de Usuarios (`frontend/index.html` y `frontend/js/users.js`)**:
+  - Columna "Correo" agregada en la tabla principal de usuarios.
+  - Campo "Correo Electrónico" (`#user-email`) integrado en el modal de creación y edición con validación de formato.
+  - Fila "Correo electrónico" agregada en el modal de detalle del usuario (`#user-detail-modal`).
+
+### 5. Verificación
+- Pruebas automatizadas de flujo completo E2E con Playwright:
+  - Recuperación iniciada con `abimaely3@gmail.com`.
+  - Captura y validación del código de 6 dígitos en base de datos.
+  - Transición a pantalla de verificación y reseteo de contraseña.
+  - Autenticación exitosa en el sistema con las nuevas credenciales.
+  - Visualización del correo `abimaely3@gmail.com` en tabla, modal de edición y ficha de usuario.
+
+## [2026-10-30] Optimización Integral de Modo Oscuro: Tablas de Datos, Gráficas y Widgets
+
+### 1. Diagnóstico y Problemas Identificados
+- **Colisión de Contraste en Tablas**: En `frontend/css/style.css`, la regla base `table tbody tr, .table tbody tr` fijaba `background-color: #FFFFFF`. En modo oscuro (`[data-theme="dark"]`), las celdas `td` tenían fondo transparente pero las filas `tr` conservaban el fondo blanco `#FFFFFF`, generando colisión de texto blanco sobre fondo blanco en todos los módulos (Dashboard, Inventario, Catálogo, Compras, Mermas y Caja).
+- **Legibilidad de Gráficas en Modo Oscuro (Chart.js)**:
+  - El plugin `barValueLabelsPlugin` fijaba el color de los números de las barras de forma estática en `ctx.fillStyle = '#0f172a'`, haciendo que los montos en quetzales (Q) se dibujaran en negro sobre fondos oscuros.
+  - Los ejes Y y X de la gráfica utilizaban colores de modo claro (`#334155`, `#f1f5f9`), perdiendo visibilidad o generando líneas toscas.
+- **Widgets de Rankings y Filtros Rápidos**: Las tarjetas del Top 5 en Reportes tenían fondo `#F8FAFC`, mostrándose como bloques blancos en la interfaz oscura.
+- **Miniaturas y Placeholders**: Los contenedores de imagen con icono de caja conservaban fondo gris claro `#F8FAFC`.
+- **Paginación y Modales**: Los enlaces de paginación carecían de adaptación al tema carbón.
+
+### 2. Soluciones Implementadas
+
+1. **Tablas de Datos Universales en Modo Oscuro (`frontend/css/style.css`)**:
+   - Se configuraron `table tbody tr`, `.table tbody tr`, `table tbody td`, `.table tbody td` con `background-color: transparent !important; color: var(--theme-text-main) !important;` bajo `[data-theme="dark"]` y `[data-bs-theme="dark"]`.
+   - Se adaptaron los efectos hover a `rgba(255, 255, 255, 0.05) !important` para un resaltado sutil y legible.
+   - Se mantuvieron protegidos los encabezados verde esmeralda institucional (`var(--color-teal-dark)`, `#0A5C5E` / `#0D7377`) con texto blanco puro.
+   - Se adaptaron las tablas dentro de ventanas modales e historial POS.
+
+2. **Componentes Auxiliares y Tarjetas KPI (`frontend/css/style.css`)**:
+   - Tarjetas KPI de mermas (`.merma-kpi-card`) adaptadas al fondo de tarjeta oscura (`var(--theme-bg-card)`).
+   - Miniaturas de producto (`.inventory-product-thumb--placeholder`, `.inventory-product-thumb-fallback`) adaptadas a fondo oscuro y bordes discretos.
+   - Paginación (`.pagination .page-link`) adaptada con fondo oscuro y estado activo en teal institucional.
+   - Adaptación de acento `.text-teal` a tono luminoso institucional `#14b8a6` en modo oscuro para garantizar contraste AAA.
+   - Definición de clase institucional `.bg-teal-subtle` adaptativa para ambos modos.
+
+3. **Gráficas Reactivas y Adaptativas (`frontend/js/reportes.js` y `frontend/js/app.js`)**:
+   - En `barValueLabelsPlugin`, se verifica reactivamente si el tema activo es oscuro para alternar `ctx.fillStyle` entre `#F8FAFC` (modo oscuro) y `#0F172A` (modo claro).
+   - En `construirConfiguracionGrafica`, las etiquetas de escala, cuadrículas, tooltips y barras de tendencia adaptan sus tonalidades de forma dinámica.
+   - Se implementó despacho del evento global `window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme } }))` en `applyTheme()` de `app.js`.
+   - En `reportes.js`, se suscribió el listener `themeChanged` para re-dibujar la gráfica activa de manera instantánea al alternar el modo sin recargar la página.
+   - Widgets del ranking de ventas y filtros rápidos ajustados con fondos oscuros translúcidos y badges legibles.
+
+### 3. Archivos Modificados
+- [`frontend/css/style.css`](../frontend/css/style.css): Reglas globales de tablas, hover, modales, paginación, KPIs, miniaturas, badges y ranking de reportes en modo oscuro.
+- [`frontend/js/app.js`](../frontend/js/app.js): Emisión del evento `themeChanged` al alternar entre modo claro y oscuro.
+- [`frontend/js/reportes.js`](../frontend/js/reportes.js): Adaptación dinámica de Chart.js y listener de cambio de tema.
+- [`frontend/index.html`](../frontend/index.html): Incremento de versión de cache-busting a `style.css?v=10.2`, `app.js?v=4.1`, `reportes.js?v=5.2`.
+
+### 4. Verificación
+- Pruebas visuales automatizadas con capturas de pantalla de alta resolución en modo oscuro:
+  - `dark_dashboard.png`: Tabla de últimas ventas perfectamente integrada con fondo carbón y números de ticket visibles.
+  - `dark_reportes.png`: Gráfica con montos en quetzales en blanco puro sobre barras verde esmeralda y ranking de productos en tarjetas carbón.
+  - `dark_inventario.png`, `dark_catalogo.png`, `dark_compras.png`, `dark_mermas.png`, `dark_caja.png`: Filas de datos oscuras, textos de alto contraste y miniaturas armonizadas.
+
+## [2026-10-30] Estandarización de Tabla de Mermas: Miniaturas con Ícono de Caja y Zoom Flotante (Theme Sync con Inventario)
+
+### 1. Requerimiento y Alcance
+A solicitud del usuario para replicar el diseño y funcionalidad de la tabla de Inventario en la tabla de Mermas:
+1. **Miniatura con Placeholder de Caja (`bi-box-seam`)**:
+   - Para productos sin fotografía registrada o cuya imagen falle al cargar (error 404/broken image), se sustituyó el ícono de imagen rota por el contenedor gris suave con ícono institucional de caja (`<i class="bi bi-box-seam"></i>`), idéntico al de Inventario y Catálogo.
+   - En caso de falla de carga en tiempo de ejecución, el manejador `onerror` remueve el tag `<img>` y activa de forma automática el fallback ya renderizado en el DOM.
+2. **Zoom Flotante al Pasar el Cursor**:
+   - Se incorporó la funcionalidad de previsualización ampliada al pasar el cursor (`mouseenter` / `focus`) sobre cualquier miniatura con fotografía real, utilizando el modal flotante posicionado dinámicamente (`#inventory-image-zoom`).
+   - El zoom se oculta de forma reactiva al retirar el cursor (`mouseleave` / `blur`), al hacer scroll, al redimensionar la ventana o al presionar la tecla `Escape`.
+3. **Estandarización de Celda y Encabezados**:
+   - La celda del producto ahora utiliza la estructura `.inventory-product-cell` y `.inventory-product-name` con tipografía seminegrita y truncado elíptico.
+   - Se removió la sub-insignia redundante de atributos (`[Talla / Color]`) para mantener la coherencia del esquema de productos independientes.
+   - Se estandarizó el encabezado de la columna a `"Producto"` (removiendo el texto `"Producto / Detalle"`).
+   - Se corrigieron los radios de borde inferior en el encabezado de la tabla para un acoplamiento perfecto con las filas del cuerpo.
+
+### 2. Archivos Modificados
+- [`frontend/index.html`](../frontend/index.html):
+  - Estandarización de `<th>Producto</th>` en la tabla de Mermas.
+  - Incremento de versiones de cache-busting: `style.css?v=10.1`, `mermas.js?v=2.3`.
+- [`frontend/css/style.css`](../frontend/css/style.css):
+  - Extensión de selectores de `.inventory-product-cell`, `.inventory-product-name`, `.inventory-product-thumb`, `.inventory-product-thumb--placeholder`, `.inventory-product-thumb-wrap`, `.inventory-product-thumb-fallback` y affordances de zoom para incluir `#mermas-view`.
+  - Ajuste de radios en `#mermas-view .mermas-table thead th`.
+- [`frontend/js/mermas.js`](../frontend/js/mermas.js):
+  - Implementación de `getProductThumbHtml()`, `setupMermasImageZoom()`, `showMermasImageZoom()`, `positionMermasImageZoom()`, `hideMermasImageZoom()`.
+  - Actualización de `getProductCellHtml()` para renderizar miniatura estándar y nombre directo.
+  - Consulta de catálogo completa (`/api/productos?limit=1000`) sin filtro restrictivo.
+
+
+## [2026-10-30] Retiro de Opción "Crear Producto Nuevo" en Módulo de Compras
+
+### 1. Requerimiento y Alcance
+A solicitud del usuario para delimitar responsabilidades y evitar altas directas de catálogo desde la recepción de mercadería:
+1. **Eliminación del Botón Superior**: Se retiró el botón `Crear Producto Nuevo` (`#btn-compras-nuevo-prod-top`) ubicado junto a la barra de búsqueda y filtrado en la pestaña *"Ingresar Mercadería"*.
+2. **Limpieza del Estado Vacío**: En el panel de resultados vacíos (`#compras-products-empty`), se eliminó el botón secundario `#btn-compras-nuevo-producto` y el mensaje de invitación a crear productos al vuelo, mostrando en su lugar un texto sobrio y limpio que indica verificar el término de búsqueda.
+3. **Flujo de Catálogo Centralizado**: La creación y clonación de nuevos productos permanece exclusiva en el módulo de **Catálogos** para mantener la consistencia y control del inventario.
+
+### 2. Archivos Modificados
+- [`frontend/index.html`](../frontend/index.html):
+  - Retiro de `#btn-compras-nuevo-prod-top` y `#btn-compras-nuevo-producto`.
+  - Actualización del mensaje informativo en `#compras-products-empty`.
+  - Incremento de versión de cache-busting: `compras.js?v=3.3`.
+
+
+## [2026-10-30] Sincronización de Catálogo Completo en Módulo de Compras (Ingreso de Mercadería)
+
+### 1. Diagnóstico y Causa
+- En la base de datos existían 12 productos en total. El producto #4 (*"Producto Prueba Sin Codigo"*) tenía su estado registrado como `"Inactivo"`.
+- Mientras que **Catálogo** e **Inventario** listaban los 12 registros (reflejando existencias físicas de 10 unidades), la llamada del módulo de compras incluía el parámetro restrictivo `&is_active=true` (`/api/productos?limit=1000&is_active=true`), excluyendo al producto #4 y mostrando únicamente 11 artículos disponibles para confeccionar órdenes o ingresar mercadería.
+
+### 2. Solución Aplicada
+1. **Frontend (`frontend/js/compras.js`)**:
+   - Se removió el filtro estricto `&is_active=true` de `loadProducts()`, permitiendo que el personal pueda abastecer o ingresar mercadería de cualquier producto registrado en el catálogo.
+   - Se incorporó soporte visual para identificar con badge `"Inactivo"` si un artículo físico se encuentra en dicho estado.
+   - Cache-busting actualizado a `compras.js?v=3.2`.
+2. **Base de Datos (PostgreSQL)**:
+   - Se actualizó el estado del producto #4 a `"Activo"`, dejando los 12 productos totalmente operativos y sincronizados en los tres módulos (Catálogo: 12, Inventario: 12, Compras: 12).
+
+
+## [2026-10-30] Tratamiento Integral de Artículos como Productos Independientes en Catálogo, Inventario y Compras
+
+### 1. Requerimiento y Alcance
+A solicitud de la dueña del negocio para eliminar abstracciones confusas y facilitar la operación al personal:
+1. **Eliminación Total del Esquema de Variantes Agrupadas**:
+   - Cada artículo físico es tratado como un producto 100% independiente en todo el sistema, sin subsecciones de variantes que confundan al cliente o al personal de caja.
+   - En la base de datos (PostgreSQL), se promovieron las variantes hijas secundarias a registros de entidad propios en `producto`, manteniendo intactas las relaciones foráneas de inventarios, traslados, órdenes de compra y ventas (`variante_producto`).
+2. **Catálogo**:
+   - Tabla de productos 1-a-1: cada fila es un artículo físico con su nombre descriptivo completo, sin insignias de opciones (`"2 opciones ▼"` o `"2 var."`).
+   - Ficha técnica (`#product-detail-modal`): muestra un único código de barras directo, stock físico exacto del artículo y sin tabla desglosada de variantes al pie.
+3. **Inventario**:
+   - Se removió el renderizado de etiquetas secundarias de variantes (`[Talla ... · Color ...]`). Cada fila despliega su nombre completo y SKU de forma directa y legible.
+   - En el modal de ajuste de inventario se simplificó la presentación del producto sin atributos entre corchetes.
+   - La métrica KPI de *"Total Productos"* refleja con exactitud el total de artículos independientes.
+4. **Módulo de Compras (Ingreso de Mercadería y Órdenes)**:
+   - En el catálogo de selección para confeccionar órdenes de compra, se actualizó el texto informativo a `"[N] productos disponibles"` (eliminando la frase *"variantes disponibles"*).
+   - En el buscador y listado de compra, cada producto muestra su nombre directo, código de barras y stock sin etiquetas redundantes de variantes.
+   - En las tablas de modal de recepción de mercadería (`#tabla-recibir-detalles`) y detalle de orden (`#tbody-ver-detalles`), se eliminó la columna/texto de variantes y los encabezados se simplificaron a `"Producto"`.
+5. **Limpieza General de Vocabulario y Encabezados**:
+   - Se estandarizaron los encabezados de tablas y etiquetas que decían `"Producto / Variante"` a `"Producto"` en los módulos de Mermas, Traslados y Compras.
+   - Se actualizó la descripción del Historial de Precios a *"Consulta de solo lectura de cambios de precio por producto"*.
+
+### 2. Archivos Modificados
+- [`frontend/index.html`](../frontend/index.html):
+  - Estandarización de encabezados y etiquetas de formularios de `"Producto / Variante"` a `"Producto"`.
+  - Actualización del encabezado del modal de detalle de producto a `"Precios e Inventario"`.
+  - Incremento de versiones de cache-busting: `catalog.js?v=4.8`, `inventory.js?v=4.1`, `compras.js?v=3.1`, `style.css?v=10.0`.
+- [`frontend/js/catalog.js`](../frontend/js/catalog.js):
+  - Renderizado lineal directo de productos independientes en `loadProducts()`.
+  - Ficha técnica limpia con código de barras y stock unificados en `viewProductDetail()`.
+- [`frontend/js/inventory.js`](../frontend/js/inventory.js):
+  - Retiro de `attrBadge` en `renderInventoryTable()` para mostrar únicamente el nombre completo del producto.
+  - Limpieza de `attrText` en `openInventoryModal()`.
+- [`frontend/js/compras.js`](../frontend/js/compras.js):
+  - Actualización de contador a `${items.length} productos disponibles` en `renderList()`.
+  - Eliminación de etiquetas anidadas de variantes en el listado de selección.
+  - Simplificación de filas en `renderRecibirModal()` y `renderVerOrdenModal()`.
+- **Base de Datos (PostgreSQL)**:
+  - Migración de datos en contenedor `regalito_db_prod` vinculando variantes a sus respectivos productos independientes (IDs 1 al 12).
+
+
+## [2026-10-30] Desagrupación del Catálogo Principal y Limpieza Integral de Ficha Técnica
+
+### 1. Requerimiento y Alcance
+A petición del usuario para simplificar la lectura operativa y evitar intermediarios o etiquetas desplegables:
+1. **Aplanamiento del Catálogo Principal (Filas Directas por Artículo Físico)**:
+   - Se eliminaron el agrupador visual y las etiquetas de opciones (`"2 opciones ▼"` o `"2 var."`).
+   - Cada artículo físico/variante ahora se despliega como una fila única, directa e independiente en la tabla del catálogo (ej. *"Playera Polo 8971"* y *"Playera Polo 8971 - Talla XL · Negro"*).
+   - Cada fila muestra su precio de venta, existencia física de stock real, fotografía y botones de acción independientes.
+2. **Rediseño y Limpieza de la Ficha Técnica (Modal de Detalle)**:
+   - Se eliminó por completo el bloque inferior de la tabla *"Opciones y Variantes Disponibles"*.
+   - Se suprimió la terminología técnica redundante como *"Opción base"*.
+   - Se muestra un único código de barras directo y limpio por ficha técnica (eliminando secuencias separadas por comas).
+   - Se simplificó el campo de *"Stock Actual"* para mostrar exclusivamente la cifra exacta de existencias de ese artículo específico (eliminando textos agregados como `"(total 2 opciones)"`).
+   - Se integró el atributo diferenciador (ej. *"Talla XL · Negro"*) directamente en el nombre del producto dentro de la sección de *"Información General"*.
+
+### 2. Archivos Modificados
+- [`frontend/index.html`](../frontend/index.html):
+  - Retiro del bloque `#pdetail-opciones-wrapper` en `#product-detail-modal`.
+  - Incremento de versiones de cache-busting (`style.css?v=10.0`, `catalog.js?v=4.7`).
+- [`frontend/css/style.css`](../frontend/css/style.css):
+  - Eliminación de la clase `.catalog-options-badge`.
+- [`frontend/js/catalog.js`](../frontend/js/catalog.js):
+  - Modificación de `loadProducts()` para iterar y aplanar cada variante física en su propia fila independiente `<tr>`.
+  - Actualización de `viewProductDetail(productId, variantId)` para mostrar los datos limpios de la variante seleccionada, nombre integrado con atributo, código de barras único y stock exacto.
+
+## [2026-10-30] Corrección UI/UX: Estandarización de Etiqueta de Variantes a "X opciones ▼"
+
+### 1. Requerimiento y Alcance
+A petición del usuario para eliminar la ambigüedad y brindar un indicador visual interactivo:
+1. **Reemplazo de Texto Técnico ("X var." → "X opciones")**:
+   - Se sustituyó la abreviatura técnica `"2 var."` que aparecía junto al nombre del producto en la tabla de Catálogo.
+   - Ahora muestra el término claro y completo: `"[N] opciones"` (calculando el número dinámicamente según la cantidad real de variantes en inventario).
+2. **Indicador Visual Interactivo (Flecha Desplegable)**:
+   - Se integró un icono SVG de flecha hacia abajo (`<i class="bi bi-caret-down-fill"></i>`) dentro de la misma insignia (`"[N] opciones ▼"`).
+   - Se diseñó como un elemento interactivo con cursor tipo pointer, hover con realce en color teal y transición suave.
+3. **Acción al Clic (Despliegue de Detalle y Opciones)**:
+   - Al hacer clic directamente en la insignia o sobre el nombre del producto, se abre la ficha técnica detallada (`#product-detail-modal`).
+   - Se añadió un desglose estructurado en tabla de todas las opciones/variantes disponibles (atributos de talla/color, código de barras, precio de detalle y stock físico exacto de cada una).
+   - Se incorporó la visualización de la fotografía del producto en la ficha técnica.
+4. **Política Cero Emojis**:
+   - Todo el diseño utiliza exclusivamente iconos vectoriales de Bootstrap Icons (`bi-caret-down-fill`), manteniendo el tono industrial y sobrio.
+
+### 2. Archivos Modificados
+- [`frontend/index.html`](../frontend/index.html):
+  - Inclusión de contenedor de imagen `#pdetail-foto-wrapper` y tabla de variantes `#pdetail-opciones-wrapper` en `#product-detail-modal`.
+  - Incremento de versiones de cache-busting (`style.css?v=9.9`, `catalog.js?v=4.6`).
+- [`frontend/css/style.css`](../frontend/css/style.css):
+  - Estilos dedicados para `.catalog-options-badge`, hover interactivo, animación de flecha y adaptación a modo oscuro.
+- [`frontend/js/catalog.js`](../frontend/js/catalog.js):
+  - Actualización del renderizado en `loadProducts()` para generar la etiqueta dinámica `${numVariantes} opciones` con icono SVG.
+  - Actualización de `viewProductDetail()` para renderizar la foto del producto y la tabla desglosada de todas las opciones.
+
+## [2026-10-30] Reversión de Formulario a Artículo Único y Nuevo Flujo "Copiar de Producto Existente"
+
+### 1. Requerimiento y Alcance
+A solicitud de la dueña del negocio para optimizar la velocidad y simplicidad operativa en el mostrador:
+1. **Reversión del Formulario a Estructura Simple y Lineal**:
+   - Se removió la sección compleja de "Identificación y Variantes" con subfilas dinámicas anidadas y el botón "+ Añadir otra Talla o Color".
+   - Se restableció el formulario de "Nuevo Producto" a su estructura estándar y limpia de un solo artículo: un único campo visible de **"Código de barras"** acompañado de su botón **"Generar"**.
+   - Se preservó la accesibilidad: placeholder directo `"Usa la pistola para escanear aquí"` y preselección automática de Sucursal y Bodega predeterminadas (cero clics innecesarios).
+2. **Nuevo Flujo: "Copiar de un producto existente"**:
+   - En la cabecera de la tabla de Catálogo se incorporó el botón secundario `Copiar de un producto existente` (con ícono SVG `bi bi-copy` y estilo accesible).
+   - Al pulsarlo, se despliega una ventana modal optimizada con:
+     - Título claro y directo: *"Selecciona el producto que deseas copiar"*.
+     - Buscador amplio y visible: *"Escribe el nombre o escanea el código del producto base..."* con botón de limpieza en un clic.
+     - Lista de resultados con tipografía grande, miniatura del producto (o ícono de paquete), insignia de subcategoría, código de barras y precio en Quetzales.
+     - Búsqueda en tiempo real por texto o código de barras escaneado directamente con la pistola lectora.
+3. **Comportamiento de Precarga (Clonación de Datos)**:
+   - Al seleccionar un artículo base, se transfieren automáticamente:
+     - Nombre base (para añadir fácilmente atributos al final, ej. "Vestido de Niña 2T").
+     - Subcategoría y Unidad de medida.
+     - Descripción e Imagen idénticas.
+     - Precios: Detalle, Mayoreo y Costo promedio.
+     - Ubicación (Sucursal y Bodega) y Stock mínimo.
+4. **Seguridad Estricta de Inventario (Campos Obligatoriamente Vacíos)**:
+   - **Código de barras**: Completamente vacío, con el cursor enfocado automáticamente para recibir de inmediato la lectura física de la pistola escáner.
+   - **Stock actual**: Vacío para obligar a la captura de las existencias reales de la nueva unidad.
+   - **IDs internos**: Limpios (`id_producto`, `id_variante`, `id_inventario`) para garantizar que se guarde como un registro totalmente nuevo.
+
+### 2. Archivos Modificados
+- [`frontend/index.html`](../frontend/index.html):
+  - Inclusión del botón `#btn-copy-product` junto a `#btn-new-product`.
+  - Reversión de la sección de Identificación en `#product-modal` a campo lineal único.
+  - Creación de la estructura del modal `#copy-product-modal` con buscador e items interactivos.
+  - Incremento de versiones de cache-busting (`style.css?v=9.8`, `catalog.js?v=4.5`).
+- [`frontend/css/style.css`](../frontend/css/style.css):
+  - Nuevas clases `.copy-product-item`, `.copy-product-item-thumb`, `.copy-product-item-name`, `.copy-product-item-meta`, `.copy-product-item-badge`, estados de hover / foco accesible y soporte nativo para tema oscuro.
+  - Retiro de estilos obsoletos de subfilas de variantes.
+- [`frontend/js/catalog.js`](../frontend/js/catalog.js):
+  - Implementación de `initCopyProductModal()`, `openCopyProductModal()`, `loadCopyProducts()`, `filterAndRenderCopyProducts()`, `renderCopyProductList()` y `cloneFromProduct(productId)`.
+  - Retiro de `addVariantRow()`, `updateVariantRowIndices()` y recolección de `variantes_extra` en `saveProduct()`.
+  - Enfoque automático del cursor en `#codigo_barras` con `shown.bs.modal`.
+
+## [2026-10-30] Rediseño UI/UX de Formulario "Nuevo Producto": Gestión de Variantes, Lenguaje Accesible y Automatización de Ubicaciones
+
+### 1. Requerimiento y Alcance
+A petición del usuario, se mejoró la experiencia de uso del modal de creación y edición de productos para optimizar la agilidad y accesibilidad en el mostrador:
+1. **Gestión de Variantes en la Misma Pantalla**:
+   - Se eliminó el campo de texto rígido único de "Atributo / Talla / Medida".
+   - Se agregó un botón grande y de alto contraste en verde esmeralda institucional: `+ Añadir otra Talla o Color`.
+   - Al pulsar el botón, se despliega dinámicamente una nueva tarjeta agrupada con 3 campos clave:
+     1. *Código de barras* (con botón para generación automática EAN-13).
+     2. *Nombre de la variante* (ej. "Talla M, Rojo").
+     3. *Stock actual*.
+     - Incluye botón de eliminación para descartar variantes agregadas por error.
+2. **Lenguaje Accesible y Directo**:
+   - Se sustituyó el texto técnico del placeholder de código de barras ("EAN-13 o escaneado") por una indicación amigable y directa: `"Usa la pistola para escanear aquí"`.
+3. **Automatización de Campos (Cero Clics Innecesarios)**:
+   - Los selectores de **"Sucursal"** y **"Área de bodega"** ahora aparecen precargados y seleccionados automáticamente con la ubicación principal del usuario (ej. *Tienda Central Panajachel* y *Vitrina Principal*).
+   - El usuario ya no necesita interactuar obligatoriamente con estos selectores en cada creación, requiriendo su atención únicamente para cambios excepcionales.
+
+### 2. Cambios Implementados
+- **Backend**:
+  - [`backend/app/schemas/schemas.py`](../backend/app/schemas/schemas.py): Creación del esquema `VarianteExtraItem` e inclusión de `variantes_extra` en `ProductoCreate` y `ProductoUpdate`.
+  - [`backend/app/services/product_service.py`](../backend/app/services/product_service.py): Manejo atómico en `create_product` y `update_product` para persistir múltiples variantes e inventarios en una sola transacción.
+- **Frontend**:
+  - [`frontend/index.html`](../frontend/index.html): Retiro del combobox rígido de atributo, nuevo placeholder accesible en `#codigo_barras`, contenedor `#product-variants-container` y botón `#btn-add-variant`.
+  - [`frontend/css/style.css`](../frontend/css/style.css): Reglas visuales para `.product-variant-row` y `.product-add-variant-btn`.
+  - [`frontend/js/catalog.js`](../frontend/js/catalog.js): Funciones `addVariantRow()`, `updateVariantRowIndices()`, precarga automática de ubicación en `populateSucursales`/`populateAreas` y envío de `variantes_extra` en `saveProduct()`.
+
+---
+
+## [2026-10-30] Ocultamiento Visual del Menú de Configuraciones Adicionales en Catálogos
+
+### 1. Requerimiento y Alcance
+A petición del usuario, se ocultó visualmente el menú desplegable de **"Configuraciones Adicionales"** en el módulo de Catálogos para simplificar y despejar la interfaz de navegación superior (pestañas principales: *Productos*, *Categorías*, *Subcategorías*, *Unidades*).
+- **Preservación Total del Código y Lógica**: Todo el bloque DOM, selectores, modales secundarios (sucursales, áreas de bodega, motivos de merma, métodos de pago, proveedores, departamentos, municipios) y sus controladores en JavaScript permanecen 100% íntegros y operativos.
+- **Implementación**: Se aplicó la clase `d-none` y estilo inline `display: none !important;` al contenedor `.catalog-extra-tabs` en [`frontend/index.html`](../frontend/index.html), manteniendo la estructura viva sin causar errores de referencia en `catalog.js`.
+
+### 2. Archivos Modificados
+- [`frontend/index.html`](../frontend/index.html): Adición de `d-none` a `.catalog-extra-tabs` y actualización de versiones de cache-busting (`catalog.js?v=4.1`, `style.css?v=9.6`).
+
+---
+
+## [2026-10-30] Diagnóstico, Sincronización y Estandarización de Conteo entre Inventario, Catálogo y Compras
+
+### 1. Diagnóstico y Causa Raíz de la Discrepancia (10 vs 9)
+Se realizó una auditoría detallada en la base de datos PostgreSQL y en los módulos de Frontend (`inventory.js`, `catalog.js` y `compras.js`):
+- **Causa Raíz Conceptual (Productos vs Variantes)**:
+  - En la tabla `producto` existen **9 productos padre** (IDs 1 al 9).
+  - El producto ID 2 (*"Vestido de Niña 2T"*) cuenta con **2 variantes físicas** registradas en `variante_producto`:
+    - Variante 2: Talla `2T`, Color `Rosado`, Código de barras `7401000000028`, Stock `11`.
+    - Variante 3: Talla `4T`, Color `Azul`, Código de barras `7401000000035`, Stock `8`.
+  - Los 8 productos restantes tienen 1 variante cada uno, sumando un total de **10 variantes** en `variante_producto`.
+  - La tabla `inventario_sucursal` lleva el control físico del stock a nivel de **variante** (SKU), por lo que cuenta con exactamente **10 registros de inventario** correspondientes 1 a 1 con las 10 variantes.
+- **Causa Visual de Confusión en la Interfaz**:
+  - En **Inventario / Bodega**: La tabla renderizaba únicamente el nombre general del producto sin atributos de variante. En consecuencia, el *"Vestido de Niña 2T"* aparecía repetido en dos filas consecutivas con el mismo nombre y la tarjeta KPI superior mostraba `"TOTAL PRODUCTOS: 10"`, aparentando un producto duplicado o desincronizado.
+  - En **Catálogo**: Se listaban los 9 productos base de la tabla `producto`, pero solo leía el stock de la primera variante (`stock: 11`), omitiendo las 8 unidades de la segunda variante.
+  - En **Compras**: Se consultaban los productos activos (`is_active=true`) y se aplanaban sus variantes. Con 8 productos activos (incluyendo las 2 variantes del Vestido), mostraba exactamente 9 variantes disponibles para ingresar.
+
+### 2. Cambios Implementados
+
+1. **Backend**:
+   - [`backend/app/schemas/inventory_schema.py`](../backend/app/schemas/inventory_schema.py): Se agregaron los campos `id_producto`, `producto_estado`, `talla` y `color` a `InventoryResponse`.
+   - [`backend/app/services/inventory_service.py`](../backend/app/services/inventory_service.py): En `_format_response`, se mapearon los atributos de variante (`talla`, `color`), el ID del producto padre y su estado (`Activo`/`Inactivo`).
+
+2. **Frontend - Inventario (`frontend/js/inventory.js`)**:
+   - **Cálculo de KPI Unificado**: `kpi-inv-total` ahora calcula los productos únicos (`Set(id_producto)`), mostrando fielmente **9** productos (alineado con Catálogo).
+   - **Distinción Visual de Variantes**: La tabla de inventario ahora renderiza insignias claras con los atributos de cada variante (ej. `[2T · Rosado]` y `[4T · Azul]`), eliminando la apariencia de filas duplicadas.
+   - **Indicador de Estado**: Se agregó una insignia suave `Inactivo` para aquellos productos cuyo catálogo base haya sido desactivado.
+   - **Buscador Mejorado**: El filtro de búsqueda por SKU ahora también permite buscar por talla o color.
+   - **Modal de Ajuste**: El campo de producto incluye los atributos de la variante para total claridad al ajustar existencias.
+
+3. **Frontend - Catálogo (`frontend/js/catalog.js`)**:
+   - **Stock Consolidado Multivariante**: La columna de stock ahora suma las existencias de todas las variantes del producto (mostrando 19 unidades para *"Vestido de Niña 2T"*).
+   - **Insignia de Variantes**: Los productos con más de una variante muestran una etiqueta visible `2 var.` junto al nombre.
+   - **Ficha Técnica Detallada**: El modal de detalle (`viewProductDetail`) muestra todos los códigos de barras, atributos y stock total consolidado.
+
+4. **Frontend - Compras (`frontend/js/compras.js`)**:
+   - **Claridad Terminológica**: El contador de catálogo disponible ahora especifica claramente *"X variantes disponibles"*, evitando confusión entre productos padre y variantes comprables.
+
+### 3. Verificación
+- Integridad de datos en PostgreSQL: 100% íntegra, sin registros huérfanos ni duplicados.
+- Pruebas visuales automatizadas con Playwright en `http://localhost:9090` confirmando el renderizado correcto en Inventario, Catálogo y Compras.
+
+## [2026-10-29] Saneamiento Estructural, Desmantelamiento de Modo Híbrido SQLite y Actualización de Documentación
+
+### 1. Requerimiento y Alcance
+- **Eliminación de Archivos Temporales y Huérfanos**:
+  - Eliminación de la carpeta `scratch/` en la raíz del proyecto.
+  - Eliminación de `.pytest_cache/` en `backend/`.
+  - Eliminación de `package-lock.json` en la raíz (vestigio innecesario ya que el frontend no usa Node.js ni build steps).
+- **Limpieza y Reorganización de Scripts en Backend**:
+  - Reubicación de scripts de pruebas iniciales (`fix_pass.py`, `init_db.py`, `seed_admin.py`) hacia la subcarpeta archivada `backend/scripts/`.
+- **Limpieza de Archivos en Database**:
+  - Eliminación de `database/fix_encoding.sql` (cuyo fix ya está integrado en `init.sql` y en la migración 0011).
+  - Reubicación de `database/backup.sql` a la carpeta `respaldos/backup.sql`.
+  - Conservación íntegra de `database/init.sql` para despliegues limpios de Docker desde cero.
+- **Desmantelamiento Completo del Modo Híbrido Offline (SQLite + Nube)**:
+  - El sistema opera 100% en modo local con PostgreSQL 15 en Docker, por lo que todo el código del modo híbrido fue removido:
+    - En Interfaz: Removido el botón indicador de copia local (`#btn-sync-modal`) y el modal `#sync-modal` de `frontend/index.html`.
+    - En Frontend: Eliminado el archivo `frontend/js/sync.js` y su etiqueta `<script>` correspondiente.
+    - En Backend: Removidas las dependencias y rutas de sincronización en `main.py`, `deps.py`, `config.py`, `.env` y `.env.example`.
+    - Eliminados los archivos `sync.py`, `sync_service.py`, `sync_repository.py` y `sync_daemon.py`.
+    - Las tablas `sync_cache_metadata` y `sync_queue` se conservaron intactas e inactivas en la base de datos para no alterar la cadena de versiones de Alembic (migración 0016).
+- **Actualización Total de la Documentación (`documentacion/general.md`)**:
+  - Reescribir `general.md` reflejando fielmente el estado actual del sistema: 48 tablas relacionales en español, arquitectura modular por capas en FastAPI, frontend estático servido por Nginx en el puerto `9090`, base de datos PostgreSQL 15, facturación FEL y procedimientos de operación con Docker.
+
+---
+
+### 2. Archivos y Carpetas Modificados
+
+1. **Archivos Eliminados**:
+   - `scratch/` (directorio completo)
+   - `backend/.pytest_cache/` (directorio completo)
+   - `package-lock.json`
+   - `database/fix_encoding.sql`
+   - `frontend/js/sync.js`
+   - `backend/app/api/sync.py`
+   - `backend/app/services/sync_service.py`
+   - `backend/app/repositories/sync_repository.py`
+   - `backend/app/core/sync_daemon.py`
+
+2. **Archivos Reubicados**:
+   - `backend/fix_pass.py` -> `backend/scripts/fix_pass.py`
+   - `backend/init_db.py` -> `backend/scripts/init_db.py`
+   - `backend/seed_admin.py` -> `backend/scripts/seed_admin.py`
+   - `database/backup.sql` -> `respaldos/backup.sql`
+
+3. **Archivos Modificados**:
+   - [`frontend/index.html`](../frontend/index.html): Retiro de `#btn-sync-modal`, `#sync-modal` y referencia a `sync.js`.
+   - [`backend/app/main.py`](../backend/app/main.py): Retiro de router `sync` y daemon del ciclo de vida (`lifespan`).
+   - [`backend/app/api/deps.py`](../backend/app/api/deps.py): Retiro de dependencias y servicios de sincronización.
+   - [`backend/app/core/config.py`](../backend/app/core/config.py): Retiro de variables `LOCAL_SQLITE_URL` y `LOCAL_SQLITE_PATH`.
+   - `.env` y `.env.example`: Retiro de variables obsoletas de SQLite.
+   - [`documentacion/general.md`](../documentacion/general.md): Documentación integral actualizada con las 48 tablas, puertos y arquitectura real.
+
+---
+
+### 3. Verificación
+- Verificación de arranque de backend y frontend en Docker (`docker compose -f docker-compose.prod.yml`):
+  - Contenedor backend levantado y respondiendo: `INFO: Uvicorn running on http://0.0.0.0:8000`.
+  - Healthcheck HTTP: `{"api":"ok","db":"ok","status":"ok"}`.
+  - Frontend servido por Nginx en puerto 9090 con respuesta HTTP 200.
+
+## [2026-10-29] Limpieza Visual Profunda, Estandarización de Tablas y Eliminación Global de Emojis
+
+### 1. Requerimiento y Alcance
+- **Eliminación Total de Botones "← Panel"**:
+  - Supresión definitiva de todos los botones y enlaces de retorno dirigidos al dashboard en todas las vistas del sistema.
+  - La navegación ahora se realiza de forma limpia y exclusiva a través del menú lateral (Sidebar).
+- **Estandarización Global de Encabezados de Tabla (`style.css`)**:
+  - Regla global unificada para `table thead`, `table thead tr`, `table thead th`, `.table thead th`:
+    - Fondo verde oscuro institucional (`var(--color-teal-dark)` / `#0A5C5E`).
+    - Texto 100% blanco obligatorio (`color: #FFFFFF !important;`) con peso `font-weight: 600 !important;`.
+    - Herencia blanca en enlaces, textos e iconos (`th a`, `th span`, `th i`).
+    - Filas y celdas del cuerpo (`tbody`, `td`, `tr`) con fondo blanco `#FFFFFF` y hover suave `#F8FAFC` para lograr un contraste óptimo.
+  - Actualización de los encabezados del historial de Compras a `# Compra`, `Fecha`, `Proveedor`, `Responsable`, `Total Compra`, `Estado`, `Acciones`.
+- **Limpieza de Títulos Duplicados en Barra Superior (Topbar)**:
+  - Eliminación de la duplicación donde el nombre del módulo activo se mostraba en la barra superior y se repetía en grande abajo.
+  - La barra superior ahora muestra de manera estática y sobria el nombre del negocio: **`Regalito - Panajachel`** junto al ícono institucional `bi-shop`.
+- **Cero Emojis en Todo el Sistema**:
+  - Búsqueda y reemplazo sistemático de emojis en HTML, CSS y controladores JS.
+  - Reemplazo de cajas en fallbacks por el ícono Bootstrap `bi-box-seam`.
+  - Reemplazo de engranaje en catálogos por `bi-gear-fill`.
+  - Reemplazo de flechas y banners por texto e íconos limpios.
+
+---
+
+### 2. Archivos Modificados
+
+1. [`frontend/index.html`](../frontend/index.html):
+   - Eliminación de botones redundantes `← Panel` en los encabezados de todos los módulos.
+   - Actualización del contenedor `#topbar-module-title` para desplegar estáticamente `Regalito - Panajachel`.
+   - Reemplazo de emoji en el dropdown de configuraciones adicionales del catálogo por `<i class="bi bi-gear-fill me-1"></i>`.
+   - Normalización de las columnas de la tabla de compras (`# Compra`, `Fecha`, `Total Compra`).
+   - Incremento del token de versión de CSS a `style.css?v=9.1` para forzar la recarga de estilos.
+
+2. [`frontend/css/style.css`](../frontend/css/style.css):
+   - Reemplazo de la antigua regla de cabecera clara (`#F8FAFC` con texto `#1E293B`) por la regla global de alto contraste institucional (`--color-teal-dark` con `#FFFFFF`).
+   - Aplicación de fondo blanco `#FFFFFF` a `table tbody tr` y `table tbody td`.
+   - Estandarización de estados hover en cabeceras ordenables (`filter: brightness(1.12)` manteniendo texto e iconos en `#FFFFFF`).
+
+3. [`frontend/js/app.js`](../frontend/js/app.js):
+   - Modificación de la función `updateTopbarHeader(viewKey)` para mantener el título estático `Regalito - Panajachel` y no sobreescribirlo dinámicamente con los nombres repetidos de cada vista, preservando los badges y botones exclusivos de turno en POS.
+
+4. [`frontend/js/catalog.js`](../frontend/js/catalog.js):
+   - Reemplazo de fallbacks de producto por `<i class="bi bi-box-seam"></i>`.
+
+5. [`frontend/js/inventory.js`](../frontend/js/inventory.js):
+   - Reemplazo de fallbacks de producto en `getProductThumbHtml` por `<i class="bi bi-box-seam"></i>`.
+
+6. [`frontend/js/compras.js`](../frontend/js/compras.js):
+   - Reemplazo de fallbacks de producto en compras por `<i class="bi bi-box-seam"></i>`.
+
+7. [`frontend/js/mermas.js`](../frontend/js/mermas.js):
+   - Reemplazo de fallbacks de producto en `getProductCellHtml` por `<i class="bi bi-box-seam"></i>`.
+
+8. [`frontend/js/pos.js`](../frontend/js/pos.js):
+   - Limpieza del banner de escaneo de productos (`showScannerBanner`), dejando texto directo y profesional.
+
+9. [`frontend/js/traslados.js`](../frontend/js/traslados.js):
+   - Limpieza del separador de ruta de traslados a `->`.
+
+---
+
+### 3. Verificación Automatizada
+- Script de prueba [`scratch/verify_ui_standardization.py`](../scratch/verify_ui_standardization.py) ejecutado con Playwright Chromium:
+  - Comprobación de título en Topbar (`Regalito - Panajachel`) en Dashboard, Compras, Inventario y Usuarios.
+  - Verificación de 0 botones `← Panel` en toda la interfaz.
+  - Verificación de estilos calculados en `<thead> <th>` de tablas: fondo `rgb(10, 92, 94)` y texto `rgb(255, 255, 255)` con peso `600`.
+  - Capturas de pantalla generadas:
+    - `verify_dashboard_topbar.png`
+    - `verify_compras_table.png`
+    - `verify_inventory_table.png`
+    - `verify_users_table.png`
+
 ## [2026-10-28] Simplificación del Módulo de Compras (Ingreso Directo a Inventario en 1 Solo Paso)
 
 ### 1. Requerimiento y Alcance
@@ -4304,3 +4920,51 @@ Se desarrolló el módulo de **Productos** y el mantenimiento de **Categorías**
 ### Verificación
 - Verificación automatizada con Playwright: Se confirmó que el elemento `[data-dashblock='accesos-rapidos']` y los botones `#dash-qa-*` ya no existen en el DOM (`qa_block is None: True`).
 - El Dashboard carga de forma inmediata y todas las tarjetas métricas y tablas se visualizan limpiamente en una sola pantalla.
+
+
+## [2026-10-30] Implementacion Universal de Reportes en Excel y PDF en Todos los Modulos
+
+### Causa / Requerimiento
+- Solicitud del usuario: *"en cada modulo que tenga una tabla pueda imprimirse un reporte en excel y pdf... todos los modulos que tengan tablas deben de tener esa opcion, si no la tienen recuerda pdf y excel"*.
+- Regla de diseno estricta: Cero emojis en codigo, botones de interfaz, dropdowns y documentacion.
+- Mantener colores corporativos Teal (`#0A5C5E` / `#0D7377`) y consistencia en metadatos y encabezados.
+
+### Solucion Implementada
+1. **Librerias CDN de Exportacion**:
+   - Insercion en [`frontend/index.html`](../frontend/index.html) de:
+     - SheetJS (`xlsx.full.min.js`) para generacion de archivos `.xlsx` nativos.
+     - jsPDF (`jspdf.umd.min.js`) y jsPDF-AutoTable (`jspdf.plugin.autotable.min.js`) para generacion de archivos PDF estandarizados en tamano Carta (Portrait o Landscape segun cantidad de columnas).
+2. **Modulo Central de Exportacion (`ReportExporter`)**:
+   - Creacion de [`frontend/js/report_exporter.js`](../frontend/js/report_exporter.js):
+     - `parseTableData`: Extraccion limpia de celdas DOM filtrando botones de accion, chevrons, miniaturas, iconos de zoom y filas de estado vacio.
+     - `exportTableToExcel`: Creacion de libro de calculo, calculo automatico de anchos de columna y descarga de archivo `.xlsx` con estampa temporal.
+     - `exportTableToPdf`: Generacion de reporte PDF corporativo con franja superior teal `#0A5C5E`, membrete de "TIENDA EL REGALITO - PANAJACHEL", metadatos de auditoria (Fecha, Hora, Usuario generador, Cantidad de registros), encabezados con fondo `#0A5C5E`, filas alternadas `#F8FAFC` y pie de pagina con numeracion "Pagina X de Y".
+     - `EXPORT_REGISTRY`: Mapeo declarativo y escuchador global delegado para todos los botones de reporte de la aplicacion.
+3. **Botones de Reporte en Interfaz de Usuario**:
+   - Integracion de dropdowns estandarizados `<button class="btn btn-outline-secondary dropdown-toggle"><i class="bi bi-download me-1"></i> Reporte</button>` con opciones "Descargar Excel" y "Descargar PDF" en los siguientes modulos y tablas:
+     - **Inventario**: `#inventory-view` (`.inventory-table`).
+     - **Catalogo - Productos**: `#tab-products` (`#products-table`).
+     - **Catalogo - Categorias**: `#tab-categories` (`#categories-table`).
+     - **Catalogo - Subcategorias**: `#tab-subcategories` (`#subcategories-table`).
+     - **Catalogo - Unidades de Medida**: `#tab-unidades` (`#unidades-table`).
+     - **Catalogo - Sucursales**: `#tab-sucursales` (`#sucursales-table`).
+     - **Catalogo - Areas de Bodega**: `#tab-areas` (`#areas-table`).
+     - **Catalogo - Motivos de Merma**: `#tab-motivos` (`#motivos-table`).
+     - **Catalogo - Metodos de Pago**: `#tab-metodos` (`#metodos-table`).
+     - **Catalogo - Proveedores**: `#tab-proveedores` (`#proveedores-table`).
+     - **Catalogo - Departamentos**: `#tab-departamentos` (`#departamentos-table`).
+     - **Catalogo - Municipios**: `#tab-municipios` (`#municipios-table`).
+     - **Compras**: `#compras-view` (`#tabla-compras-ordenes`).
+     - **Mermas**: `#mermas-view` (`#tabla-mermas`).
+     - **Caja / Turnos**: `#cash-view` (`#cash-table`).
+     - **Usuarios / Personal**: `#users-view` (`.users-table`).
+     - **Clientes**: `#clients-view` (`.clients-table`).
+     - **Traslados**: `#traslados-view` (`#tabla-traslados`).
+     - **Visitas de Seguimiento**: `#visitas-view` (`#tabla-visitas`).
+     - **Roles y Permisos**: `#roles-view` (`#roles-table`).
+     - **Bitacora de Auditoria**: `#bitacora-view` (`#bitacora-table`).
+     - **Historial de Precios**: `#historial-view` (`#historial-table`).
+
+### Verificacion
+- Pruebas automatizadas ejecutadas con Playwright verificando la navegacion por modulos, el despliegue del menu "Reporte", y la descarga efectiva y valida tanto de los archivos `.xlsx` como `.pdf` en Inventario, Mermas, Catalogo, Compras, Usuarios y Caja.
+- Cero errores en consola de JavaScript (`Errores en consola: 0`).

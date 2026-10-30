@@ -147,36 +147,53 @@ body {
    Estándar RNF24: Contraste garantizado, soporte para fondos corporativos y claros
 --------------------------------------------------------------------------- */
 
-/* Regla base de alto contraste para cualquier cabecera clara o por defecto */
+/* ===========================================================================
+   ESTANDARIZACIÓN GLOBAL DE TABLAS (TODOS LOS MÓDULOS DEL SISTEMA)
+   - Todas las tablas del sistema (thead, th): fondo verde oscuro institucional
+     (--color-teal-dark / #0A5C5E) con texto blanco obligatorio (color: #ffffff)
+     y font-weight: 600.
+   - Celdas y filas (tbody, td, tr): fondo blanco para máximo contraste.
+   =========================================================================== */
+table thead,
+table thead tr,
 table thead th,
-.table thead th {
-    font-weight: 600;
+table thead.table-light,
+table thead.table-light th,
+.table thead,
+.table thead tr,
+.table thead th,
+.table thead.table-light,
+.table thead.table-light th,
+.table > thead > tr > th,
+.thead-catalog,
+.thead-catalog tr,
+.thead-catalog th,
+.thead-cash,
+.thead-cash tr,
+.thead-cash th,
+.thead-users,
+.thead-users tr,
+.thead-users th {
+    background-color: var(--color-teal-dark) !important;
+    background: var(--color-teal-dark) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
     font-size: 0.85rem;
     letter-spacing: 0.02em;
     vertical-align: middle;
     white-space: nowrap;
-    border-bottom: 2px solid #E2E8F0;
-    color: #1E293B !important; /* Texto oscuro de alto contraste (#1e293b) */
-    background-color: #F8FAFC !important; /* Fondo gris claro suave */
-    box-shadow: none !important;
-    padding: 0.75rem 1rem;
-}
-
-/* Reglas comunes para cabeceras con fondo corporativo */
-.thead-catalog th,
-.thead-cash th,
-.thead-users th {
-    color: #FFFFFF !important;
-    font-weight: 600;
-    font-size: 0.85rem;
     border-bottom: none !important;
     box-shadow: none !important;
-    vertical-align: middle;
-    white-space: nowrap;
     padding: 0.75rem 1rem;
 }
 
-/* Asegurar herencia de color blanco en elementos hijos de cabeceras corporativas */
+/* Herencia garantizada de color blanco en elementos hijos dentro de cualquier encabezado */
+table thead th a,
+table thead th span,
+table thead th i,
+.table thead th a,
+.table thead th span,
+.table thead th i,
 .thead-catalog th a,
 .thead-catalog th span,
 .thead-catalog th i,
@@ -189,42 +206,17 @@ table thead th,
     color: #FFFFFF !important;
 }
 
-/* Cabeceras de tabla del módulo de Catálogos (Teal global del sistema)
-   REDISEÑO UI/UX: se sustituyó el azul corporativo por el verde esmeralda
-   usado en Caja y Usuarios para unificar la identidad visual. */
-.thead-catalog,
-.thead-catalog tr,
-.thead-catalog th {
-    background-color: var(--color-teal-dark) !important;
-    background: linear-gradient(135deg, var(--color-teal), var(--color-teal-dark)) !important;
-    color: #FFFFFF !important;
-}
-
-/* Cabeceras de tabla del módulo de Caja (Teal corporativo RNF24) */
-.thead-cash,
-.thead-cash tr,
-.thead-cash th {
-    background-color: var(--color-teal-dark) !important;
-    background: linear-gradient(135deg, var(--color-teal), var(--color-teal-dark)) !important;
-    color: #FFFFFF !important;
-}
-
-/* Cabeceras de tabla del módulo de Usuarios (Teal corporativo RNF24) */
-.thead-users,
-.thead-users tr,
-.thead-users th {
-    background-color: var(--color-teal-dark) !important;
-    background: linear-gradient(135deg, var(--color-teal), var(--color-teal-dark)) !important;
-    color: #FFFFFF !important;
-}
-
 /* Bordes redondeados en extremos de cabeceras corporativas */
+table thead th:first-child,
+.table thead th:first-child,
 .thead-catalog th:first-child,
 .thead-cash th:first-child,
 .thead-users th:first-child {
     border-top-left-radius: 0.5rem;
     border-bottom-left-radius: 0.5rem;
 }
+table thead th:last-child,
+.table thead th:last-child,
 .thead-catalog th:last-child,
 .thead-cash th:last-child,
 .thead-users th:last-child {
@@ -240,7 +232,10 @@ th.sortable {
     transition: all 0.15s ease;
 }
 
-/* Hover en cabeceras corporativas: sutil resalte conservando texto blanco */
+/* Hover en cabeceras: sutil resalte conservando texto blanco */
+th.sortable:hover,
+table thead th.sortable:hover,
+.table thead th.sortable:hover,
 .thead-catalog th.sortable:hover,
 .thead-cash th.sortable:hover,
 .thead-users th.sortable:hover {
@@ -250,29 +245,30 @@ th.sortable {
     text-underline-offset: 3px;
 }
 
-/* Hover en cabeceras claras sin clase corporativa */
-table thead:not([class*="thead-"]) th.sortable:hover,
-.table thead:not([class*="thead-"]) th.sortable:hover {
-    color: var(--color-celeste-dark) !important;
-    background-color: #EDF2F7 !important;
-}
-
-/* Iconos de ordenamiento */
+/* Iconos de ordenamiento siempre blancos */
 th.sortable .sort-icon {
     font-size: 0.75em;
     margin-left: 5px;
     opacity: 0.85;
     display: inline-block;
     vertical-align: middle;
-}
-.thead-catalog th.sortable .sort-icon,
-.thead-cash th.sortable .sort-icon,
-.thead-users th.sortable .sort-icon {
     color: #FFFFFF !important;
 }
-table thead:not([class*="thead-"]) th.sortable .sort-icon {
-    color: #64748B;
+
+/* Filas y celdas del cuerpo: fondo blanco puro y texto oscuro de alto contraste */
+table tbody tr,
+.table tbody tr,
+table tbody td,
+.table tbody td {
+    background-color: #FFFFFF;
+    color: var(--color-text-dark);
 }
+
+table tbody tr:hover,
+.table tbody tr:hover {
+    background-color: #F8FAFC !important;
+}
+
 
 
 /* Texto con la paleta corporativa */
@@ -293,16 +289,28 @@ table thead:not([class*="thead-"]) th.sortable .sort-icon {
    MÓDULO DE AUTENTICACIÓN (LOGIN) - REDISEÑO MODERNO Y LIMPIO
    ========================================================================== */
 
-/* 1. Fondo sólido limpio sin imágenes de distracción */
+/* 1. Fondo de pantalla completa con fotografía del Lago de Atitlán */
 .auth-bg {
-    background-color: #F9FAFB !important;
-    background-image: none !important;
+    position: relative;
+    background-image: 
+        linear-gradient(rgba(15, 23, 42, 0.40), rgba(15, 23, 42, 0.60)),
+        url('/img/lago-atitlan.jpg') !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+    min-height: 100vh;
 }
 
 [data-theme="dark"] .auth-bg,
 [data-bs-theme="dark"] .auth-bg {
-    background-color: #0F172A !important;
-    background-image: none !important;
+    background-image: 
+        linear-gradient(rgba(10, 15, 26, 0.60), rgba(10, 15, 26, 0.80)),
+        url('/img/lago-atitlan.jpg') !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
 }
 
 /* Tarjeta Central con sombra difusa estilo Apple / Stripe */
@@ -313,9 +321,9 @@ table thead:not([class*="thead-"]) th.sortable .sort-icon {
     border-radius: 24px !important;
     padding: 3rem 2.5rem !important;
     box-shadow:
-        0 1px 3px 0 rgba(0, 0, 0, 0.02),
-        0 10px 25px -5px rgba(0, 0, 0, 0.04),
-        0 20px 48px -12px rgba(15, 23, 42, 0.08) !important;
+        0 1px 3px 0 rgba(0, 0, 0, 0.05),
+        0 12px 32px -4px rgba(15, 23, 42, 0.18),
+        0 24px 56px -12px rgba(15, 23, 42, 0.25) !important;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -326,9 +334,9 @@ table thead:not([class*="thead-"]) th.sortable .sort-icon {
     background: #1E293B !important;
     border-color: #334155 !important;
     box-shadow:
-        0 1px 3px 0 rgba(0, 0, 0, 0.2),
-        0 10px 25px -5px rgba(0, 0, 0, 0.35),
-        0 20px 48px -12px rgba(0, 0, 0, 0.5) !important;
+        0 1px 3px 0 rgba(0, 0, 0, 0.3),
+        0 12px 32px -4px rgba(0, 0, 0, 0.45),
+        0 24px 56px -12px rgba(0, 0, 0, 0.6) !important;
 }
 
 /* 2. Logo de la empresa ampliado un 30% con Turquesa Vibrante */
@@ -3036,9 +3044,11 @@ input[type="password"]::-ms-clear {
    Cuadro de 40x40 px con esquinas redondeadas y placeholder gris suave
    con ícono de caja cuando el producto no tiene imagen.
 --------------------------------------------------------------------------- */
-#inventory-view .inventory-product-cell { min-width: 0; }
+#inventory-view .inventory-product-cell,
+#mermas-view .inventory-product-cell { min-width: 0; }
 
-#inventory-view .inventory-product-name {
+#inventory-view .inventory-product-name,
+#mermas-view .inventory-product-name {
     display: block;
     max-width: 240px;
     overflow: hidden;
@@ -3047,7 +3057,8 @@ input[type="password"]::-ms-clear {
 }
 
 #inventory-view .inventory-product-thumb,
-#compras-view .inventory-product-thumb {
+#compras-view .inventory-product-thumb,
+#mermas-view .inventory-product-thumb {
     width: 40px;
     height: 40px;
     flex: 0 0 40px;
@@ -3058,7 +3069,8 @@ input[type="password"]::-ms-clear {
 }
 
 #inventory-view .inventory-product-thumb--placeholder,
-#compras-view .inventory-product-thumb--placeholder {
+#compras-view .inventory-product-thumb--placeholder,
+#mermas-view .inventory-product-thumb--placeholder {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -3074,7 +3086,8 @@ input[type="password"]::-ms-clear {
 }
 
 #inventory-view .inventory-product-thumb-wrap,
-#compras-view .inventory-product-thumb-wrap {
+#compras-view .inventory-product-thumb-wrap,
+#mermas-view .inventory-product-thumb-wrap {
     position: relative;
     width: 40px;
     height: 40px;
@@ -3083,13 +3096,15 @@ input[type="password"]::-ms-clear {
 }
 
 #inventory-view .inventory-product-thumb-wrap .inventory-product-thumb,
-#compras-view .inventory-product-thumb-wrap .inventory-product-thumb {
+#compras-view .inventory-product-thumb-wrap .inventory-product-thumb,
+#mermas-view .inventory-product-thumb-wrap .inventory-product-thumb {
     position: absolute;
     inset: 0;
 }
 
 #inventory-view .inventory-product-thumb-fallback,
-#compras-view .inventory-product-thumb-fallback {
+#compras-view .inventory-product-thumb-fallback,
+#mermas-view .inventory-product-thumb-fallback {
     display: none;
     width: 40px;
     height: 40px;
@@ -3105,31 +3120,37 @@ input[type="password"]::-ms-clear {
 
 /* Se muestra el placeholder si la imagen falla al cargar. */
 #inventory-view .inventory-product-thumb-wrap.is-placeholder .inventory-product-thumb-fallback,
-#compras-view .inventory-product-thumb-wrap.is-placeholder .inventory-product-thumb-fallback {
+#compras-view .inventory-product-thumb-wrap.is-placeholder .inventory-product-thumb-fallback,
+#mermas-view .inventory-product-thumb-wrap.is-placeholder .inventory-product-thumb-fallback {
     display: inline-flex;
 }
 
 /* Affordance de zoom: la miniatura con imagen real invita a ampliarla. */
 #inventory-view .inventory-product-thumb-wrap[data-zoom-src],
-#compras-view .inventory-product-thumb-wrap[data-zoom-src] {
+#compras-view .inventory-product-thumb-wrap[data-zoom-src],
+#mermas-view .inventory-product-thumb-wrap[data-zoom-src] {
     cursor: zoom-in;
 }
 
 #inventory-view .inventory-product-thumb-wrap[data-zoom-src] .inventory-product-thumb,
-#compras-view .inventory-product-thumb-wrap[data-zoom-src] .inventory-product-thumb {
+#compras-view .inventory-product-thumb-wrap[data-zoom-src] .inventory-product-thumb,
+#mermas-view .inventory-product-thumb-wrap[data-zoom-src] .inventory-product-thumb {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 #inventory-view .inventory-product-thumb-wrap[data-zoom-src]:hover .inventory-product-thumb,
 #inventory-view .inventory-product-thumb-wrap[data-zoom-src]:focus-visible .inventory-product-thumb,
 #compras-view .inventory-product-thumb-wrap[data-zoom-src]:hover .inventory-product-thumb,
-#compras-view .inventory-product-thumb-wrap[data-zoom-src]:focus-visible .inventory-product-thumb {
+#compras-view .inventory-product-thumb-wrap[data-zoom-src]:focus-visible .inventory-product-thumb,
+#mermas-view .inventory-product-thumb-wrap[data-zoom-src]:hover .inventory-product-thumb,
+#mermas-view .inventory-product-thumb-wrap[data-zoom-src]:focus-visible .inventory-product-thumb {
     border-color: var(--color-teal);
     box-shadow: 0 0 0 3px var(--color-teal-light);
 }
 
 #inventory-view .inventory-product-thumb-wrap:focus-visible,
-#compras-view .inventory-product-thumb-wrap:focus-visible {
+#compras-view .inventory-product-thumb-wrap:focus-visible,
+#mermas-view .inventory-product-thumb-wrap:focus-visible {
     outline: none;
     border-radius: 10px;
 }
@@ -3537,7 +3558,7 @@ input[type="password"]::-ms-clear {
 
 /* ---------------------------------------------------------------------------
    4) MINIATURA DEL PRODUCTO · 40x40 px CON EFECTO ZOOM (LUPA) AL HOVER
-   Si no hay imagen se muestra el ícono de caja 📦 solicitado.
+   Si no hay imagen se muestra el ícono de caja bi-box-seam.
 --------------------------------------------------------------------------- */
 #catalog-view .catalog-product-cell {
     min-width: 0;
@@ -4003,6 +4024,102 @@ input[type="password"]::-ms-clear {
 #product-modal .product-attribute-hint {
     margin-top: 0.3rem;
     font-size: 0.75rem;
+}
+
+/* Modal: Copiar de Producto Existente */
+.copy-product-list-container {
+    max-height: 440px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.copy-product-list-container::-webkit-scrollbar {
+    width: 6px;
+}
+.copy-product-list-container::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 4px;
+}
+.copy-product-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1.15rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.18s ease-in-out;
+}
+.copy-product-item:hover, .copy-product-item:focus {
+    background-color: #f0fdfa;
+    border-color: var(--color-teal, #0d9488);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(13, 148, 136, 0.12);
+    outline: none;
+}
+.copy-product-item-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 1.5rem;
+}
+.copy-product-item-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.2rem;
+    line-height: 1.3;
+}
+.copy-product-item-meta {
+    font-size: 0.85rem;
+    color: #64748b;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+}
+.copy-product-item-badge {
+    background-color: #e2e8f0;
+    color: #334155;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.copy-product-item-action {
+    flex-shrink: 0;
+}
+[data-bs-theme="dark"] .copy-product-item {
+    background: #1e293b;
+    border-color: #334155;
+}
+[data-bs-theme="dark"] .copy-product-item:hover,
+[data-bs-theme="dark"] .copy-product-item:focus {
+    background: #0f2e2d;
+    border-color: var(--color-teal, #0d9488);
+}
+[data-bs-theme="dark"] .copy-product-item-name {
+    color: #f1f5f9;
+}
+[data-bs-theme="dark"] .copy-product-item-meta {
+    color: #94a3b8;
+}
+[data-bs-theme="dark"] .copy-product-item-thumb {
+    background: #0f172a;
+    border-color: #334155;
+}
+[data-bs-theme="dark"] .copy-product-item-badge {
+    background-color: #334155;
+    color: #cbd5e1;
 }
 
 /* Dropzone de imagen ------------------------------------------------------- */
@@ -4729,13 +4846,13 @@ input[type="password"]::-ms-clear {
 #mermas-view .mermas-table > thead > tr > th:first-child,
 #mermas-view .mermas-table > .thead-users > tr > th:first-child {
     border-top-left-radius: 0.5rem;
-    border-bottom-left-radius: 0.5rem;
+    border-bottom-left-radius: 0;
 }
 
 #mermas-view .mermas-table > thead > tr > th:last-child,
 #mermas-view .mermas-table > .thead-users > tr > th:last-child {
     border-top-right-radius: 0.5rem;
-    border-bottom-right-radius: 0.5rem;
+    border-bottom-right-radius: 0;
 }
 
 #mermas-view .mermas-table th span,
@@ -6230,26 +6347,59 @@ input[type="password"]::-ms-clear {
 }
 
 /* Tablas de Datos */
+[data-theme="dark"] table,
 [data-theme="dark"] .table,
+[data-bs-theme="dark"] table,
 [data-bs-theme="dark"] .table {
     color: var(--theme-text-main) !important;
-    --bs-table-bg: transparent;
-    --bs-table-striped-bg: rgba(255, 255, 255, 0.02);
-    --bs-table-hover-bg: var(--theme-table-hover);
+    --bs-table-bg: transparent !important;
+    --bs-table-color: var(--theme-text-main) !important;
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.02) !important;
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.05) !important;
     border-color: var(--theme-border) !important;
 }
 
+[data-theme="dark"] table tbody tr,
+[data-theme="dark"] .table tbody tr,
+[data-bs-theme="dark"] table tbody tr,
+[data-bs-theme="dark"] .table tbody tr {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] table tbody td,
+[data-theme="dark"] .table tbody td,
 [data-theme="dark"] .table > :not(caption) > * > *,
+[data-bs-theme="dark"] table tbody td,
+[data-bs-theme="dark"] .table tbody td,
 [data-bs-theme="dark"] .table > :not(caption) > * > * {
     background-color: transparent !important;
+    background: transparent !important;
     color: var(--theme-text-main) !important;
     border-bottom-color: var(--theme-border) !important;
 }
 
+[data-theme="dark"] table tbody tr:hover,
+[data-theme="dark"] .table tbody tr:hover,
+[data-theme="dark"] .table-hover > tbody > tr:hover,
 [data-theme="dark"] .table-hover > tbody > tr:hover > *,
+[data-bs-theme="dark"] table tbody tr:hover,
+[data-bs-theme="dark"] .table tbody tr:hover,
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover,
 [data-bs-theme="dark"] .table-hover > tbody > tr:hover > * {
-    background-color: var(--theme-table-hover) !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
     color: var(--theme-text-main) !important;
+}
+
+/* Modales con tablas */
+[data-theme="dark"] .modal table,
+[data-bs-theme="dark"] .modal table,
+[data-theme="dark"] #pos-history-modal #pos-history-table,
+[data-bs-theme="dark"] #pos-history-modal #pos-history-table {
+    background-color: transparent !important;
+    background: transparent !important;
 }
 
 /* PROTECCIÓN DE COLOR CORPORATIVO: Los encabezados verde esmeralda permanecen intactos */
@@ -6348,6 +6498,172 @@ input[type="password"]::-ms-clear {
 [data-bs-theme="dark"] .list-group-item {
     background-color: var(--theme-bg-card) !important;
     border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+}
+
+/* Tarjetas de Encabezado y Pie */
+[data-theme="dark"] .card-header,
+[data-theme="dark"] .card-footer,
+[data-bs-theme="dark"] .card-header,
+[data-bs-theme="dark"] .card-footer {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+}
+
+/* Paginación en Modo Oscuro */
+[data-theme="dark"] .pagination .page-link,
+[data-bs-theme="dark"] .pagination .page-link {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] .pagination .page-item.active .page-link,
+[data-bs-theme="dark"] .pagination .page-item.active .page-link {
+    background-color: var(--color-teal) !important;
+    border-color: var(--color-teal) !important;
+    color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .pagination .page-item.disabled .page-link,
+[data-bs-theme="dark"] .pagination .page-item.disabled .page-link {
+    background-color: var(--theme-bg-body) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .pagination .page-link:hover,
+[data-bs-theme="dark"] .pagination .page-link:hover {
+    background-color: var(--theme-bg-subtle) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--color-celeste) !important;
+}
+
+/* Tarjetas KPI de Mermas */
+[data-theme="dark"] .merma-kpi-card,
+[data-bs-theme="dark"] .merma-kpi-card {
+    background: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+}
+
+/* Miniaturas de Producto y Placeholders en Modo Oscuro */
+[data-theme="dark"] .inventory-product-thumb--placeholder,
+[data-theme="dark"] .inventory-product-thumb-fallback,
+[data-bs-theme="dark"] .inventory-product-thumb--placeholder,
+[data-bs-theme="dark"] .inventory-product-thumb-fallback {
+    background-color: var(--theme-bg-input) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-muted) !important;
+}
+
+[data-theme="dark"] .inventory-product-thumb,
+[data-bs-theme="dark"] .inventory-product-thumb {
+    background-color: var(--theme-bg-input) !important;
+}
+
+/* Colores de Acento y Badges Teal */
+[data-theme="dark"] .text-teal,
+[data-bs-theme="dark"] .text-teal {
+    color: #14b8a6 !important;
+}
+
+.bg-teal-subtle {
+    background-color: var(--color-teal-light, #e6f4f4) !important;
+    color: var(--color-teal-dark, #0a5c5e) !important;
+}
+
+[data-theme="dark"] .bg-teal-subtle,
+[data-bs-theme="dark"] .bg-teal-subtle {
+    background-color: rgba(13, 115, 119, 0.25) !important;
+    color: #5eead4 !important;
+}
+
+/* Módulo de Reportes en Modo Oscuro */
+[data-theme="dark"] #reportes-view .reportes-rank-title,
+[data-bs-theme="dark"] #reportes-view .reportes-rank-title {
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] #reportes-view .reportes-rank-select,
+[data-theme="dark"] #reportes-view .reportes-rank-limit,
+[data-bs-theme="dark"] #reportes-view .reportes-rank-select,
+[data-bs-theme="dark"] #reportes-view .reportes-rank-limit {
+    background-color: var(--theme-bg-input) !important;
+    color: var(--theme-text-main) !important;
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] #reportes-view .reportes-rank-item,
+[data-bs-theme="dark"] #reportes-view .reportes-rank-item {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] #reportes-view .reportes-rank-name,
+[data-bs-theme="dark"] #reportes-view .reportes-rank-name {
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] #reportes-view .reportes-rank-list,
+[data-bs-theme="dark"] #reportes-view .reportes-rank-list {
+    scrollbar-color: var(--theme-border) transparent;
+}
+
+[data-theme="dark"] #reportes-view .reportes-rank-list::-webkit-scrollbar-thumb,
+[data-bs-theme="dark"] #reportes-view .reportes-rank-list::-webkit-scrollbar-thumb {
+    background-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .reportes-quick-filters .btn,
+[data-bs-theme="dark"] .reportes-quick-filters .btn {
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text-secondary) !important;
+    background-color: transparent !important;
+}
+
+[data-theme="dark"] .reportes-quick-filters .btn:hover,
+[data-bs-theme="dark"] .reportes-quick-filters .btn:hover {
+    background-color: var(--theme-bg-subtle) !important;
+    color: #FFFFFF !important;
+    border-color: var(--color-teal) !important;
+}
+
+[data-theme="dark"] .reportes-quick-filters .btn.active,
+[data-bs-theme="dark"] .reportes-quick-filters .btn.active {
+    background-color: var(--color-teal) !important;
+    color: #FFFFFF !important;
+    border-color: var(--color-teal) !important;
+}
+
+[data-theme="dark"] .reportes-rank-pill,
+[data-bs-theme="dark"] .reportes-rank-pill {
+    background-color: var(--theme-bg-input) !important;
+    color: var(--theme-text-muted) !important;
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] .reportes-rank-pill:hover,
+[data-bs-theme="dark"] .reportes-rank-pill:hover {
+    background-color: var(--theme-bg-subtle) !important;
+    color: var(--theme-text-main) !important;
+}
+
+[data-theme="dark"] .reportes-rank-pill.active,
+[data-bs-theme="dark"] .reportes-rank-pill.active {
+    background-color: var(--color-teal-dark) !important;
+    color: #FFFFFF !important;
+    border-color: var(--color-teal) !important;
+}
+
+[data-theme="dark"] #reportes-view .reportes-export-menu,
+[data-bs-theme="dark"] #reportes-view .reportes-export-menu {
+    background-color: var(--theme-bg-card) !important;
+    border-color: var(--theme-border) !important;
+}
+
+[data-theme="dark"] #reportes-view .reportes-export-menu .dropdown-item,
+[data-bs-theme="dark"] #reportes-view .reportes-export-menu .dropdown-item {
     color: var(--theme-text-main) !important;
 }
 
