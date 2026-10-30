@@ -1,182 +1,204 @@
 # Tienda el Regalito POS — Documentación General
 
-## 1. Arquitectura
+Sistema POS empresarial y de gestión integral para **Curiosidades El Regalito** (Panajachel, Sololá, Guatemala). Diseñado para operar de forma 100% local, robusta y con alta tolerancia a fallos, utilizando PostgreSQL 15 en Docker, API REST con FastAPI (Python 3.13) y Frontend web accesible y optimizado (Bootstrap 5 sin necesidad de compilación o build steps).
 
-Aplicación web **POS (Punto de Venta)** con arquitectura de **backend por capas** y **frontend estático** servido por el propio backend.
+---
+
+## 1. Arquitectura del Sistema
+
+El sistema implementa una arquitectura monolítica modular en contenedores Docker:
+- **Frontend Web**: HTML5, CSS3 y JavaScript moderno modular, servido a través de **Nginx** en el puerto de producción `9090` (o directamente por FastAPI en desarrollo).
+- **Backend API**: **FastAPI** asíncrono con arquitectura por capas (Controllers, Services, Repositories, Interfaces, DTOs con Pydantic v2).
+- **Base de Datos**: **PostgreSQL 15** con 48 tablas relacionales en español y migraciones versionadas con **Alembic**.
 
 ```
 Sistema_Regalito/
-├── backend/                 # API REST (FastAPI, Python)
-│   └── app/
-│       ├── main.py          # Punto de entrada + handlers de error globales
-│       ├── api/             # CAPA CONTROLLERS (routers FastAPI, delgados, sin try/except)
-│       │   ├── auth.py          # Login (JWT)
-│       │   ├── cash_register.py # Apertura/cierre de caja
-│       │   ├── categories.py    # CRUD Categorías
-│       │   ├── products.py      # CRUD + filtros Productos
-│       │   ├── roles.py         # CRUD Roles
-│       │   ├── departments.py   # CRUD Departamentos
-│       │   ├── users.py         # CRUD + filtros Usuarios
-│       │   └── deps.py          # DI + patrón Unit of Work (UoW)
-│       ├── services/        # CAPA SERVICIOS (lógica de negocio)
-│       │   ├── category_service.py
-│       │   ├── product_service.py
-│       │   ├── role_service.py
-│       │   ├── department_service.py
-│       │   └── user_service.py
-│       ├── repositories/    # CAPA REPOSITORIOS (acceso a datos async)
-│       │   ├── category_repository.py
-│       │   ├── product_repository.py
-│       │   ├── role_repository.py
-│       │   ├── department_repository.py
-│       │   └── user_repository.py
-│       ├── interfaces/      # CAPA CONTRATOS (ABC: repositorios y servicios)
-│       │   ├── repositories.py
-│       │   └── services.py
-│       ├── db/              # CAPA MODELOS/ENTIDADES + configuración BD
-│       │   ├── database.py  # Motor async + get_db (DI)
-│       │   └── models.py    # Entidades SQLAlchemy
-│       ├── schemas/         # CAPA DTOs (Pydantic v2)
-│       │   └── schemas.py
-│       └── core/            # Configuración y seguridad
-│           ├── config.py
-│           └── security.py
-│   ├── alembic/             # Migraciones versionadas (Alembic)
-│   └── tests/               # Pruebas unitarias (pytest + aiosqlite)
-├── database/init.sql        # Esquema y datos iniciales (PostgreSQL, solo volumen nuevo)
-├── frontend/                # HTML/CSS/JS estáticos (incluye módulo Usuarios)
-└── documentacion/           # Documentación del proyecto
+├── backend/                     # API REST (FastAPI, Python 3.13)
+│   ├── alembic/                 # Migraciones versionadas (0001 a 0016)
+│   ├── app/
+│   │   ├── main.py              # Inicializador FastAPI, CORS y montaje de rutas
+│   │   ├── api/                 # Capa Controladores (Routers HTTP)
+│   │   │   ├── auth.py          # Autenticación OAuth2 y JWT
+│   │   │   ├── bitacora.py      # Auditoría de eventos
+│   │   │   ├── caja.py / cash_register.py # Apertura, movimientos y arqueo ciego
+│   │   │   ├── catalogos.py     # Categorías, subcategorías, unidades, sucursales
+│   │   │   ├── catalogos_generales.py # Proveedores, motivos merma, métodos pago
+│   │   │   ├── clientes.py      # Gestión de clientes y contactos
+│   │   │   ├── compras.py       # Ingreso directo de mercadería y órdenes
+│   │   │   ├── configuracion.py # Parámetros del sistema
+│   │   │   ├── dashboard.py     # KPIs y métricas operativas del día
+│   │   │   ├── facturacion.py   # Emisión y certificación FEL
+│   │   │   ├── health.py        # Healthcheck de API y Base de Datos
+│   │   │   ├── historial_precios.py # Registro histórico de cambios de precio
+│   │   │   ├── inventory.py     # Existencias, ajustes y alertas de stock
+│   │   │   ├── mermas.py        # Registro de productos dañados / merma
+│   │   │   ├── products.py      # Catálogo de productos y variantes
+│   │   │   ├── reportes.py      # Reportes contables, ventas y exportación
+│   │   │   ├── roles.py         # Roles y matriz de permisos
+│   │   │   ├── sales.py         # Punto de venta (POS) y transacciones
+│   │   │   ├── tipos_cliente.py # Clasificación de clientes
+│   │   │   ├── traslados.py     # Movimientos entre bodegas/sucursales
+│   │   │   ├── users.py         # Usuarios y personal
+│   │   │   ├── visitas.py       # Visitas de supervisión
+│   │   │   └── deps.py          # Inyección de dependencias (DI)
+│   │   ├── services/            # Capa de Lógica de Negocio
+│   │   ├── repositories/        # Capa de Acceso a Datos (SQLAlchemy Async)
+│   │   ├── interfaces/          # Contratos abstractos (ABC)
+│   │   ├── schemas/             # DTOs y validaciones (Pydantic v2)
+│   │   ├── db/                  # Motor asíncrono y modelos ORM
+│   │   └── core/                # Seguridad, configuración y tokens
+│   ├── scripts/                 # Scripts auxiliares de mantenimiento
+│   ├── auto_migrate.py          # Script de auto-migración al iniciar contenedor
+│   └── requirements.txt         # Dependencias Python
+├── database/
+│   └── init.sql                 # Esquema DDL inicial y datos semilla completos
+├── documentacion/               # Manuales y registro de cambios
+├── frontend/                    # Interfaz de usuario (HTML/CSS/JS)
+│   ├── css/style.css            # Estilos globales y tokens corporativos
+│   ├── js/                      # Controladores modulares de interfaz
+│   ├── index.html               # Aplicación SPA principal
+│   └── cliente.html             # Pantalla secundaria para el cliente (POS)
+├── respaldos/                   # Copias de seguridad de la base de datos
+├── docker-compose.prod.yml      # Orquestación de producción (Nginx, Backend, DB)
+├── docker-compose.yml           # Orquestación de desarrollo
+└── nginx.conf                   # Configuración del servidor web proxy inverso
 ```
 
-## 1.1 Facturación Electrónica FEL
+---
 
-El módulo FEL implementa la emisión de facturas electrónicas (SDD `specs/emision_factura_fel.feature`):
+## 2. Tecnologías y Entorno de Ejecución
 
-- **Capa DERCAS**: `app/schemas/fel_schema.py` (DTOs), `app/repositories/fel_repository.py`, `app/services/fel_service.py`, `app/api/facturacion.py`.
-- **Reglas de negocio SAT**:
-  - Totales Q0.00 o negativos se bloquean antes de contactar al certificador (HTTP 400).
-  - NIT "CF" (Consumidor Final) prohibido en ventas > Q2,500.00 (Decreto 7-2019/SAT).
-- **Comunicación**: `httpx.AsyncClient` (asíncrono, timeout configurable) contra `FEL_API_URL`.
-- **Contingencia**: ante timeout/caída de red/5xx (o sin URL configurada), la venta NO se revierte y `factura_fel.estado = 'Contingencia'` (los campos del DTE quedan NULL hasta certificar). Reintento vía `POST /api/facturacion/reintentar/{id_venta}`.
-- **Rechazo fiscal** (400/422 del certificador): HTTP 400; al integrarse en `sale_service` vía UnitOfWork la venta y el descuento de inventario se revierten (rollback).
-- **Integración con ventas**: `sale_service.registrar_venta` descarga stock, crea la venta y (si `FEL_ENABLED` y hay datos de receptor) llama a `emitir_factura` en la misma transacción UoW; un solo `commit`.
+| Componente | Tecnología | Rol / Versión |
+|---|---|---|
+| **Backend** | Python 3.13 + FastAPI | Framework asíncrono de alto rendimiento |
+| **Servidor ASGI** | Uvicorn | Ejecución asíncrona del backend |
+| **Base de Datos** | PostgreSQL 15 | Base de datos relacional ACID |
+| **Driver BD** | asyncpg + SQLAlchemy 2.x | Conexión y ORM asíncrono |
+| **Migraciones** | Alembic | Control de versiones del esquema DDL |
+| **Frontend** | HTML5, CSS3, JavaScript ES6+ | Sin frameworks pesados ni compilación |
+| **Estilos UI** | Bootstrap 5.3 + Bootstrap Icons | Diseño limpio, industrial y responsivo |
+| **Proxy / Web Server** | Nginx Alpine | Servidor web estático y reverse proxy |
+| **Contenedores** | Docker & Docker Compose | Aislamiento y portabilidad completa |
 
-### Configuración FEL (`.env`)
-```
-FEL_ENABLED=true
-FEL_API_URL=https://...            # URL del certificador SAT (vacío = offline/contingencia)
-FEL_API_KEY=...
-FEL_TIMEOUT=15
-FEL_SERIE=FEL
-FEL_EMISOR_NIT=
-FEL_EMISOR_NOMBRE=
-```
+---
 
-## 2. Tecnologías detectadas
+## 3. Puertos y Direcciones de Red
 
-| Capa | Tecnología |
-|------|-----------|
-| Lenguaje | Python 3.13 |
-| Framework backend | FastAPI + Uvicorn |
-| Base de datos | PostgreSQL 15 (Docker, puerto 5433) |
-| ORM | SQLAlchemy 2.x (asíncrono, `asyncpg`) |
-| Migraciones | Alembic |
-| Validación / DTOs | Pydantic v2 (`ConfigDict`, `from_attributes`) |
-| Autenticación | JWT (`python-jose`) + OAuth2 + `passlib`/`bcrypt` (fijar `bcrypt==4.0.1`) |
-| Configuración | `pydantic-settings` |
-| Pruebas | `pytest` + `pytest-asyncio` + `aiosqlite` |
+| Servicio | Puerto en Host | Puerto Interno | Descripción |
+|---|---|---|---|
+| **Frontend (Nginx)** | `9090` | `80` | URL principal de la tienda: `http://localhost:9090/` |
+| **Backend API** | `8000` | `8000` | API FastAPI directa (desarrollo): `http://localhost:8000/` |
+| **PostgreSQL** | `5433` (dev) / `5432` | `5432` | Base de datos relacional de la tienda |
 
-## 3. Arquitectura por capas (reglas)
+---
 
-- **Controllers (`app/api/`)**: solo reciben la petición, llaman a la interfaz del servicio y devuelven JSON con el código HTTP correcto (200, 201, 400, 404, 500). **Cero lógica y cero try/except**.
-- **Services (`app/services/`)**: contienen todas las validaciones y reglas de negocio.
-- **Repositories (`app/repositories/`)**: único punto de acceso a datos. Acceso asíncrono (`async/await`). Uso de SQLAlchemy `select()` (seguro contra inyección SQL, sin string concatenado).
-- **Interfaces (`app/interfaces/`)**: contratos `ABC` de servicios y repositorios.
-- **DTOs (`app/schemas/`)**: los modelos de BD nunca se exponen directamente al cliente.
-- **Inyección de dependencias + Unit of Work (UoW)**: en `app/api/deps.py`. El `UnitOfWork` agrupa la transacción y expone los repositorios del módulo de Usuarios. Los repositorios de Roles/Departamentos/Usuarios NO hacen commit: el UoW decide `commit()`/`rollback()`.
-- **Manejo de errores global**: handlers de `HTTPException` y `Exception` (500) registrados en `main.py`. Los controladores no manejan errores.
+## 4. Esquema de Base de Datos (48 Tablas en Español)
 
-## 4. Reglas de negocio
+El modelo de datos está completamente normalizado y en idioma español para facilitar la auditoría y mantenimiento contable:
 
-- **Cero datos quemados**: los dropdowns de Rol y Departamento se llenan desde la BD. Al crear/editar un usuario, el rol y el departamento se validan contra la base de datos (deben existir y estar activos).
-- **Eliminación lógica (Soft Delete)**: no se ejecuta `DELETE`. Se usa el campo booleano `is_active` (`true`/`false`) en todas las entidades.
-- **Filtros inteligentes**:
-  - Productos (`GET /api/productos`): `name`, `sku`, `barcode`, `is_active`, `category_id`, `created_from`, `created_to`, `limit`, `offset`.
-  - Usuarios (`GET /api/usuarios`): `name`, `lastname`, `code`, `is_active`, `role_id`, `department_id`, `created_from`, `created_to`, `limit`, `offset`.
-- **Unicidad**: `name` de categorías/roles/departamentos; `sku` y `barcode` de productos; `code`, `username` de usuarios.
+### 4.1 Ventas y Facturación
+- `venta`: Encabezado de transacciones de venta (fecha, total, cliente, turno).
+- `detalle_venta`: Artículos vendidos, cantidades, precios unitarios y subtotales.
+- `pago_venta`: Desglose de pagos recibidos (efectivo, tarjeta, transferencia).
+- `factura_fel`: Comprobantes tributarios electrónicos emitidos ante la SAT.
 
-### Frontend — Módulo de Usuarios (estándar empresarial)
-El formulario se muestra en un **modal de Bootstrap** (`#user-modal`). `frontend/js/users.js` implementa:
-- **Validación visual inline**: los errores **422** se muestran debajo de cada campo (`.invalid-feedback`) con traducción al español (`translateValidation`); los **400** y errores generales en `#user-form-alert`.
-- **Errores 422**: `renderFieldErrors()` recorre `errorData.detail`, extrae el campo con `err.loc[err.loc.length - 1]`, agrega `is-invalid` y coloca `err.msg` traducido en su `.invalid-feedback`.
-- **Notificaciones Toast** (`showToast`): reemplazan todo `alert()` de éxito/error; **confirmación no nativa** (`confirmModal`) reemplaza `confirm()`.
-- **Micro-interacciones**: limpieza de errores en tiempo real (`input`/`change`), envío con **Enter**, autofocus en el primer campo y **reseteo impecable** al cerrar el modal (`hidden.bs.modal` → `resetUserForm()`).
-- **Defensivo**: `.trim()` en campos de texto y **bloqueo del botón Guardar** con spinner (`setSaving`) para evitar dobles clics.
-- **Estado vacío**: `#users-empty` muestra "No hay usuarios registrados" cuando la tabla está vacía.
-- IDs de los campos alineados a Pydantic (`name`, `lastname`, `code`, `username`, `password`, `role_id`, `department_id`, `is_active`); `role_id`/`department_id` se envían como enteros (`parseInt(..., 10)`); en edición se excluye `password` si va vacío.
+### 4.2 Control de Caja y Turnos
+- `caja`: Puntos de cobro físicos de la tienda.
+- `turno_caja`: Turnos de trabajo asignados a cajeros (aperturas y cierres).
+- `movimiento_caja`: Entradas y salidas manuales de efectivo durante el turno.
+- `cierre_caja_ciegas`: Arqueo ciego de efectivo al finalizar la jornada.
+- `detalle_arqueo_efectivo`: Desglose por denominación de billetes y monedas.
+- `denominacion_efectivo`: Catálogo oficial de billetes y monedas en Quetzales.
+- `tipo_movimiento_caja`: Clasificación de ingresos y egresos de caja.
 
-## 5. Base de datos
+### 4.3 Inventario y Bodega
+- `producto`: Maestro de productos.
+- `variante_producto`: Códigos de barra, presentaciones y costos.
+- `inventario_sucursal`: Existencias físicas por sucursal y bodega.
+- `area_bodega`: Ubicaciones físicas dentro de la tienda (mostrador, estantes, bodega).
+- `alerta_stock`: Notificaciones automáticas de stock mínimo o agotado.
+- `historial_precio`: Trazabilidad histórica de cambios en precios y costos.
+- `traslado_inventario`: Transferencia de mercadería entre áreas o sucursales.
 
-### Conexión
-Definida en `app/core/config.py` (variable `DATABASE_URL`, con `.env`). Por defecto:
+### 4.4 Compras y Abastecimiento
+- `compra`: Registro de compras e ingreso de mercadería a inventario.
+- `detalle_compra`: Desglose de productos ingresados, costos y cantidades.
+- `orden_compra`: Órdenes de abastecimiento y pedidos a proveedores.
+- `detalle_orden_compra`: Ítems asociados a la orden de compra.
+- `proveedor`: Directorio de proveedores y distribuidores comerciales.
 
-```
-postgresql://regalito_admin:Regalito_2026@localhost:5433/regalito_pos
-```
+### 4.5 Mermas y Desperdicios
+- `merma`: Registro de productos dañados, vencidos o averiados.
+- `detalle_merma`: Cantidades y productos específicos dados de baja.
+- `motivo_merma`: Catálogo de causales (vencimiento, daño físico, rotura).
 
-`app/db/database.py` convierte la URL a `postgresql+asyncpg://` y crea el motor asíncrono.
+### 4.6 Catálogos y Clasificación
+- `categoria`: Familias principales de artículos.
+- `subcategoria`: Subfamilias de clasificación de producto.
+- `unidad_medida`: Unidades comerciales (unidad, docena, fardo, caja).
+- `metodo_pago`: Medios de cobro aceptados (efectivo, tarjeta, transferencia).
+- `departamento_geografico`: Departamentos de Guatemala (Sololá, etc.).
+- `municipio`: Municipios de Guatemala (Panajachel, etc.).
+- `sucursal`: Sedes físicas del negocio.
 
-### Levantar la base de datos (Docker)
+### 4.7 Clientes y Relaciones Comerciales
+- `cliente`: Directorio de clientes con NIT o Consumidor Final.
+- `tipo_cliente`: Categorías de cliente (Mayorista, Minorista, Frecuente).
+- `cliente_contacto`: Canales de comunicación y teléfonos de clientes.
+- `visita_seguimiento`: Bitácora de supervisión y visitas de clientes mayoristas.
+- `visita_modulo_evaluacion`: Evaluaciones y calificaciones de visitas.
+
+### 4.8 Seguridad, Usuarios y Auditoría
+- `usuario`: Cuentas de personal administrativo y cajeros.
+- `rol`: Perfiles de acceso (Administrador, Cajero, Bodeguero).
+- `permiso`: Permisos atómicos del sistema.
+- `rol_permiso`: Asignación granular de permisos a perfiles.
+- `sesion_usuario`: Control de sesiones activas.
+- `intento_login`: Registro de seguridad y prevención de fuerza bruta.
+- `bitacora_auditoria`: Registro de auditoría inmutable de todas las acciones del sistema.
+- `parametro_sistema`: Configuración global de la aplicación.
+- `sync_cache_metadata` / `sync_queue`: Tablas inactivas preservadas para integridad de migraciones históricas.
+
+---
+
+## 5. Facturación Electrónica SAT (FEL)
+
+El módulo FEL emite Documentos Tributarios Electrónicos (DTE) válidos ante la SAT:
+- **Validaciones automáticas**:
+  - Ventas con monto Q0.00 o negativo son bloqueadas de inmediato.
+  - El NIT "CF" (Consumidor Final) se rechaza si la venta supera los Q2,500.00 (Decreto 7-2019 de la SAT).
+- **Mecanismo de contingencia**: Si el certificador SAT experimenta caídas o demoras, la venta no se detiene; se registra en estado `Contingencia` y permite su certificación posterior vía `POST /api/facturacion/reintentar/{id_venta}`.
+
+---
+
+## 6. Procedimiento de Inicio y Parada
+
+### 6.1 Iniciar el sistema en Producción (Docker)
 ```bash
-docker-compose up -d db
+docker compose -f docker-compose.prod.yml up -d
 ```
+Acceder a la aplicación en: `http://localhost:9090`
 
-### `init.sql` (solo volumen nuevo)
-Solo se ejecuta la primera vez que el volumen se crea. Contiene el esquema completo (incluye `roles`, `departments`, `users` normalizado, `categories`, `products`, `cash_registers`) y datos semilla.
-
-### Migraciones con Alembic (entornos con datos existentes)
-El esquema actualizado del Módulo de Usuarios se aplica de forma **aditiva** (preserva datos) con la migración `0001`:
-
+### 6.2 Ver estado de los contenedores
 ```bash
-# desde backend/
-alembic upgrade head
+docker ps
 ```
 
-> Si ya tenías un volumen con datos y no quieres migrar, puedes recrearlo: `docker-compose down -v && docker-compose up -d db` (pierde los datos).
-
-## 6. Ejecución del backend
-
+### 6.3 Ver registros en tiempo real
 ```bash
-pip install -r backend/requirements.txt
-uvicorn app.main:app --reload --port 8000   # desde backend/
+docker logs -f regalito_backend_prod
 ```
 
-Swagger/OpenAPI disponible en `http://localhost:8000/docs`.
-
-## 7. Pruebas
-
+### 6.4 Detener el sistema
 ```bash
-# desde backend/
-python -m pytest -q
+docker compose -f docker-compose.prod.yml down
 ```
 
-Las pruebas usan SQLite en memoria (`aiosqlite`), no requieren PostgreSQL. Cubren la capa de servicios (Categorías, Productos, Roles, Departamentos, Usuarios).
+---
 
-## 8. Endpoints principales
+## 7. Pruebas y Verificación Automatizada
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| POST | `/api/auth/login` | Autenticación (token JWT) |
-| GET/POST | `/api/categorias` | Listar / crear categorías |
-| GET/PUT/DELETE | `/api/categorias/{id}` | Obtener / editar / desactivar categoría |
-| GET/POST | `/api/productos` | Listar (con filtros) / crear producto |
-| GET/PUT/DELETE | `/api/productos/{id}` | Obtener / editar / desactivar producto |
-| GET | `/api/productos/barcode/{barcode}` | Buscar producto por código de barras |
-| GET/POST | `/api/roles` | Listar / crear roles |
-| GET/PUT/DELETE | `/api/roles/{id}` | Obtener / editar / desactivar rol |
-| GET/POST | `/api/departamentos` | Listar / crear departamentos |
-| GET/PUT/DELETE | `/api/departamentos/{id}` | Obtener / editar / desactivar departamento |
-| GET/POST | `/api/usuarios` | Listar (con filtros) / crear usuario |
-| GET/PUT/DELETE | `/api/usuarios/{id}` | Obtener / editar / desactivar usuario |
-| POST | `/api/caja/apertura` | Abrir caja |
-| POST | `/api/caja/cierre-ciegas` | Cerrar caja |
+El proyecto cuenta con scripts de validación con **Playwright Chromium**:
+- Pruebas E2E de flujos de venta en POS.
+- Comprobación de apertura y cierre de caja con arqueo ciego.
+- Verificación de estandarización de interfaz y cabeceras de tabla sin emojis.

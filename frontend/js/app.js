@@ -106,12 +106,13 @@ window.renderSkeletonCard = function(lines = 3) {
 // ---------------------------------------------------------------------------
 
 window.getUserRole = function() {
-    return localStorage.getItem('user_role') || '';
+    return sessionStorage.getItem('user_role') || localStorage.getItem('user_role') || '';
 };
 
 window.getUserPermissions = function() {
     try {
-        return JSON.parse(localStorage.getItem('user_permissions') || '[]');
+        const raw = sessionStorage.getItem('user_permissions') || localStorage.getItem('user_permissions') || '[]';
+        return JSON.parse(raw);
     } catch (e) {
         return [];
     }
@@ -128,18 +129,23 @@ window.isAdmin = function() {
     return window.getUserRole() === 'Administradora';
 };
 
+window.getToken = function() {
+    return sessionStorage.getItem('jwt_token') || localStorage.getItem('jwt_token') || '';
+};
+
 // ---------------------------------------------------------------------------
 // Auth Guard: control de acceso y redirección
 // ---------------------------------------------------------------------------
 
 function hasActiveSession() {
-    return !!localStorage.getItem('jwt_token');
+    return !!sessionStorage.getItem('jwt_token');
 }
 
 // Limpia completamente la sesión local y muestra la pantalla de Login sin residuos.
 async function showLogin() {
     // Si tenemos un token, intentamos hacer logout en el backend para limpiar la cookie
-    if (localStorage.getItem('jwt_token')) {
+    const token = sessionStorage.getItem('jwt_token') || localStorage.getItem('jwt_token');
+    if (token) {
         try {
             await nativeFetch(`${API_URL}/auth/logout`, { method: 'POST' });
         } catch (e) {
@@ -152,9 +158,17 @@ async function showLogin() {
         healthCheckInterval = null;
     }
 
-    // 1. Limpieza total de almacenamiento
+    // 1. Limpieza de almacenamiento de sesión (preservando preferencias de UI y usuario recordado)
+    const rememberedUser = localStorage.getItem('remember_user');
+    const savedTheme = localStorage.getItem('themePreference');
+    const savedSidebar = localStorage.getItem('sidebarCollapsed');
+
     localStorage.clear();
     sessionStorage.clear();
+
+    if (rememberedUser) localStorage.setItem('remember_user', rememberedUser);
+    if (savedTheme) localStorage.setItem('themePreference', savedTheme);
+    if (savedSidebar) localStorage.setItem('sidebarCollapsed', savedSidebar);
 
     // 2. Limpieza de estado en memoria y sanitización de URL sin recarga
     currentView = null;
@@ -162,15 +176,26 @@ async function showLogin() {
         history.replaceState(null, '', window.location.pathname + window.location.search);
     }
 
-    // 3. Limpieza de formularios de autenticación
+    // 3. Limpieza y preparación de formularios de autenticación
     const loginUser = document.getElementById('login-user');
     const loginPass = document.getElementById('login-pass');
     const loginError = document.getElementById('login-error');
-    if (loginUser) loginUser.value = '';
+    const rememberMe = document.getElementById('remember-me');
+
     if (loginPass) loginPass.value = '';
     if (loginError) {
         loginError.textContent = '';
         loginError.classList.add('d-none');
+    }
+
+    if (loginUser && rememberedUser) {
+        loginUser.value = rememberedUser;
+        if (rememberMe) rememberMe.checked = true;
+        if (loginPass) setTimeout(() => loginPass.focus(), 150);
+    } else {
+        if (loginUser) loginUser.value = '';
+        if (rememberMe) rememberMe.checked = false;
+        if (loginUser) setTimeout(() => loginUser.focus(), 150);
     }
 
     // 4. Limpieza de datos visuales de usuario
@@ -235,6 +260,7 @@ window.fetch = async function (...args) {
                 const refreshRes = await nativeFetch(`${API_URL}/auth/refresh`, { method: 'POST' });
                 if (refreshRes.ok) {
                     const data = await refreshRes.json();
+                    sessionStorage.setItem('jwt_token', data.access_token);
                     localStorage.setItem('jwt_token', data.access_token);
                     isRefreshing = false;
                     onRefreshed(data.access_token);
@@ -283,9 +309,9 @@ window.fetch = async function (...args) {
 
 // Actualiza el nombre visible y badge de rol en el header y sidebar
 function updateUserInfoUI() {
-    const rawUser = localStorage.getItem('user_name') || '';
-    const role = localStorage.getItem('user_role') || '';
-    let displayName = localStorage.getItem('user_display_name');
+    const rawUser = sessionStorage.getItem('user_name') || localStorage.getItem('user_name') || '';
+    const role = sessionStorage.getItem('user_role') || localStorage.getItem('user_role') || '';
+    let displayName = sessionStorage.getItem('user_display_name') || localStorage.getItem('user_display_name');
 
     if (rawUser.toLowerCase() === 'admin' || role === 'Administradora' || !displayName || displayName.toLowerCase() === 'admin') {
         displayName = 'Administrador';
@@ -315,17 +341,17 @@ function applyRoleRestrictions() {
 
     const moduleAllowed = {
         pos: isUserAdmin || window.hasPermission('VENTA_COBRAR'),
-        inventory: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
+        inventory: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA') || window.hasPermission('VENTA_COBRAR'),
         compras: isUserAdmin || window.hasPermission('COMPRA_EMITIR_ORDEN') || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         mermas: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         traslados: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         visitas: isUserAdmin || window.hasPermission('VISITA_REGISTRAR'),
-        cash: isUserAdmin || role === 'Cajero',
-        caja: isUserAdmin || role === 'Cajero',
+        cash: isUserAdmin || role === 'Cajero' || window.hasPermission('CAJA_CIERRE_CIEGAS'),
+        caja: isUserAdmin || role === 'Cajero' || window.hasPermission('CAJA_CIERRE_CIEGAS'),
         users: isUserAdmin,
         roles: isUserAdmin,
         clients: isUserAdmin || window.hasPermission('CLIENTE_ADMIN'),
-        catalog: isUserAdmin || role === 'Bodeguero',
+        catalog: isUserAdmin || role === 'Bodeguero' || window.hasPermission('CATALOGO_ADMIN'),
         bitacora: isUserAdmin || window.hasPermission('BITACORA_CONSULTAR'),
         historial: isUserAdmin || window.hasPermission('REPORTE_VER'),
         reportes: isUserAdmin || window.hasPermission('REPORTE_VER'),
@@ -378,13 +404,13 @@ function canAccessView(viewKey) {
 
     const role = window.getUserRole();
     if (viewKey === 'pos') return window.hasPermission('VENTA_COBRAR');
-    if (viewKey === 'inventory') return window.hasPermission('INV_INGRESAR_MERCADERIA');
+    if (viewKey === 'inventory') return window.hasPermission('INV_INGRESAR_MERCADERIA') || window.hasPermission('VENTA_COBRAR');
     if (viewKey === 'compras') return window.hasPermission('COMPRA_EMITIR_ORDEN') || window.hasPermission('INV_INGRESAR_MERCADERIA');
     if (viewKey === 'mermas') return window.hasPermission('INV_INGRESAR_MERCADERIA');
     if (viewKey === 'traslados') return window.hasPermission('INV_INGRESAR_MERCADERIA');
     if (viewKey === 'visitas') return window.hasPermission('VISITA_REGISTRAR');
-    if (viewKey === 'cash' || viewKey === 'caja') return role === 'Cajero';
-    if (viewKey === 'catalog') return role === 'Bodeguero';
+    if (viewKey === 'cash' || viewKey === 'caja') return role === 'Cajero' || window.hasPermission('CAJA_CIERRE_CIEGAS');
+    if (viewKey === 'catalog') return role === 'Bodeguero' || window.hasPermission('CATALOGO_ADMIN');
     if (viewKey === 'clients') return window.hasPermission('CLIENTE_ADMIN');
     if (viewKey === 'users' || viewKey === 'configuracion') return false;
     if (viewKey === 'roles') return false;
@@ -407,9 +433,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // View Switcher for Auth Module
 window.switchView = function(viewId) {
     authViews.forEach(id => {
-        document.getElementById(id).classList.add('d-none');
+        const el = document.getElementById(id);
+        if (el) el.classList.add('d-none');
     });
-    document.getElementById(viewId).classList.remove('d-none');
+    const target = document.getElementById(viewId);
+    if (target) {
+        target.classList.remove('d-none');
+    }
 };
 
 // ---------------------------------------------------------------------------
@@ -444,26 +474,8 @@ function updateTopbarHeader(viewKey) {
     const topbarHistoryBtn = document.getElementById('btn-pos-history');
     if (!topbarTitle) return;
 
-    const titleMap = {
-        dashboard: '<i class="bi bi-speedometer2 text-teal"></i> <span>Panel Principal</span>',
-        pos: '<i class="bi bi-cart3 text-teal"></i> <span>Punto de Venta</span>',
-        inventory: '<i class="bi bi-boxes text-teal"></i> <span>Inventario / Bodega</span>',
-        compras: '<i class="bi bi-bag-plus text-teal"></i> <span>Compras</span>',
-        cash: '<i class="bi bi-cash-coin text-teal"></i> <span>Caja</span>',
-        users: '<i class="bi bi-people text-teal"></i> <span>Usuarios / Personal</span>',
-        roles: '<i class="bi bi-shield-lock text-teal"></i> <span>Roles y Permisos</span>',
-        clients: '<i class="bi bi-person-lines-fill text-teal"></i> <span>Clientes</span>',
-        catalog: '<i class="bi bi-tags text-teal"></i> <span>Catálogos</span>',
-        reportes: '<i class="bi bi-graph-up text-teal"></i> <span>Reportes</span>',
-        configuracion: '<i class="bi bi-gear text-teal"></i> <span>Configuración</span>',
-        bitacora: '<i class="bi bi-journal-text text-teal"></i> <span>Bitácora</span>',
-        historial: '<i class="bi bi-clock-history text-teal"></i> <span>Historial de Precios</span>',
-        mermas: '<i class="bi bi-trash3 text-teal"></i> <span>Mermas</span>',
-        traslados: '<i class="bi bi-arrow-left-right text-teal"></i> <span>Traslados</span>',
-        visitas: '<i class="bi bi-geo-alt text-teal"></i> <span>Visitas de Seguimiento</span>',
-    };
-
-    topbarTitle.innerHTML = titleMap[viewKey] || '<i class="bi bi-grid text-teal"></i> <span>Sistema El Regalito</span>';
+    // Barra superior sobria y estática con el nombre del negocio (evita duplicidad de títulos)
+    topbarTitle.innerHTML = '<i class="bi bi-shop text-teal"></i> <span>Regalito - Panajachel</span>';
 
     if (viewKey === 'pos') {
         if (topbarTurnBadge) topbarTurnBadge.classList.remove('d-none');
@@ -585,6 +597,14 @@ window.navigateTo = function(viewKey) {
 // Soporte de avance/retroceso del navegador: sincroniza la vista con la ruta.
 window.addEventListener('hashchange', () => {
     if (!hasActiveSession()) {
+        const currentHash = (window.location.hash || '').replace(/^#/, '');
+        if (!currentHash) {
+            const isRecoveryActive = ['view-recover', 'view-verify', 'view-reset'].some(id => {
+                const el = document.getElementById(id);
+                return el && !el.classList.contains('d-none');
+            });
+            if (isRecoveryActive) return;
+        }
         showLogin();
         return;
     }
@@ -735,14 +755,33 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
         }
 
         const data = await response.json();
-        localStorage.setItem('jwt_token', data.access_token);
-        localStorage.setItem('user_role', data.rol || '');
-        localStorage.setItem('user_id_rol', data.id_rol || '');
-        localStorage.setItem('user_permissions', JSON.stringify(data.permisos || []));
-        localStorage.setItem('user_name', user);
+
+        // Manejo de opción 'Recordarme': guarda el nombre de usuario para prellenarlo, nunca la sesión completa
+        const rememberMe = document.getElementById('remember-me');
+        if (rememberMe && rememberMe.checked) {
+            localStorage.setItem('remember_user', user);
+        } else {
+            localStorage.removeItem('remember_user');
+        }
 
         const isUserAdmin = user.toLowerCase() === 'admin' || data.rol === 'Administradora';
         const displayName = isUserAdmin ? 'Administrador' : (data.nombre_completo || user);
+        const permsJson = JSON.stringify(data.permisos || []);
+
+        // Guardar sesión en sessionStorage (activa estrictamente durante la sesión del navegador)
+        sessionStorage.setItem('jwt_token', data.access_token);
+        sessionStorage.setItem('user_role', data.rol || '');
+        sessionStorage.setItem('user_id_rol', data.id_rol || '');
+        sessionStorage.setItem('user_permissions', permsJson);
+        sessionStorage.setItem('user_name', user);
+        sessionStorage.setItem('user_display_name', displayName);
+
+        // Sincronizar en localStorage para compatibilidad con submódulos en la pestaña activa
+        localStorage.setItem('jwt_token', data.access_token);
+        localStorage.setItem('user_role', data.rol || '');
+        localStorage.setItem('user_id_rol', data.id_rol || '');
+        localStorage.setItem('user_permissions', permsJson);
+        localStorage.setItem('user_name', user);
         localStorage.setItem('user_display_name', displayName);
 
         updateUserInfoUI();
@@ -755,18 +794,142 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
     }
 });
 
-// 3. Recover Password
-document.getElementById('form-recover').addEventListener('submit', (e) => {
-    e.preventDefault();
-    showToast('Código de verificación enviado a tu correo.', 'success');
-    switchView('view-verify');
-});
+// ---------------------------------------------------------------------------
+// 3. RECUPERACIÓN DE CONTRASEÑAS (FLUJO COMPLETO CON CÓDIGO OTP)
+// ---------------------------------------------------------------------------
 
-// 4. Verify Code Auto-advance
+let recoveryState = {
+    identifier: '',
+    email: '',
+    reset_token: ''
+};
+
+// Formulario 1: Solicitar Código
+const formRecover = document.getElementById('form-recover');
+if (formRecover) {
+    formRecover.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('recover-email');
+        const errAlert = document.getElementById('recover-error');
+        const succAlert = document.getElementById('recover-success');
+        const btnSubmit = document.getElementById('btn-recover-submit');
+
+        if (errAlert) errAlert.classList.add('d-none');
+        if (succAlert) succAlert.classList.add('d-none');
+
+        const identifier = input ? input.value.trim() : '';
+        if (!identifier) {
+            if (errAlert) {
+                errAlert.textContent = 'Ingresa tu correo electrónico o nombre de usuario.';
+                errAlert.classList.remove('d-none');
+            }
+            return;
+        }
+
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando código...';
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/auth/recuperar-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier })
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                const msg = data.detail || 'No se pudo procesar la solicitud de recuperación.';
+                if (errAlert) {
+                    errAlert.textContent = msg;
+                    errAlert.classList.remove('d-none');
+                } else {
+                    showToast(msg, 'danger');
+                }
+                return;
+            }
+
+            recoveryState.identifier = identifier;
+            recoveryState.email = data.email || identifier;
+
+            // Actualizar vista de verificación
+            const targetBadge = document.getElementById('verify-target-email');
+            if (targetBadge) {
+                targetBadge.textContent = recoveryState.email;
+            }
+
+            // Limpiar inputs de código completamente (el usuario debe revisar su correo real)
+            const codeInputs = document.querySelectorAll('.code-input');
+            codeInputs.forEach(inp => {
+                inp.value = '';
+            });
+
+            const verifyErr = document.getElementById('verify-error');
+            if (verifyErr) verifyErr.classList.add('d-none');
+
+            showToast(data.message || 'Código de verificación enviado a tu correo.', 'success');
+            switchView('view-verify');
+            if (codeInputs[0]) codeInputs[0].focus();
+
+        } catch (err) {
+            if (errAlert) {
+                errAlert.textContent = 'Error de conexión con el servidor. Intenta de nuevo.';
+                errAlert.classList.remove('d-none');
+            }
+        } finally {
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = 'Enviar Código';
+            }
+        }
+    });
+}
+
+// Botón de reenvío de código
+const btnResend = document.getElementById('btn-resend-code');
+if (btnResend) {
+    btnResend.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (!recoveryState.identifier && !recoveryState.email) {
+            switchView('view-recover');
+            return;
+        }
+        btnResend.textContent = 'Reenviando...';
+        try {
+            const res = await fetch(`${API_URL}/auth/recuperar-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier: recoveryState.identifier || recoveryState.email })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                showToast('Nuevo código enviado a tu correo.', 'success');
+                const codeInputs = document.querySelectorAll('.code-input');
+                codeInputs.forEach(inp => {
+                    inp.value = '';
+                });
+                if (codeInputs[0]) codeInputs[0].focus();
+            } else {
+                showToast(data.detail || 'Error al reenviar código.', 'danger');
+            }
+        } catch (err) {
+            showToast('Error de conexión.', 'danger');
+        } finally {
+            btnResend.textContent = 'Reenviar código';
+        }
+    });
+}
+
+// Formulario 2: Verificar Código (6 dígitos)
 const codeInputs = document.querySelectorAll('.code-input');
 codeInputs.forEach((input, index) => {
     input.addEventListener('input', (e) => {
-        if (e.target.value.length === 1) {
+        // Solo dígitos
+        e.target.value = e.target.value.replace(/\D/g, '');
+        if (e.target.value.length >= 1) {
+            e.target.value = e.target.value.slice(0, 1);
             if (index < codeInputs.length - 1) {
                 codeInputs[index + 1].focus();
             }
@@ -779,30 +942,175 @@ codeInputs.forEach((input, index) => {
             }
         }
     });
+    input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+        if (pasted.length) {
+            codeInputs.forEach((inp, i) => {
+                inp.value = pasted[i] || '';
+            });
+            const lastFilled = Math.min(pasted.length, codeInputs.length) - 1;
+            if (lastFilled >= 0 && codeInputs[lastFilled]) codeInputs[lastFilled].focus();
+        }
+    });
 });
 
-document.getElementById('form-verify').addEventListener('submit', (e) => {
-    e.preventDefault();
-    switchView('view-reset');
-});
+const formVerify = document.getElementById('form-verify');
+if (formVerify) {
+    formVerify.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errAlert = document.getElementById('verify-error');
+        const btnSubmit = document.getElementById('btn-verify-submit');
+        if (errAlert) errAlert.classList.add('d-none');
 
-// 5. Reset Password
-document.getElementById('form-reset').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const pass = document.getElementById('reset-pass').value;
-    const confirm = document.getElementById('reset-pass-confirm').value;
-    const errorDiv = document.getElementById('reset-error');
-    
-    if (pass !== confirm) {
-        errorDiv.textContent = 'Las contraseñas no coinciden.';
-        errorDiv.classList.remove('d-none');
-        return;
-    }
+        const code = Array.from(codeInputs).map(i => i.value.trim()).join('');
+        if (code.length !== 6) {
+            if (errAlert) {
+                errAlert.textContent = 'Por favor ingresa los 6 dígitos del código.';
+                errAlert.classList.remove('d-none');
+            }
+            return;
+        }
 
-    errorDiv.classList.add('d-none');
-    showToast('Contraseña actualizada correctamente.', 'success');
-    switchView('view-login');
-});
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verificando...';
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/auth/verificar-codigo`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: recoveryState.email || recoveryState.identifier,
+                    codigo: code
+                })
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                const msg = data.detail || 'Código incorrecto o expirado.';
+                if (errAlert) {
+                    errAlert.textContent = msg;
+                    errAlert.classList.remove('d-none');
+                } else {
+                    showToast(msg, 'danger');
+                }
+                return;
+            }
+
+            recoveryState.reset_token = data.reset_token;
+            showToast('Código verificado con éxito.', 'success');
+
+            const resetErr = document.getElementById('reset-error');
+            if (resetErr) resetErr.classList.add('d-none');
+            const passInput = document.getElementById('reset-pass');
+            const confirmInput = document.getElementById('reset-pass-confirm');
+            if (passInput) passInput.value = '';
+            if (confirmInput) confirmInput.value = '';
+
+            switchView('view-reset');
+            if (passInput) passInput.focus();
+
+        } catch (err) {
+            if (errAlert) {
+                errAlert.textContent = 'Error de conexión con el servidor. Intenta de nuevo.';
+                errAlert.classList.remove('d-none');
+            }
+        } finally {
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = 'Verificar Código';
+            }
+        }
+    });
+}
+
+// Formulario 3: Restablecer Contraseña
+const formReset = document.getElementById('form-reset');
+if (formReset) {
+    formReset.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const pass = document.getElementById('reset-pass')?.value || '';
+        const confirm = document.getElementById('reset-pass-confirm')?.value || '';
+        const errorDiv = document.getElementById('reset-error');
+        const btnSubmit = document.getElementById('btn-reset-submit');
+
+        if (errorDiv) errorDiv.classList.add('d-none');
+
+        if (pass.length < 6) {
+            if (errorDiv) {
+                errorDiv.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+                errorDiv.classList.remove('d-none');
+            }
+            return;
+        }
+
+        if (pass !== confirm) {
+            if (errorDiv) {
+                errorDiv.textContent = 'Las contraseñas no coinciden.';
+                errorDiv.classList.remove('d-none');
+            }
+            return;
+        }
+
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando contraseña...';
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/auth/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    reset_token: recoveryState.reset_token,
+                    email: recoveryState.email,
+                    nueva_password: pass
+                })
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                const msg = data.detail || 'No se pudo restablecer la contraseña.';
+                if (errorDiv) {
+                    errorDiv.textContent = msg;
+                    errorDiv.classList.remove('d-none');
+                } else {
+                    showToast(msg, 'danger');
+                }
+                return;
+            }
+
+            showToast('Contraseña restablecida exitosamente. Ahora puedes ingresar.', 'success');
+            
+            // Limpiar estado y redirigir a Login con usuario precargado
+            const loginUser = document.getElementById('login-user');
+            if (loginUser) loginUser.value = recoveryState.identifier || recoveryState.email;
+            const loginPass = document.getElementById('login-pass');
+            if (loginPass) {
+                loginPass.value = '';
+                loginPass.focus();
+            }
+
+            recoveryState = { identifier: '', email: '', reset_token: '' };
+            switchView('view-login');
+
+        } catch (err) {
+            if (errorDiv) {
+                errorDiv.textContent = 'Error de conexión con el servidor. Intenta de nuevo.';
+                errorDiv.classList.remove('d-none');
+            }
+        } finally {
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = 'Guardar Contraseña';
+            }
+        }
+    });
+}
 
 let healthCheckInterval = null;
 
@@ -1037,6 +1345,7 @@ if (btnLogout) {
             console.warn('No se pudo guardar la preferencia de tema en localStorage:', e);
         }
         updateThemeIcon(theme);
+        window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: theme } }));
     }
 
     function toggleTheme() {

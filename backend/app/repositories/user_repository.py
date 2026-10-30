@@ -1,5 +1,5 @@
 from typing import Optional, List
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.db.models import Usuario, Rol
@@ -25,7 +25,17 @@ class UserRepositoryImpl(UserRepository):
         return result.scalar_one_or_none()
 
     async def get_by_username(self, username: str) -> Optional[Usuario]:
-        result = await self.db.execute(select(Usuario).where(Usuario.username == username))
+        result = await self.db.execute(
+            select(Usuario).options(*_USER_LOADS).where(Usuario.username == username)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_email(self, email: str) -> Optional[Usuario]:
+        if not email:
+            return None
+        result = await self.db.execute(
+            select(Usuario).options(*_USER_LOADS).where(func.lower(Usuario.email) == email.strip().lower())
+        )
         return result.scalar_one_or_none()
 
     def _build_filters(
@@ -38,7 +48,13 @@ class UserRepositoryImpl(UserRepository):
     ):
         conditions = []
         if name:
-            conditions.append(Usuario.nombre_completo.ilike(f"%{name}%"))
+            conditions.append(
+                or_(
+                    Usuario.nombre_completo.ilike(f"%{name}%"),
+                    Usuario.username.ilike(f"%{name}%"),
+                    Usuario.email.ilike(f"%{name}%"),
+                )
+            )
         if is_active is not None:
             estado = "Activo" if is_active else "Inactivo"
             conditions.append(Usuario.estado == estado)
@@ -54,6 +70,7 @@ class UserRepositoryImpl(UserRepository):
         "id_usuario": Usuario.id_usuario,
         "nombre_completo": Usuario.nombre_completo,
         "username": Usuario.username,
+        "email": Usuario.email,
         "rol": Rol.nombre,
         "estado": Usuario.estado,
         "fecha_creacion": Usuario.fecha_creacion,

@@ -480,7 +480,7 @@
         if (item) {
             playScanBeep(true);
             addToCart(item.id_variante, 1);
-            showScannerBanner(`✓ ${item.nombre} agregado al carrito`, false);
+            showScannerBanner(`${item.nombre} agregado al carrito`, false);
             toast(`'${item.nombre}' agregado a la venta`, 'success');
         } else {
             playScanBeep(false);

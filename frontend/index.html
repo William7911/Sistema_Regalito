@@ -25,7 +25,7 @@
     <!-- Custom CSS -->
     <!-- Corrección UI: versión incrementada para forzar la recarga de los estilos nuevos -->
     <!-- Rediseño de Catálogos: toolbar con tabs/dropdown, buscadores con clear y miniaturas. -->
-    <link rel="stylesheet" href="css/style.css?v=9.0">
+    <link rel="stylesheet" href="css/style.css?v=10.2">
     <style id="pos-ticket-page-style">@page { size: 80mm auto; margin: 0; }</style>
     <style>
         /* Desactivar de inmediato ícono nativo de contraseña en Edge/Chromium */
@@ -38,7 +38,7 @@
 <body class="bg-light-gray">
 
     <!-- Auth Module (Login, Register, Recover) -->
-    <div id="auth-module" class="auth-bg d-flex align-items-center justify-content-center min-vh-100">
+    <div id="auth-module" class="auth-bg d-flex align-items-center justify-content-center min-vh-100 p-3">
         
         <!-- Login Form -->
         <div id="view-login" class="auth-card animate-fade-in" style="width: 100%; max-width: 440px;">
@@ -49,99 +49,113 @@
                 <h3 class="fw-bold text-dark mb-1">El Regalito</h3>
                 <p class="text-muted small">Inicia sesión en tu cuenta</p>
             </div>
-            
-            <form id="form-login">
-                <div class="mb-3">
-                    <label class="form-label text-dark fw-medium small mb-1">Usuario / Email</label>
-                    <div class="input-group auth-input-group">
-                        <span class="input-group-text ps-3 pe-2 text-muted"><i class="bi bi-person fs-5"></i></span>
-                        <input type="text" id="login-user" class="form-control" placeholder="usuario" required autocomplete="username">
-                    </div>
+                    
+                    <form id="form-login">
+                        <div class="mb-3">
+                            <label class="form-label text-dark fw-medium small mb-1">Usuario / Email</label>
+                            <div class="input-group auth-input-group">
+                                <span class="input-group-text ps-3 pe-2 text-muted"><i class="bi bi-person fs-5"></i></span>
+                                <input type="text" id="login-user" class="form-control" placeholder="usuario" required autocomplete="username">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-dark fw-medium small mb-1">Contraseña</label>
+                            <div class="input-group auth-input-group">
+                                <span class="input-group-text ps-3 pe-2 text-muted"><i class="bi bi-lock fs-5"></i></span>
+                                <input type="password" id="login-pass" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+                                <button type="button" id="btn-toggle-pass" class="input-group-text pe-3 ps-2 btn-toggle-password" tabindex="-1" title="Mostrar u ocultar contraseña" onclick="toggleLoginPassword(event)">
+                                    <i class="bi bi-eye-slash text-muted" id="btn-toggle-pass-icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="remember-me">
+                                <label class="form-check-label text-muted small" for="remember-me">Recordarme</label>
+                            </div>
+                            <a href="javascript:void(0)" class="login-forgot-link small text-decoration-none" onclick="event.preventDefault(); switchView('view-recover')">¿Olvidaste tu contraseña?</a>
+                        </div>
+                        
+                        <div class="alert alert-danger d-none small" id="login-error"></div>
+                        
+                        <button type="submit" id="btn-login-submit" class="btn btn-brand-turquoise w-100 fw-semibold mb-3">Ingresar al Sistema</button>
+                        <div class="text-center">
+                            <span class="text-muted small" style="font-size: 0.78rem;"><i class="bi bi-shield-lock me-1"></i>El acceso es otorgado por el administrador del sistema.</span>
+                        </div>
+                    </form>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label text-dark fw-medium small mb-1">Contraseña</label>
-                    <div class="input-group auth-input-group">
-                        <span class="input-group-text ps-3 pe-2 text-muted"><i class="bi bi-lock fs-5"></i></span>
-                        <input type="password" id="login-pass" class="form-control" placeholder="••••••••" required autocomplete="current-password">
-                        <button type="button" id="btn-toggle-pass" class="input-group-text pe-3 ps-2 btn-toggle-password" tabindex="-1" title="Mostrar u ocultar contraseña" onclick="toggleLoginPassword(event)">
-                            <i class="bi bi-eye-slash text-muted" id="btn-toggle-pass-icon"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" id="remember-me">
-                        <label class="form-check-label text-muted small" for="remember-me">Recordarme</label>
-                    </div>
-                    <a href="#" class="login-forgot-link small text-decoration-none" onclick="switchView('view-recover')">¿Olvidaste tu contraseña?</a>
-                </div>
-                
-                <div class="alert alert-danger d-none small" id="login-error"></div>
-                
-                <button type="submit" id="btn-login-submit" class="btn btn-brand-turquoise w-100 fw-semibold mb-3">Ingresar al Sistema</button>
-                <div class="text-center">
-                    <span class="text-muted small" style="font-size: 0.78rem;"><i class="bi bi-shield-lock me-1"></i>El acceso es otorgado por el administrador del sistema.</span>
-                </div>
-            </form>
-        </div>
 
-        <!-- Recover Password Form -->
-        <div id="view-recover" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in d-none" style="width: 100%; max-width: 450px;">
-            <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">Recuperar Contraseña</h3>
-                <p class="text-muted small">Ingresa tu correo o usuario y te enviaremos un código</p>
-            </div>
-            <form id="form-recover">
-                <div class="mb-4">
-                    <label class="form-label text-dark fw-medium">Correo Electrónico</label>
-                    <input type="email" id="recover-email" class="form-control" required>
+                <!-- Recover Password Form -->
+                <div id="view-recover" class="glass-card p-4 p-md-5 rounded-4 shadow-lg animate-fade-in d-none w-100">
+                    <div class="text-center mb-4">
+                        <h3 class="fw-bold text-dark">Recuperar Contraseña</h3>
+                        <p class="text-muted small">Ingresa tu correo o usuario y te enviaremos un código</p>
+                    </div>
+                    <div id="recover-error" class="alert alert-danger d-none small py-2 mb-3"></div>
+                    <div id="recover-success" class="alert alert-success d-none small py-2 mb-3"></div>
+                    <form id="form-recover">
+                        <div class="mb-4">
+                            <label class="form-label text-dark fw-medium">Correo Electrónico o Usuario</label>
+                            <input type="text" id="recover-email" class="form-control" placeholder="ejemplo@correo.com o usuario" required autocomplete="username">
+                            <div class="form-text text-muted small mt-1">El código solo se enviará si el correo coincide con un usuario registrado.</div>
+                        </div>
+                        <button type="submit" id="btn-recover-submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Enviar Código</button>
+                        <div class="text-center">
+                            <a href="javascript:void(0)" class="text-teal small text-decoration-none fw-medium" onclick="event.preventDefault(); switchView('view-login')">Cancelar</a>
+                        </div>
+                    </form>
                 </div>
-                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Enviar Código</button>
-                <div class="text-center">
-                    <a href="#" class="text-teal small text-decoration-none fw-medium" onclick="switchView('view-login')">Cancelar</a>
-                </div>
-            </form>
-        </div>
 
-        <!-- Verify Code Form -->
-        <div id="view-verify" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in d-none" style="width: 100%; max-width: 450px;">
-            <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">Verificar Código</h3>
-                <p class="text-muted small">Ingresa el código de 6 dígitos enviado a tu correo</p>
-            </div>
-            <form id="form-verify">
-                <div class="mb-4 d-flex justify-content-between gap-2">
-                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
-                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
-                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
-                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
-                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
-                    <input type="text" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required>
+                <!-- Verify Code Form -->
+                <div id="view-verify" class="glass-card p-4 p-md-5 rounded-4 shadow-lg animate-fade-in d-none w-100">
+                    <div class="text-center mb-4">
+                        <h3 class="fw-bold text-dark">Verificar Código</h3>
+                        <p class="text-muted small mb-1" id="verify-subtitle">Ingresa el código de 6 dígitos enviado a tu correo</p>
+                        <span class="badge bg-teal-subtle text-teal fw-semibold mt-1" id="verify-target-email"></span>
+                    </div>
+                    <div id="verify-error" class="alert alert-danger d-none small py-2 mb-3"></div>
+                    <div id="verify-success" class="alert alert-success d-none small py-2 mb-3"></div>
+                    <form id="form-verify">
+                        <div class="mb-4 d-flex justify-content-between gap-2">
+                            <input type="text" inputmode="numeric" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required autocomplete="off">
+                            <input type="text" inputmode="numeric" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required autocomplete="off">
+                            <input type="text" inputmode="numeric" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required autocomplete="off">
+                            <input type="text" inputmode="numeric" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required autocomplete="off">
+                            <input type="text" inputmode="numeric" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required autocomplete="off">
+                            <input type="text" inputmode="numeric" class="form-control text-center fs-3 fw-bold code-input" maxlength="1" required autocomplete="off">
+                        </div>
+                        <button type="submit" id="btn-verify-submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Verificar Código</button>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="javascript:void(0)" class="text-teal small text-decoration-none fw-medium" id="btn-resend-code">Reenviar código</a>
+                            <a href="javascript:void(0)" class="text-muted small text-decoration-none fw-medium" onclick="event.preventDefault(); switchView('view-recover')">Cambiar correo</a>
+                        </div>
+                    </form>
                 </div>
-                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm">Verificar</button>
-            </form>
-        </div>
 
-        <!-- Reset Password Form -->
-        <div id="view-reset" class="glass-card p-5 rounded-4 shadow-lg animate-fade-in d-none" style="width: 100%; max-width: 450px;">
-            <div class="text-center mb-4">
-                <h3 class="fw-bold text-dark">Nueva Contraseña</h3>
-                <p class="text-muted small">Ingresa tu nueva contraseña</p>
-            </div>
-            <form id="form-reset">
-                <div class="mb-3">
-                    <label class="form-label text-dark fw-medium">Nueva Contraseña</label>
-                    <input type="password" id="reset-pass" class="form-control" required>
+                <!-- Reset Password Form -->
+                <div id="view-reset" class="glass-card p-4 p-md-5 rounded-4 shadow-lg animate-fade-in d-none w-100">
+                    <div class="text-center mb-4">
+                        <h3 class="fw-bold text-dark">Nueva Contraseña</h3>
+                        <p class="text-muted small">Ingresa y confirma tu nueva contraseña</p>
+                    </div>
+                    <div class="alert alert-danger d-none small py-2 mb-3" id="reset-error"></div>
+                    <div class="alert alert-success d-none small py-2 mb-3" id="reset-success"></div>
+                    <form id="form-reset">
+                        <div class="mb-3">
+                            <label class="form-label text-dark fw-medium">Nueva Contraseña (mínimo 6 caracteres)</label>
+                            <input type="password" id="reset-pass" class="form-control" minlength="6" required autocomplete="new-password">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-dark fw-medium">Confirmar Contraseña</label>
+                            <input type="password" id="reset-pass-confirm" class="form-control" minlength="6" required autocomplete="new-password">
+                        </div>
+                        <button type="submit" id="btn-reset-submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm mb-3">Guardar Contraseña</button>
+                        <div class="text-center">
+                            <a href="javascript:void(0)" class="text-teal small text-decoration-none fw-medium" onclick="event.preventDefault(); switchView('view-login')">Cancelar</a>
+                        </div>
+                    </form>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label text-dark fw-medium">Confirmar Contraseña</label>
-                    <input type="password" id="reset-pass-confirm" class="form-control" required>
-                </div>
-                <div class="alert alert-danger d-none small" id="reset-error"></div>
-                <button type="submit" class="btn btn-teal w-100 py-2 fw-semibold shadow-sm">Guardar Contraseña</button>
-            </form>
-        </div>
     </div>
 
     <!-- Main System Dashboard (Hidden by default) -->
@@ -282,11 +296,11 @@
                     <button id="btn-sidebar-toggle" type="button" class="btn btn-light border rounded-3 p-1 px-2" title="Ocultar/mostrar menú">
                         <i class="bi bi-list fs-5"></i>
                     </button>
-                    <!-- Título del Módulo Activo y Estado de Turno POS -->
+                    <!-- Nombre estático del negocio en barra superior (sobrio y sin duplicidad de títulos) -->
                     <div class="d-flex align-items-center gap-2 flex-wrap" id="topbar-title-container">
-                        <h5 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2" id="topbar-module-title">
-                            <i class="bi bi-cart3 text-teal"></i> <span>Punto de Venta</span>
-                        </h5>
+                        <span class="fs-6 fw-bold text-dark d-flex align-items-center gap-2" id="topbar-module-title">
+                            <i class="bi bi-shop text-teal"></i> <span>Regalito - Panajachel</span>
+                        </span>
                         <span id="pos-turn-badge" class="badge bg-light text-dark px-2 px-md-3 py-1-5 rounded-pill border">
                             <i class="bi bi-cash-stack me-1"></i> <span id="pos-turn-text">Verificando turno...</span>
                         </span>
@@ -304,11 +318,7 @@
                         <i class="bi bi-moon-stars-fill text-secondary fs-6" id="theme-icon"></i>
                     </button>
 
-                    <!-- Elementos redundantes ocultos por directiva (1 prod locales, rol repetido) -->
-                    <button id="btn-sync-modal" class="btn btn-sm btn-outline-secondary d-none" data-bs-toggle="modal" data-bs-target="#sync-modal">
-                        <i class="bi bi-cloud-check-fill text-success" id="sync-icon-indicator"></i>
-                        <span class="small fw-semibold" id="sync-text-indicator">Copia Local</span>
-                    </button>
+
                     <span id="header-role" class="d-none">Administrador</span>
 
                     <!-- Campana de Notificaciones -->
@@ -643,7 +653,7 @@
                         <p class="text-muted">Administra el personal y sus accesos</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+
                         <!-- Mejora visual: "+ Nuevo Usuario" como acción principal protagonista (sombra y peso tipográfico) -->
                         <button id="btn-new-user" class="btn btn-teal users-primary-action"><i class="bi bi-plus-lg"></i> Nuevo Usuario</button>
                         <div class="btn-group" role="group">
@@ -653,6 +663,7 @@
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="javascript:void(0)" id="btn-report-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                 <li><a class="dropdown-item" href="javascript:void(0)" id="btn-report-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                <li><a class="dropdown-item" href="javascript:void(0)" id="btn-report-users-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                             </ul>
                         </div>
                     </div>
@@ -701,6 +712,7 @@
                                         <th class="sortable" data-sort="id_usuario" style="width: 70px;">ID <span class="sort-icon"></span></th>
                                         <th class="sortable" data-sort="nombre_completo">Nombre <span class="sort-icon"></span></th>
                                         <th class="sortable" data-sort="username">Usuario <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="email">Correo <span class="sort-icon"></span></th>
                                         <th class="sortable" data-sort="rol">Rol <span class="sort-icon"></span></th>
                                         <th class="sortable" data-sort="estado">Estado <span class="sort-icon"></span></th>
                                         <th class="sortable" data-sort="fecha_creacion">Fecha Reg. <span class="sort-icon"></span></th>
@@ -747,7 +759,7 @@
                         <p class="text-muted mb-0">Gestión de cartera de clientes, tipos y facturación</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+
                         <button id="btn-new-client" class="btn btn-teal"><i class="bi bi-plus-lg"></i> Nuevo Cliente</button>
                         <div class="btn-group" role="group">
                             <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-clients">
@@ -756,6 +768,7 @@
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="javascript:void(0)" id="btn-report-clients-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                 <li><a class="dropdown-item" href="javascript:void(0)" id="btn-report-clients-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                <li><a class="dropdown-item" href="javascript:void(0)" id="btn-report-clients-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                             </ul>
                         </div>
                     </div>
@@ -1059,7 +1072,7 @@
                         <p class="text-muted">Administra productos y categorías</p>
                     </div>
                     <div>
-                        <button class="btn btn-outline-secondary me-2" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+
                     </div>
                 </div>
 
@@ -1081,10 +1094,10 @@
                         </li>
                     </ul>
 
-                    <!-- Configuraciones secundarias agrupadas para reducir el ruido visual. -->
-                    <div class="dropdown catalog-extra-tabs">
+                    <!-- Configuraciones secundarias agrupadas (ocultas visualmente, código y funcionamiento intactos) -->
+                    <div class="dropdown catalog-extra-tabs d-none" style="display: none !important;">
                         <button class="btn catalog-extra-toggle dropdown-toggle" id="catalog-extra-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            ⚙️ Configuraciones Adicionales
+                            <i class="bi bi-gear-fill me-1"></i> Configuraciones Adicionales
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end catalog-extra-menu" id="catalog-extra-menu" aria-labelledby="catalog-extra-toggle">
                             <li><button class="dropdown-item" type="button" id="tab-sucursales-link" data-catalog-target="#tab-sucursales"><i class="bi bi-building me-2"></i>Sucursales</button></li>
@@ -1106,9 +1119,20 @@
                                 <h5 class="fw-bold mb-0">Productos</h5>
                                 <p class="text-muted small mb-0">Inventario de la tienda</p>
                             </div>
-                            <div>
-                                <!-- Botón principal del módulo: mismo teal global del sistema. -->
-                                <button id="btn-new-product" class="btn btn-teal"><i class="bi bi-plus-lg"></i> Nuevo Producto</button>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-secondary dropdown-toggle rounded-3" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-products">
+                                        <i class="bi bi-download me-1"></i> Reporte
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                        <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-catalog-products-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                        <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-catalog-products-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                                    </ul>
+                                </div>
+                                <button id="btn-copy-product" class="btn btn-outline-teal rounded-3 px-3 fw-semibold" title="Crear un nuevo producto copiando los datos de uno existente">
+                                    <i class="bi bi-copy me-1"></i> Copiar de un producto existente
+                                </button>
+                                <button id="btn-new-product" class="btn btn-teal rounded-3 px-3"><i class="bi bi-plus-lg"></i> Nuevo Producto</button>
                             </div>
                         </div>
 
@@ -1140,7 +1164,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="products-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-sort="id_producto" style="width: 70px;">ID <span class="sort-icon"></span></th>
@@ -1189,7 +1213,16 @@
                                 <h5 class="fw-bold mb-0">Categorías</h5>
                                 <p class="text-muted small mb-0">Clasificación de productos</p>
                             </div>
-                            <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-secondary dropdown-toggle rounded-3" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-categories">
+                                        <i class="bi bi-download me-1"></i> Reporte
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                        <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-catalog-categories-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                        <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-catalog-categories-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                                    </ul>
+                                </div>
                                 <button id="btn-new-category" class="btn btn-verde"><i class="bi bi-plus-lg"></i> Nueva Categoría</button>
                             </div>
                         </div>
@@ -1206,7 +1239,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="categories-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th>Nombre</th>
@@ -1240,6 +1273,7 @@
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-subcat-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-subcat-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-subcat-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1262,7 +1296,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="subcategories-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-subcat-sort="id_subcategoria" style="width: 70px;">ID</th>
@@ -1301,6 +1335,7 @@
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-unidades-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-unidades-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-unidades-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1320,7 +1355,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="unidades-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-unidad-sort="id_unidad" style="width: 70px;">ID</th>
@@ -1359,6 +1394,7 @@
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-sucursales-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-sucursales-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-sucursales-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1386,7 +1422,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="sucursales-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-sucursal-sort="id_sucursal" style="width: 70px;">ID</th>
@@ -1427,6 +1463,7 @@
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-areas-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-areas-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-areas-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1449,7 +1486,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="areas-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-area-sort="id_area" style="width: 70px;">ID</th>
@@ -1488,6 +1525,7 @@
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-motivos-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-motivos-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-motivos-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1507,7 +1545,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="motivos-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-motivo-sort="id_motivo" style="width: 70px;">ID</th>
@@ -1545,6 +1583,7 @@
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-metodos-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-metodos-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-metodos-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1564,7 +1603,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="metodos-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-metodo-sort="id_metodo_pago" style="width: 70px;">ID</th>
@@ -1602,6 +1641,7 @@
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-proveedores-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-proveedores-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-proveedores-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1629,7 +1669,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="proveedores-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-proveedor-sort="id_proveedor" style="width: 70px;">ID</th>
@@ -1670,6 +1710,7 @@
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-departamentos-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-departamentos-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-departamentos-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1689,7 +1730,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="departamentos-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-departamento-sort="id_departamento" style="width: 70px;">ID</th>
@@ -1728,6 +1769,7 @@
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-municipios-excel"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Descargar Excel</a></li>
                                         <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-municipios-csv"><i class="bi bi-filetype-csv me-2 text-secondary"></i>Descargar CSV</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0)" id="btn-export-municipios-pdf"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Descargar PDF</a></li>
                                     </ul>
                                 </div>
                             </div>
@@ -1750,7 +1792,7 @@
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table align-middle table-hover mb-0">
+                                    <table class="table align-middle table-hover mb-0" id="municipios-table">
                                         <thead class="thead-catalog">
                                             <tr>
                                                 <th class="sortable" data-municipio-sort="id_municipio" style="width: 70px;">ID</th>
@@ -1784,7 +1826,16 @@
                         <h4 class="fw-bold mb-1">Módulo de Caja</h4>
                         <p class="text-muted small mb-0">Control de apertura, cierre de turnos y arqueo de efectivo</p>
                     </div>
-                    <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-cash">
+                                <i class="bi bi-download me-1"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-cash-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-cash-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                            </ul>
+                        </div>
                         <button id="btn-open-cash" class="btn btn-teal d-none" onclick="openOpenCashModal()">
                             <i class="bi bi-door-open-fill me-1"></i> Abrir Turno
                         </button>
@@ -2192,7 +2243,15 @@
                         <p class="text-muted small mb-0">Gestión de existencias y ajustes de stock</p>
                     </div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-inventory">
+                                <i class="bi bi-download me-1"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-inventory-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-inventory-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                            </ul>
+                        </div>
                         <button id="btn-inventory-alerts" class="btn btn-warning"><i class="bi bi-exclamation-triangle"></i> Alertas</button>
                     </div>
                 </div>
@@ -2342,7 +2401,15 @@
                         <p class="text-muted small mb-0">Control de envío, seguimiento en tránsito y recepción o cancelación de transferencias de inventario</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-traslados">
+                                <i class="bi bi-download me-1"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-traslados-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-traslados-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                            </ul>
+                        </div>
                         <button id="btn-traslados-refresh" class="btn btn-outline-secondary" title="Recargar"><i class="bi bi-arrow-clockwise"></i></button>
                         <button id="btn-nuevo-traslado" class="btn btn-teal"><i class="bi bi-plus-lg me-1"></i> Despachar Traslado</button>
                     </div>
@@ -2388,7 +2455,7 @@
                                         <th>Fecha Envío</th>
                                         <th>Origen</th>
                                         <th>Destino</th>
-                                        <th>Producto / Variante</th>
+                                        <th>Producto</th>
                                         <th class="text-center">Cant.</th>
                                         <th>Despachado Por</th>
                                         <th class="text-center">Estado</th>
@@ -2420,7 +2487,15 @@
                         <p class="text-muted small mb-0">Formulario simplificado para el dueño del negocio: evaluación por módulos y generación de reporte PDF</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-visitas">
+                                <i class="bi bi-download me-1"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-visitas-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-visitas-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                            </ul>
+                        </div>
                         <button id="btn-visitas-historial" class="btn btn-outline-secondary"><i class="bi bi-clock-history me-1"></i> Historial</button>
                         <button id="btn-visitas-nueva" class="btn btn-teal"><i class="bi bi-plus-lg me-1"></i> Nueva Visita</button>
                     </div>
@@ -2692,7 +2767,15 @@
                         <p class="text-muted small mb-0">Registro y consulta de salidas por deterioro, pérdida o vencimiento con descargo de existencias</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-mermas">
+                                <i class="bi bi-download me-1"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-mermas-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-mermas-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                            </ul>
+                        </div>
                         <button id="btn-nueva-merma" class="btn btn-teal"><i class="bi bi-plus-lg me-1"></i> Registrar Merma</button>
                     </div>
                 </div>
@@ -2784,14 +2867,14 @@
                 <div class="card border-0 shadow-sm rounded-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table align-middle table-hover mb-0 mermas-table">
+                            <table class="table align-middle table-hover mb-0 mermas-table" id="tabla-mermas">
                                 <thead class="thead-users">
                                     <tr>
                                         <th class="sortable" data-sort="id_merma" style="width: 80px;"># ID <span class="sort-icon"></span></th>
                                         <th class="sortable" data-sort="fecha_merma">Fecha / Hora <span class="sort-icon"></span></th>
                                         <th>Sucursal</th>
                                         <th>Registrado Por</th>
-                                        <th class="sortable" data-sort="producto_nombre">Producto / Detalle <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="producto_nombre">Producto <span class="sort-icon"></span></th>
                                         <th>Motivo</th>
                                         <th class="sortable text-center" data-sort="cantidad">Cantidad <span class="sort-icon"></span></th>
                                         <th class="sortable text-end" data-sort="costo_perdida">Costo Pérdida <span class="sort-icon"></span></th>
@@ -2827,6 +2910,15 @@
                         <p class="text-muted small mb-0">Gestión de órdenes de compra, recepción en bodega y control de costos</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-compras">
+                                <i class="bi bi-download me-1"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-compras-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-compras-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                            </ul>
+                        </div>
                         <button id="btn-compras-refresh" class="btn btn-outline-secondary" title="Recargar"><i class="bi bi-arrow-clockwise"></i></button>
                     </div>
                 </div>
@@ -2880,13 +2972,13 @@
                             <div class="card-body p-0">
                                 <div class="table-responsive">
                                     <table class="table table-hover align-middle mb-0" id="tabla-compras-ordenes">
-                                        <thead class="table-light small text-muted">
+                                        <thead>
                                             <tr>
-                                                <th class="ps-3"># Orden</th>
-                                                <th>Fecha Emisión</th>
+                                                <th class="ps-3"># Compra</th>
+                                                <th>Fecha</th>
                                                 <th>Proveedor</th>
                                                 <th>Responsable</th>
-                                                <th class="text-end">Total Estimado</th>
+                                                <th class="text-end">Total Compra</th>
                                                 <th class="text-center">Estado</th>
                                                 <th class="text-end pe-3">Acciones</th>
                                             </tr>
@@ -2915,9 +3007,6 @@
                                                 <input type="text" id="compras-search" class="form-control ps-4" placeholder="Buscar producto por nombre, talla, color o código..." autocomplete="off">
                                             </div>
                                             <button id="btn-compras-filter" class="btn btn-teal"><i class="bi bi-funnel"></i> Filtrar</button>
-                                            <button id="btn-compras-nuevo-prod-top" type="button" class="btn btn-outline-teal text-nowrap">
-                                                <i class="bi bi-plus-lg me-1"></i> Crear Producto Nuevo
-                                            </button>
                                         </div>
 
                                         <div id="compras-products-list" class="d-flex flex-column gap-2 mb-2" style="max-height: 400px; overflow-y: auto;"></div>
@@ -2925,10 +3014,7 @@
                                         <div id="compras-products-empty" class="text-center text-muted py-4 d-none">
                                             <i class="bi bi-search fs-2 d-block mb-2 text-muted opacity-50"></i>
                                             <div class="fw-semibold text-dark mb-1">No se encontró este producto</div>
-                                            <p class="small text-muted mb-3">Si es mercadería nueva que aún no está registrada en el sistema, puedes crearla directamente.</p>
-                                            <button type="button" class="btn btn-sm btn-outline-teal" id="btn-compras-nuevo-producto">
-                                                <i class="bi bi-plus-circle me-1"></i> Crear Producto Nuevo
-                                            </button>
+                                            <p class="small text-muted mb-0">Verifica el nombre o código ingresado en el buscador.</p>
                                         </div>
 
                                         <div class="d-flex justify-content-between align-items-center">
@@ -2998,7 +3084,7 @@
                         <p class="text-muted small mb-0">Parámetros del negocio y credenciales SAT</p>
                     </div>
                     <div>
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+
                     </div>
                 </div>
 
@@ -3043,7 +3129,15 @@
                         <p class="text-muted">Administra los roles y marca qué permisos tiene cada uno</p>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-roles">
+                                <i class="bi bi-download me-1"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-roles-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-roles-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                            </ul>
+                        </div>
                         <button id="btn-new-role" class="btn btn-teal"><i class="bi bi-plus-lg"></i> Nuevo Rol</button>
                     </div>
                 </div>
@@ -3051,7 +3145,7 @@
                 <div class="card border-0 shadow-sm rounded-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table align-middle table-hover mb-0">
+                            <table class="table align-middle table-hover mb-0" id="roles-table">
                                 <thead class="thead-users">
                                     <tr>
                                         <th style="width: 70px;">ID</th>
@@ -3080,7 +3174,15 @@
                         <p class="text-muted">Consulta de solo lectura de las acciones registradas</p>
                     </div>
                     <div>
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-bitacora">
+                                <i class="bi bi-download me-1"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-bitacora-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-bitacora-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
@@ -3118,7 +3220,7 @@
                 <div class="card border-0 shadow-sm rounded-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table align-middle table-hover mb-0">
+                            <table class="table align-middle table-hover mb-0" id="bitacora-table">
                                 <thead class="thead-users">
                                     <tr>
                                         <th style="width: 70px;">ID</th>
@@ -3160,10 +3262,18 @@
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h4 class="fw-bold">Historial de Precios</h4>
-                        <p class="text-muted">Consulta de solo lectura de cambios de precio por producto o variante</p>
+                        <p class="text-muted">Consulta de solo lectura de cambios de precio por producto</p>
                     </div>
                     <div>
-                        <button class="btn btn-outline-secondary" onclick="navigateTo('dashboard')"><i class="bi bi-arrow-left"></i> Panel</button>
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="btn-report-historial">
+                                <i class="bi bi-download me-1"></i> Reporte
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-historial-export-excel"><i class="bi bi-file-earmark-excel text-success"></i> Descargar Excel</button></li>
+                                <li><button class="dropdown-item d-flex align-items-center gap-2" type="button" id="btn-historial-export-pdf"><i class="bi bi-file-earmark-pdf text-danger"></i> Descargar PDF</button></li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
@@ -3188,7 +3298,7 @@
                 <div class="card border-0 shadow-sm rounded-4">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table align-middle table-hover mb-0">
+                            <table class="table align-middle table-hover mb-0" id="historial-table">
                                 <thead class="thead-users">
                                     <tr>
                                         <th style="width: 70px;">ID</th>
@@ -3289,6 +3399,11 @@
                             <label class="form-label small">Nombre de Usuario</label>
                             <input type="text" id="username" class="form-control" autocomplete="off" required>
                             <div class="invalid-feedback" id="error-username"></div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Correo Electrónico</label>
+                            <input type="email" id="user-email" class="form-control" autocomplete="off" placeholder="usuario@correo.com">
+                            <div class="invalid-feedback" id="error-user-email"></div>
                         </div>
                         <div class="mb-2">
                             <label class="form-label small">Contraseña <small class="text-muted">(dejar vacío para no cambiar)</small></label>
@@ -3413,34 +3528,20 @@
                                 </div>
                             </section>
 
-                            <!-- Tarjeta: Identificación y Opciones -->
+                            <!-- Tarjeta: Identificación -->
                             <section class="product-form-card">
-                                <h6 class="product-form-section-title"><i class="bi bi-upc-scan" aria-hidden="true"></i>Identificación y Opciones</h6>
+                                <h6 class="product-form-section-title"><i class="bi bi-upc-scan" aria-hidden="true"></i>Identificación</h6>
                                 <div class="row g-3">
-                                    <div class="col-md-5">
+                                    <div class="col-12">
                                         <label for="codigo_barras" class="form-label product-form-label">Código de barras</label>
                                         <div class="input-group">
-                                            <input type="text" id="codigo_barras" class="form-control" autocomplete="off" placeholder="EAN-13 o escaneado">
+                                            <input type="text" id="codigo_barras" class="form-control" autocomplete="off" placeholder="Usa la pistola para escanear aquí">
                                             <button type="button" class="btn btn-outline-teal" id="btn-generate-barcode" title="Generar código de barras automáticamente">
                                                 <i class="bi bi-magic me-1"></i>Generar
                                             </button>
                                         </div>
                                         <div class="invalid-feedback" id="error-codigo_barras"></div>
-                                    </div>
-                                    <div class="col-md-7">
-                                        <!--
-                                            Atributo universal: campo optimizado para captura rápida en
-                                            inventarios mixtos. Sustituye los campos rígidos de Talla y
-                                            Color por un único valor libre (ej. "M", "Rojo", "100 g",
-                                            "Grande"), con sugerencias de valores usados antes.
-                                        -->
-                                        <label for="atributo_variante" class="form-label product-form-label">Atributo / Talla / Medida (Opcional)</label>
-                                        <div class="product-attribute-combobox" id="atributo_variante_combobox">
-                                            <input type="text" id="atributo_variante" class="form-control" autocomplete="off" maxlength="30" placeholder="Ej. Talla M, Rojo, 100 g, Grande" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="atributo_variante_sugerencias" aria-haspopup="listbox">
-                                            <div class="product-attribute-suggestions d-none" id="atributo_variante_sugerencias" role="listbox" aria-label="Sugerencias de atributos usados anteriormente"></div>
-                                            <div class="invalid-feedback" id="error-atributo_variante"></div>
-                                        </div>
-                                        <div class="form-text product-attribute-hint">Escribe un valor nuevo o elige una sugerencia.</div>
+                                        <div class="form-text small text-muted">Escanea el código con la pistola o presiona "Generar".</div>
                                     </div>
                                 </div>
                             </section>
@@ -3526,6 +3627,57 @@
         </div>
     </div>
 
+    <!-- Modal: Copiar de Producto Existente -->
+    <div class="modal fade" id="copy-product-modal" tabindex="-1" aria-labelledby="copy-product-modal-title" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header border-bottom px-4 py-3 bg-light">
+                    <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="copy-product-modal-title">
+                        <i class="bi bi-copy text-teal fs-5"></i>
+                        <span>Selecciona el producto que deseas copiar</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3">
+                        Elige un producto base para duplicar su información (categoría, precios, foto y descripción). El código de barras y stock quedarán listos para tu nueva unidad.
+                    </p>
+                    <div class="mb-3">
+                        <div class="input-group input-group-lg shadow-sm rounded-3">
+                            <span class="input-group-text bg-white border-end-0 text-muted ps-3">
+                                <i class="bi bi-search fs-5"></i>
+                            </span>
+                            <input type="text" id="copy-product-search" class="form-control border-start-0 fs-6 ps-2" placeholder="Escribe el nombre o escanea el código del producto base..." autocomplete="off">
+                            <button class="btn btn-outline-secondary border-start-0 d-none" type="button" id="btn-copy-product-search-clear" title="Limpiar búsqueda">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="copy-product-list-container" class="copy-product-list-container">
+                        <div id="copy-product-list" class="d-flex flex-column gap-2">
+                            <!-- Items dinámicos -->
+                        </div>
+                        <div id="copy-product-empty" class="text-center py-5 text-muted d-none">
+                            <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary opacity-50"></i>
+                            <h6 class="fw-bold">No se encontraron productos</h6>
+                            <p class="small mb-0">Verifica el nombre o código escaneado.</p>
+                        </div>
+                        <div id="copy-product-loading" class="text-center py-5 text-muted">
+                            <div class="spinner-border text-teal mb-2" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                            <p class="small mb-0">Cargando catálogo de productos...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top bg-light py-2 px-4">
+                    <button type="button" class="btn btn-outline-secondary px-4 rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Formulario de Categoría -->
     <div class="modal fade" id="category-modal" tabindex="-1" aria-labelledby="category-modal-title" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog">
@@ -3588,6 +3740,10 @@
                             <span class="text-dark small" id="detail-username">-</span>
                         </div>
                         <div class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted small">Correo electrónico:</span>
+                            <span class="text-dark small" id="detail-email">-</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between px-0">
                             <span class="text-muted small">Rol asignado:</span>
                             <span class="badge bg-teal-light text-teal-dark" id="detail-rol">-</span>
                         </div>
@@ -3618,6 +3774,11 @@
                 </div>
                 <div class="modal-body py-3">
                     <div class="row g-3">
+                        <!-- Fotografía del producto -->
+                        <div class="col-12 d-none text-center" id="pdetail-foto-wrapper">
+                            <img id="pdetail-foto-img" src="" alt="Fotografía del producto" class="img-thumbnail rounded-3 shadow-sm" style="max-height: 180px; object-fit: contain;">
+                        </div>
+
                         <div class="col-md-6">
                             <div class="p-3 bg-light rounded-3 h-100">
                                 <h6 class="fw-bold text-dark mb-2">Información General</h6>
@@ -3632,7 +3793,7 @@
                         </div>
                         <div class="col-md-6">
                             <div class="p-3 bg-light rounded-3 h-100">
-                                <h6 class="fw-bold text-dark mb-2">Variante y Precios</h6>
+                                <h6 class="fw-bold text-dark mb-2">Precios e Inventario</h6>
                                 <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Código de barras:</span><span class="text-dark small font-monospace" id="pdetail-barcode">-</span></div>
                                 <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Atributo / Talla / Medida:</span><span class="text-dark small" id="pdetail-atributo">-</span></div>
                                 <div class="d-flex justify-content-between mb-1"><span class="text-muted small">Precio Detalle:</span><strong class="text-verde small" id="pdetail-precio-detalle">-</strong></div>
@@ -3807,101 +3968,6 @@
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Sincronización Offline SQLite (Fase 2 de 6) -->
-    <div class="modal fade" id="sync-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow-lg">
-                <div class="modal-header bg-teal text-white">
-                    <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
-                        <i class="bi bi-cloud-arrow-down-fill"></i> Sincronización Offline SQLite
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <!-- Status Card -->
-                    <div class="card border-0 bg-light rounded-3 p-3 mb-4 shadow-sm">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <div>
-                                <h6 class="fw-bold mb-1 text-dark"><i class="bi bi-database-check text-teal me-1"></i> Base SQLite Local: <code>pos_local.db</code></h6>
-                                <p class="text-muted small mb-0" id="sync-modal-status-text">Cargando estado...</p>
-                                <small class="text-muted" id="sync-modal-last-date">Última sincronización: -</small>
-                            </div>
-                            <div>
-                                <button type="button" id="btn-run-sync" class="btn btn-teal px-3 py-2 fw-semibold shadow-sm d-flex align-items-center gap-2">
-                                    <i class="bi bi-arrow-repeat" id="sync-spinner-icon"></i>
-                                    <span id="sync-btn-text">Sincronizar Nube → Local</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tabs de Navegación de Datos Locales -->
-                    <ul class="nav nav-pills mb-3 gap-2" id="sync-tabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active btn-sm" id="tab-sync-products" data-bs-toggle="pill" data-bs-target="#pane-sync-products" type="button" role="tab">
-                                <i class="bi bi-box-seam me-1"></i> Catálogo y Precios Locales (<span id="count-sync-prods">0</span>)
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link btn-sm" id="tab-sync-users" data-bs-toggle="pill" data-bs-target="#pane-sync-users" type="button" role="tab">
-                                <i class="bi bi-people me-1"></i> Usuarios y Roles Locales (<span id="count-sync-users">0</span>)
-                            </button>
-                        </li>
-                    </ul>
-
-                    <!-- Tab Content -->
-                    <div class="tab-content border rounded-3 p-3 bg-white" style="min-height: 240px; max-height: 380px; overflow-y: auto;">
-                        <!-- Pane Productos -->
-                        <div class="tab-pane fade show active" id="pane-sync-products" role="tabpanel">
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover align-middle mb-0">
-                                    <thead class="table-light small">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Producto</th>
-                                            <th>Categoría</th>
-                                            <th>Cód. Barras</th>
-                                            <th class="text-end">Precio Detalle</th>
-                                            <th class="text-end">Precio Mayoreo</th>
-                                            <th>Estado</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="sync-products-tbody" class="small">
-                                        <tr><td colspan="7" class="text-center text-muted py-3">Cargando productos locales...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Pane Usuarios -->
-                        <div class="tab-pane fade" id="pane-sync-users" role="tabpanel">
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover align-middle mb-0">
-                                    <thead class="table-light small">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Nombre Completo</th>
-                                            <th>Usuario</th>
-                                            <th>Rol</th>
-                                            <th>Estado</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="sync-users-tbody" class="small">
-                                        <tr><td colspan="5" class="text-center text-muted py-3">Cargando usuarios locales...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer bg-light py-2">
-                    <span class="text-muted small me-auto"><i class="bi bi-info-circle me-1"></i> Los datos mostrados se leen directamente desde la base SQLite local en esta laptop.</span>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
-                </div>
             </div>
         </div>
     </div>
@@ -4152,19 +4218,24 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Chart.js (UMD 4.4.1) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- SheetJS (Excel) & jsPDF / AutoTable -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="js/report_exporter.js?v=1.0"></script>
 
     <!-- App Logic -->
-    <script src="js/app.js?v=3.5"></script>
-    <script src="js/dashboard.js?v=1.1"></script>
-    <script src="js/notificaciones.js?v=1.0"></script>
+    <script src="js/app.js?v=4.5"></script>
+    <script src="js/dashboard.js?v=2.0"></script>
+    <script src="js/notificaciones.js?v=1.1"></script>
     <!-- Corrección UI: versión incrementada para forzar la recarga de users.js
          (Soft Badge, botones sin borde e ícono de papelera). -->
-    <script src="js/users.js?v=2.4"></script>
-    <script src="js/clients.js?v=2.0"></script>
+    <script src="js/users.js?v=2.6"></script>
+    <script src="js/clients.js?v=2.1"></script>
     <!-- Catálogos: rediseño visual (tabs agrupadas, miniaturas y soft badges). -->
-    <script src="js/catalog.js?v=3.9"></script>
-    <script src="js/cash_register.js?v=2.6"></script>
-    <script src="js/reportes.js?v=5.0"></script>
+    <script src="js/catalog.js?v=4.8"></script>
+    <script src="js/cash_register.js?v=2.7"></script>
+    <script src="js/reportes.js?v=5.2"></script>
 
     <!-- REDISEÑO UI/UX · REPORTES: lógica del selector de rango de fechas.
          Solo manipula el DOM (etiqueta del rango + inputs ocultos). No altera
@@ -4292,18 +4363,17 @@
         })();
     </script>
 
-    <script src="js/sync.js?v=2.3"></script>
-    <script src="js/configuracion.js?v=2.3"></script>
-    <script src="js/pos.js?v=2.7"></script>
-    <!-- Inventario: versión con miniaturas, zoom, soft badges y ghost button (cache-busting) -->
-    <script src="js/inventory.js?v=3.8"></script>
-    <script src="js/compras.js?v=2.2?v=1.0"></script>
-    <script src="js/roles.js?v=1.0"></script>
-    <script src="js/bitacora.js?v=1.0"></script>
-    <script src="js/historial.js?v=1.0"></script>
-    <script src="js/mermas.js?v=2.1"></script>
-    <script src="js/traslados.js?v=1.0"></script>
-    <script src="js/visitas.js?v=1.0"></script>
+    <script src="js/configuracion.js?v=2.4"></script>
+    <script src="js/pos.js?v=3.0"></script>
+    <!-- Inventario: versión con productos independientes y soft badges -->
+    <script src="js/inventory.js?v=4.1"></script>
+    <script src="js/compras.js?v=3.3"></script>
+    <script src="js/roles.js?v=1.1"></script>
+    <script src="js/bitacora.js?v=1.1"></script>
+    <script src="js/historial.js?v=1.1"></script>
+    <script src="js/mermas.js?v=2.3"></script>
+    <script src="js/traslados.js?v=1.1"></script>
+    <script src="js/visitas.js?v=1.1"></script>
 
     <!-- Modales Bloque 2: Sucursales, Áreas, Subcategorías, Unidades -->
     <!-- Modal: Formulario Sucursal -->
@@ -4927,7 +4997,7 @@
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label for="merma-input-producto" class="form-label small fw-semibold">Producto / Variante <span class="text-danger">*</span></label>
+                                <label for="merma-input-producto" class="form-label small fw-semibold">Producto <span class="text-danger">*</span></label>
                                 <select id="merma-input-producto" class="form-select" required>
                                     <option value="">Seleccione producto...</option>
                                 </select>
@@ -5015,7 +5085,7 @@
                             <table class="table table-sm table-hover align-middle mb-0" id="tabla-recibir-detalles">
                                 <thead class="table-light small">
                                     <tr>
-                                        <th>Producto / Variante</th>
+                                        <th>Producto</th>
                                         <th class="text-center" style="width: 100px;">Pedida</th>
                                         <th class="text-center" style="width: 110px;">Recibida</th>
                                         <th class="text-center" style="width: 110px;">Costo Unit. (Q)</th>
@@ -5096,7 +5166,7 @@
                         <table class="table table-sm table-hover align-middle mb-0">
                             <thead class="table-light small">
                                 <tr>
-                                    <th>Producto / Variante</th>
+                                    <th>Producto</th>
                                     <th>Código</th>
                                     <th class="text-center">Cant. Pedida</th>
                                     <th class="text-end">Costo Pactado</th>
@@ -5147,7 +5217,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold">Producto / Variante <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-semibold">Producto <span class="text-danger">*</span></label>
                             <select id="traslado-input-producto" class="form-select form-select-sm" required>
                                 <option value="">Seleccionar producto...</option>
                             </select>

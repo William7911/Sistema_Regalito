@@ -76,6 +76,10 @@ class UserRepository(ABC):
         ...
 
     @abstractmethod
+    async def get_by_email(self, email: str) -> Optional[Usuario]:
+        ...
+
+    @abstractmethod
     async def search(
         self,
         name: Optional[str] = None,

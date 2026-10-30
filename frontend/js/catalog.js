@@ -45,6 +45,7 @@ function escapeCatalogAttribute(value) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 }
+const escapeCatalogHtml = escapeCatalogAttribute;
 
 // REDISEÑO UI/UX: Soft Badge reutilizable para todos los estados del catálogo.
 // Fondo pastel + texto oscuro + bordes redondeados (mismo lenguaje de Inventario).
@@ -131,13 +132,13 @@ function setupCatalogImageZoom(trigger) {
 function catalogProductThumb(imagenUrl) {
     const url = String(imagenUrl || '').trim();
     if (!url) {
-        return '<span class="catalog-product-thumb catalog-product-thumb--placeholder" aria-hidden="true">📦</span>';
+        return '<span class="catalog-product-thumb catalog-product-thumb--placeholder" aria-hidden="true"><i class="bi bi-box-seam"></i></span>';
     }
     const safeUrl = escapeCatalogAttribute(url);
     return `
         <span class="catalog-product-thumb-wrap catalog-product-thumb-wrap--zoomable" data-zoom-src="${safeUrl}" tabindex="0" aria-label="Vista previa ampliada de la imagen del producto">
             <img src="${safeUrl}" alt="" class="catalog-product-thumb" loading="lazy" onerror="this.parentElement.classList.add('is-placeholder'); this.parentElement.removeAttribute('data-zoom-src'); this.parentElement.removeAttribute('tabindex'); this.parentElement.removeAttribute('aria-label'); this.remove();">
-            <span class="catalog-product-thumb-fallback" aria-hidden="true">📦</span>
+            <span class="catalog-product-thumb-fallback" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
         </span>`;
 }
 
@@ -498,6 +499,13 @@ async function populateSucursales(selectId, selectedId = null, placeholder) {
         placeholder,
         selectedId
     );
+    const select = document.getElementById(selectId);
+    if (select && (!select.value || select.value === '')) {
+        const firstValidOption = Array.from(select.options).find(opt => opt.value && opt.value !== '');
+        if (firstValidOption) {
+            select.value = firstValidOption.value;
+        }
+    }
 }
 
 async function populateAreas(selectId, sucursalId, selectedId = null) {
@@ -513,6 +521,12 @@ async function populateAreas(selectId, sucursalId, selectedId = null) {
         'Sin área',
         selectedId
     );
+    if (select && (!select.value || select.value === '')) {
+        const firstValidOption = Array.from(select.options).find(opt => opt.value && opt.value !== '');
+        if (firstValidOption) {
+            select.value = firstValidOption.value;
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -600,46 +614,47 @@ async function loadProducts() {
         const items = data.items || [];
         hideCatalogImageZoom();
         if (items.length) {
+            // Cada artículo físico es un producto independiente
             tbody.innerHTML = items.map((p) => {
-                const variante = p.variantes && p.variantes[0] ? p.variantes[0] : null;
-                const inventario = variante && variante.inventarios && variante.inventarios[0]
-                    ? variante.inventarios[0] : null;
                 const sub = p.subcategoria
                     ? (p.subcategoria.categoria ? `${p.subcategoria.categoria.nombre} / ${p.subcategoria.nombre}` : p.subcategoria.nombre)
                     : '-';
-                const precio = variante ? Number(variante.precio_detalle).toFixed(2) : '0.00';
-                const stock = inventario ? Number(inventario.stock_actual) : 0;
-                const minStock = inventario ? Number(inventario.stock_minimo) : 0;
                 const activo = p.estado === 'Activo';
                 const fecha = p.fecha_creacion ? formatDate(p.fecha_creacion) : '-';
-                // REDISEÑO UI/UX: miniatura 40x40, soft badges, papelera en la
-                // acción destructiva y nombre con tooltip accesible.
                 const thumb = catalogProductThumb(p.imagen_url);
-                const stockBadge = stock <= minStock
-                    ? `<span class="catalog-stock-badge catalog-stock-badge--danger">${stock}</span>`
-                    : `<span class="catalog-stock-badge catalog-stock-badge--ok">${stock}</span>`;
                 const nombreSeguro = escapeCatalogAttribute(p.nombre || '');
+
+                const v = (p.variantes && p.variantes[0]) ? p.variantes[0] : null;
+                const inventario = v && v.inventarios && v.inventarios[0] ? v.inventarios[0] : null;
+                const stock = inventario ? Number(inventario.stock_actual) : 0;
+                const minStock = inventario ? Number(inventario.stock_minimo) : 0;
+                const precio = v && v.precio_detalle ? Number(v.precio_detalle).toFixed(2) : '0.00';
+
+                const stockBadge = stock <= minStock
+                    ? `<span class="catalog-stock-badge catalog-stock-badge--danger" title="Stock disponible">${stock}</span>`
+                    : `<span class="catalog-stock-badge catalog-stock-badge--ok" title="Stock disponible">${stock}</span>`;
+
                 return `
-                <tr>
-                    <td>${p.id_producto}</td>
-                    <td>
-                        <div class="catalog-product-cell d-flex align-items-center gap-2">
-                            ${thumb}
-                            <span class="catalog-product-name" title="${nombreSeguro}">${p.nombre}</span>
-                        </div>
-                    </td>
-                    <td>${sub}</td>
-                    <td>Q ${precio}</td>
-                    <td>${stockBadge}</td>
-                    <td>${catalogStatusBadge(p.estado)}</td>
-                    <td>${fecha}</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-info" onclick="viewProductDetail(${p.id_producto})" title="Ver detalle"><i class="bi bi-eye"></i></button>
-                        <button class="btn btn-sm btn-outline-rosado" onclick="editProduct(${p.id_producto})" title="Editar"><i class="bi bi-pencil"></i></button>
-                        ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateProduct(${p.id_producto})" title="Desactivar"><i class="bi bi-trash"></i></button>` : ''}
-                    </td>
-                </tr>
-            `;
+                    <tr>
+                        <td>${p.id_producto}</td>
+                        <td>
+                            <div class="catalog-product-cell d-flex align-items-center gap-2">
+                                ${thumb}
+                                <span class="catalog-product-name" role="button" onclick="viewProductDetail(${p.id_producto})" style="cursor: pointer;" title="${nombreSeguro}">${escapeCatalogHtml(p.nombre)}</span>
+                            </div>
+                        </td>
+                        <td>${escapeCatalogHtml(sub)}</td>
+                        <td>Q ${precio}</td>
+                        <td>${stockBadge}</td>
+                        <td>${catalogStatusBadge(p.estado)}</td>
+                        <td>${fecha}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-info" onclick="viewProductDetail(${p.id_producto})" title="Ver detalle"><i class="bi bi-eye"></i></button>
+                            <button class="btn btn-sm btn-outline-rosado" onclick="editProduct(${p.id_producto})" title="Editar"><i class="bi bi-pencil"></i></button>
+                            ${activo ? `<button class="btn btn-sm btn-outline-danger" onclick="deactivateProduct(${p.id_producto})" title="Desactivar"><i class="bi bi-trash"></i></button>` : ''}
+                        </td>
+                    </tr>
+                `;
             }).join('');
             tbody.querySelectorAll('.catalog-product-thumb-wrap[data-zoom-src]').forEach((wrap) => {
                 setupCatalogImageZoom(wrap);
@@ -711,8 +726,8 @@ function updateProductSortIndicators() {
     });
 }
 
-// Modal informativo de detalle de producto (solo lectura).
-async function viewProductDetail(productId) {
+// Modal informativo de detalle de producto (solo lectura para un artículo físico específico).
+async function viewProductDetail(productId, variantId = null) {
     try {
         const res = await fetch(`${PRODUCTS_API}/${productId}`, { headers: authHeaders() });
         if (!res.ok) {
@@ -721,14 +736,34 @@ async function viewProductDetail(productId) {
             return;
         }
         const p = await res.json();
-        const variante = p.variantes && p.variantes[0] ? p.variantes[0] : null;
+        const variantesList = p.variantes || [];
+
+        // Seleccionar la variante específica según variantId o tomar la primera por defecto
+        let variante = null;
+        if (variantId !== null && variantId !== undefined) {
+            variante = variantesList.find(v => Number(v.id_variante) === Number(variantId)) || null;
+        }
+        if (!variante) {
+            variante = variantesList[0] || null;
+        }
+
         const inventario = variante && variante.inventarios && variante.inventarios[0]
             ? variante.inventarios[0] : null;
         const sub = p.subcategoria
             ? (p.subcategoria.categoria ? `${p.subcategoria.categoria.nombre} / ${p.subcategoria.nombre}` : p.subcategoria.nombre)
             : '-';
+
+        // Atributo diferenciador (ej. Talla XL, Negro)
+        const attrParts = variante ? [variante.talla, variante.color].filter(Boolean) : [];
+        const atributoDiferenciador = attrParts.join(' · ');
+
+        // Integrar el atributo diferenciador directamente al nombre del producto en "Información General"
+        const nombreCompleto = atributoDiferenciador 
+            ? `${p.nombre} - ${atributoDiferenciador}` 
+            : (p.nombre || '-');
+
         document.getElementById('pdetail-id').textContent = p.id_producto;
-        document.getElementById('pdetail-nombre').textContent = p.nombre || '-';
+        document.getElementById('pdetail-nombre').textContent = nombreCompleto;
         document.getElementById('pdetail-descripcion').textContent = p.descripcion || '-';
         document.getElementById('pdetail-subcategoria').textContent = sub;
         document.getElementById('pdetail-unidad').textContent = (p.unidad && p.unidad.descripcion) ? p.unidad.descripcion : '-';
@@ -736,16 +771,34 @@ async function viewProductDetail(productId) {
         document.getElementById('pdetail-fecha').textContent = p.fecha_creacion
             ? new Date(p.fecha_creacion).toLocaleString()
             : '-';
+
+        // Un único código de barras directo (sin comas ni secuencias)
         document.getElementById('pdetail-barcode').textContent = variante ? (variante.codigo_barras || '-') : '-';
-        // REDISEÑO UI/UX: el atributo universal combina Talla y Color en una sola línea.
-        const atributoUnificado = [variante?.talla, variante?.color].filter(Boolean).join(' · ');
-        document.getElementById('pdetail-atributo').textContent = atributoUnificado || '-';
-        document.getElementById('pdetail-precio-detalle').textContent = variante ? `Q ${Number(variante.precio_detalle).toFixed(2)}` : '-';
-        document.getElementById('pdetail-precio-mayoreo').textContent = variante ? `Q ${Number(variante.precio_mayoreo).toFixed(2)}` : '-';
-        document.getElementById('pdetail-costo').textContent = variante ? `Q ${Number(variante.costo_promedio).toFixed(2)}` : '-';
-        document.getElementById('pdetail-sucursal').textContent = inventario ? inventario.id_sucursal : '-';
-        document.getElementById('pdetail-stock').textContent = inventario ? inventario.stock_actual : '-';
-        document.getElementById('pdetail-stock-min').textContent = inventario ? inventario.stock_minimo : '-';
+        document.getElementById('pdetail-atributo').textContent = atributoDiferenciador || '-';
+        document.getElementById('pdetail-precio-detalle').textContent = variante && variante.precio_detalle ? `Q ${Number(variante.precio_detalle).toFixed(2)}` : '-';
+        document.getElementById('pdetail-precio-mayoreo').textContent = variante && variante.precio_mayoreo ? `Q ${Number(variante.precio_mayoreo).toFixed(2)}` : '-';
+        document.getElementById('pdetail-costo').textContent = variante && variante.costo_promedio ? `Q ${Number(variante.costo_promedio).toFixed(2)}` : '-';
+        document.getElementById('pdetail-sucursal').textContent = (inventario && inventario.id_sucursal) ? inventario.id_sucursal : '-';
+
+        // Stock Actual limpio y específico de este artículo (sin textos tipo "(total 2 opciones)")
+        const stockActual = inventario && inventario.stock_actual !== undefined ? inventario.stock_actual : 0;
+        const stockMinimo = inventario && inventario.stock_minimo !== undefined ? inventario.stock_minimo : 0;
+        document.getElementById('pdetail-stock').textContent = stockActual;
+        document.getElementById('pdetail-stock-min').textContent = stockMinimo;
+
+        // Fotografía del producto
+        const fotoWrapper = document.getElementById('pdetail-foto-wrapper');
+        const fotoImg = document.getElementById('pdetail-foto-img');
+        if (fotoWrapper && fotoImg) {
+            if (p.imagen_url && p.imagen_url.trim()) {
+                fotoImg.src = p.imagen_url;
+                fotoWrapper.classList.remove('d-none');
+            } else {
+                fotoImg.src = '';
+                fotoWrapper.classList.add('d-none');
+            }
+        }
+
         const modal = getModal('product-detail-modal');
         if (modal) modal.show();
     } catch (err) {
@@ -997,6 +1050,269 @@ function initAtributoCombobox() {
 }
 
 // ---------------------------------------------------------------------------
+// Flujo: Copiar de Producto Existente
+// ---------------------------------------------------------------------------
+
+let copyProductCatalogCache = [];
+
+function initCopyProductModal() {
+    const btnCopy = document.getElementById('btn-copy-product');
+    const searchInput = document.getElementById('copy-product-search');
+    const clearBtn = document.getElementById('btn-copy-product-search-clear');
+    const copyModalEl = document.getElementById('copy-product-modal');
+
+    if (btnCopy) {
+        btnCopy.addEventListener('click', openCopyProductModal);
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim().toLowerCase();
+            if (clearBtn) {
+                clearBtn.classList.toggle('d-none', !query);
+            }
+            filterAndRenderCopyProducts(query);
+        });
+
+        // Soporte para pistola lectora de código de barras (al dar enter)
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const query = searchInput.value.trim().toLowerCase();
+                const matched = getFilteredCopyProducts(query);
+                if (matched.length === 1) {
+                    cloneFromProduct(matched[0].id_producto);
+                }
+            }
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (searchInput) {
+                searchInput.value = '';
+                clearBtn.classList.add('d-none');
+                filterAndRenderCopyProducts('');
+                searchInput.focus();
+            }
+        });
+    }
+
+    if (copyModalEl) {
+        copyModalEl.addEventListener('shown.bs.modal', () => {
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select();
+            }
+        });
+    }
+}
+
+async function openCopyProductModal() {
+    const modal = getModal('copy-product-modal');
+    if (modal) modal.show();
+
+    const searchInput = document.getElementById('copy-product-search');
+    const clearBtn = document.getElementById('btn-copy-product-search-clear');
+    if (searchInput) searchInput.value = '';
+    if (clearBtn) clearBtn.classList.add('d-none');
+
+    await loadCopyProducts();
+}
+
+async function loadCopyProducts() {
+    const listEl = document.getElementById('copy-product-list');
+    const loadingEl = document.getElementById('copy-product-loading');
+    const emptyEl = document.getElementById('copy-product-empty');
+
+    if (loadingEl) loadingEl.classList.remove('d-none');
+    if (emptyEl) emptyEl.classList.add('d-none');
+    if (listEl) listEl.innerHTML = '';
+
+    try {
+        const res = await fetch(`${PRODUCTS_API}?limit=500&sort_by=nombre&sort_dir=asc`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('Error al cargar lista de productos');
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : (data.items || []);
+        // Solo productos activos para copiar
+        copyProductCatalogCache = items.filter(p => p.estado === 'Activo');
+        renderCopyProductList(copyProductCatalogCache);
+    } catch (err) {
+        if (listEl) {
+            listEl.innerHTML = `<div class="alert alert-danger py-2 small mb-0">No se pudieron cargar los productos: ${escapeCatalogHtml(err.message)}</div>`;
+        }
+    } finally {
+        if (loadingEl) loadingEl.classList.add('d-none');
+    }
+}
+
+function getFilteredCopyProducts(query) {
+    if (!query) return copyProductCatalogCache;
+    return copyProductCatalogCache.filter(p => {
+        const nombre = (p.nombre || '').toLowerCase();
+        const sub = (p.subcategoria ? (p.subcategoria.nombre || '') : '').toLowerCase();
+        const cat = (p.subcategoria && p.subcategoria.categoria ? (p.subcategoria.categoria.nombre || '') : '').toLowerCase();
+        const barcodes = (p.variantes || []).map(v => (v.codigo_barras || '').toLowerCase()).join(' ');
+        return nombre.includes(query) || sub.includes(query) || cat.includes(query) || barcodes.includes(query);
+    });
+}
+
+function filterAndRenderCopyProducts(query) {
+    const filtered = getFilteredCopyProducts(query);
+    renderCopyProductList(filtered);
+}
+
+function renderCopyProductList(items) {
+    const listEl = document.getElementById('copy-product-list');
+    const emptyEl = document.getElementById('copy-product-empty');
+    if (!listEl) return;
+
+    if (!items || items.length === 0) {
+        listEl.innerHTML = '';
+        if (emptyEl) emptyEl.classList.remove('d-none');
+        return;
+    }
+
+    if (emptyEl) emptyEl.classList.add('d-none');
+
+    listEl.innerHTML = items.map(p => {
+        const variante = p.variantes && p.variantes[0] ? p.variantes[0] : null;
+        const sub = p.subcategoria
+            ? (p.subcategoria.categoria ? `${p.subcategoria.categoria.nombre} / ${p.subcategoria.nombre}` : p.subcategoria.nombre)
+            : 'Sin subcategoría';
+        const precio = variante ? Number(variante.precio_detalle).toFixed(2) : '0.00';
+        const barcode = variante && variante.codigo_barras ? variante.codigo_barras : 'Sin código';
+        
+        let thumbHtml = '';
+        if (p.imagen_url && p.imagen_url.trim()) {
+            thumbHtml = `<img src="${escapeCatalogAttribute(p.imagen_url)}" alt="${escapeCatalogAttribute(p.nombre)}" class="copy-product-item-thumb" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\\'copy-product-item-thumb\\'><i class=\\'bi bi-box-seam\\'></i></span>';">`;
+        } else {
+            thumbHtml = `<span class="copy-product-item-thumb"><i class="bi bi-box-seam"></i></span>`;
+        }
+
+        return `
+            <div class="copy-product-item" data-id="${p.id_producto}" role="button" tabindex="0" title="Copiar datos de ${escapeCatalogAttribute(p.nombre)}">
+                <div class="d-flex align-items-center gap-3">
+                    ${thumbHtml}
+                    <div>
+                        <div class="copy-product-item-name">${escapeCatalogHtml(p.nombre)}</div>
+                        <div class="copy-product-item-meta">
+                            <span class="copy-product-item-badge">${escapeCatalogHtml(sub)}</span>
+                            <span><i class="bi bi-upc me-1 text-muted"></i><code>${escapeCatalogHtml(barcode)}</code></span>
+                            <span class="fw-semibold text-teal">Q ${precio}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="copy-product-item-action">
+                    <button type="button" class="btn btn-sm btn-outline-teal rounded-3 px-3 fw-semibold">
+                        <i class="bi bi-copy me-1"></i> Copiar
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Agregar listeners para clic y teclado (Enter/Espacio)
+    listEl.querySelectorAll('.copy-product-item').forEach(el => {
+        const id = parseInt(el.getAttribute('data-id'), 10);
+        const triggerClone = () => {
+            if (id) cloneFromProduct(id);
+        };
+        el.addEventListener('click', triggerClone);
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                triggerClone();
+            }
+        });
+    });
+}
+
+async function cloneFromProduct(productId) {
+    try {
+        const copyModal = getModal('copy-product-modal');
+        if (copyModal) copyModal.hide();
+
+        const res = await fetch(`${PRODUCTS_API}/${productId}`, { headers: authHeaders() });
+        if (!res.ok) {
+            showToast('No se pudo cargar la información del producto base', 'danger');
+            return;
+        }
+        const p = await res.json();
+        const variante = p.variantes && p.variantes[0] ? p.variantes[0] : null;
+        const inventario = variante && variante.inventarios && variante.inventarios[0] ? variante.inventarios[0] : null;
+
+        await resetProductForm();
+
+        // 1. Limpiar identificadores para asegurar que se cree como producto NUEVO
+        inputFor('product-form', 'product-id').value = '';
+        inputFor('product-form', 'variante-id').value = '';
+        inputFor('product-form', 'inventario-id').value = '';
+
+        // 2. Copiar datos del producto base
+        inputFor('product-form', 'nombre').value = p.nombre || '';
+        inputFor('product-form', 'descripcion').value = p.descripcion || '';
+        inputFor('product-form', 'imagen_url').value = p.imagen_url || '';
+        setProductImagePreview(p.imagen_url || '');
+
+        // 3. Precios y costo
+        inputFor('product-form', 'precio_detalle').value = variante ? (variante.precio_detalle || '') : '';
+        inputFor('product-form', 'precio_mayoreo').value = variante ? (variante.precio_mayoreo || '') : '';
+        inputFor('product-form', 'costo_promedio').value = variante ? (variante.costo_promedio || '') : '';
+
+        // 4. Ubicación y stock mínimo
+        inputFor('product-form', 'stock_minimo').value = (inventario && inventario.stock_minimo !== undefined && inventario.stock_minimo !== null) ? inventario.stock_minimo : 5;
+
+        // 5. CAMPOS OBLIGATORIAMENTE VACÍOS (Seguridad de Stock)
+        // Código de barras: completamente vacío
+        inputFor('product-form', 'codigo_barras').value = '';
+        // Stock actual: vacío o 0
+        inputFor('product-form', 'stock_actual').value = '';
+
+        // 6. Subcategoría y Unidad
+        const sucursalId = inventario ? inventario.id_sucursal : null;
+        await Promise.all([
+            populateSubcategorias('id_subcategoria', p.id_subcategoria, '-- Seleccione subcategoría --'),
+            populateUnidades('id_unidad', p.id_unidad, '-- Seleccione unidad --'),
+            populateSucursales('id_sucursal', sucursalId, '-- Seleccione sucursal --'),
+        ]);
+        const finalSucursalId = document.getElementById('id_sucursal')?.value || sucursalId || 1;
+        await populateAreas('id_area', finalSucursalId, inventario ? inventario.id_area : null);
+
+        document.getElementById('product-modal-title').textContent = 'Nuevo Producto';
+        baseSaveTextProduct = 'Guardar';
+        const text = document.getElementById('btn-save-product-text');
+        if (text) text.textContent = baseSaveTextProduct;
+
+        const modalEl = document.getElementById('product-modal');
+        const focusBarcodeInput = () => {
+            const barcodeInput = inputFor('product-form', 'codigo_barras');
+            if (barcodeInput) {
+                barcodeInput.focus();
+                barcodeInput.select();
+            }
+        };
+
+        if (modalEl) {
+            modalEl.addEventListener('shown.bs.modal', focusBarcodeInput, { once: true });
+        }
+
+        const modal = getModal('product-modal');
+        if (modal) modal.show();
+
+        // 7. Cursor enfocado automáticamente en el código de barras para recibir la pistola
+        setTimeout(focusBarcodeInput, 400);
+        setTimeout(focusBarcodeInput, 700);
+
+        showToast(`Datos base copiados de "${p.nombre}". Escanea el nuevo código y define el stock.`, 'info');
+    } catch (err) {
+        showToast('Error al clonar el producto: ' + err.message, 'danger');
+    }
+}
+window.cloneFromProduct = cloneFromProduct;
+window.openCopyProductModal = openCopyProductModal;
+
+// ---------------------------------------------------------------------------
 // Formulario / Modal de Producto
 // ---------------------------------------------------------------------------
 
@@ -1014,6 +1330,7 @@ async function resetProductForm() {
     if (fileInput) fileInput.value = '';
     setProductImageUploading(false);
     setProductImagePreview('');
+
     // REDISEÑO UI/UX: el campo de URL vuelve a estar plegado al reabrir el modal.
     const urlWrapper = document.getElementById('imagen-url-wrapper');
     const urlToggle = document.getElementById('toggle-imagen-url');
@@ -1028,12 +1345,16 @@ async function resetProductForm() {
     baseSaveTextProduct = 'Guardar';
     const text = document.getElementById('btn-save-product-text');
     if (text) text.textContent = baseSaveTextProduct;
+
+    // Automatización de campos: preseleccionar ubicación principal del usuario (cero clics)
     await Promise.all([
         populateSubcategorias('id_subcategoria', null, '-- Seleccione subcategoría --'),
         populateUnidades('id_unidad', null, '-- Seleccione unidad --'),
         populateSucursales('id_sucursal', null, '-- Seleccione sucursal --'),
     ]);
-    populateAreas('id_area', null);
+    const sucursalSelect = document.getElementById('id_sucursal');
+    const defaultSucursalId = sucursalSelect?.value || 1;
+    await populateAreas('id_area', defaultSucursalId);
 }
 
 function openCreateProductModal() {
@@ -1072,10 +1393,13 @@ async function editProduct(productId) {
         if (imagenFileInput) imagenFileInput.value = '';
         setProductImagePreview(p.imagen_url || '');
         inputFor('product-form', 'codigo_barras').value = variante ? (variante.codigo_barras || '') : '';
-        // REDISEÑO UI/UX: al editar se precarga el atributo universal combinando
-        // Talla + Color (campo de captura rápida para inventarios mixtos).
-        const atributoUnificado = [variante?.talla, variante?.color].filter(Boolean).join(' · ');
-        inputFor('product-form', 'atributo_variante').value = atributoUnificado;
+        
+        const attrInput = inputFor('product-form', 'atributo_variante');
+        if (attrInput) {
+            const atributoUnificado = [variante?.talla, variante?.color].filter(Boolean).join(' · ');
+            attrInput.value = atributoUnificado;
+        }
+
         inputFor('product-form', 'precio_detalle').value = variante ? variante.precio_detalle : '';
         inputFor('product-form', 'precio_mayoreo').value = variante ? variante.precio_mayoreo : '';
         inputFor('product-form', 'costo_promedio').value = variante ? variante.costo_promedio : '';
@@ -1231,10 +1555,8 @@ async function saveProduct(event) {
         imagen_url: inputFor(formId, 'imagen_url')?.value?.trim() || '',
         variante: {
             codigo_barras: inputFor(formId, 'codigo_barras')?.value?.trim() || null,
-            // REDISEÑO UI/UX: el atributo universal reemplaza a Talla/Color.
-            // Se guarda en "color" (String(30)) para admitir valores largos.
             talla: null,
-            color: inputFor(formId, 'atributo_variante')?.value?.trim() || null,
+            color: null,
             precio_detalle: numPrecioDetalle,
             precio_mayoreo: numPrecioMayoreo,
             costo_promedio: numCosto,
@@ -1246,6 +1568,7 @@ async function saveProduct(event) {
             stock_minimo: numStockMin,
         },
     };
+
     if (id) payload.estado = inputFor(formId, 'product_is_active')?.checked ? 'Activo' : 'Inactivo';
 
     const url = id ? `${PRODUCTS_API}/${id}` : PRODUCTS_API;
@@ -1260,9 +1583,10 @@ async function saveProduct(event) {
         const createdProduct = await res.json().catch(() => null);
         const modal = getModal('product-modal');
         if (modal) modal.hide();
-        // REDISEÑO UI/UX: cada valor nuevo se suma a las sugerencias del combobox
-        // de atributo universal para agilizar la captura en inventarios mixtos.
-        registerAtributoSugerido(inputFor(formId, 'atributo_variante')?.value?.trim() || '');
+        
+        const attrVal = inputFor(formId, 'atributo_variante')?.value?.trim();
+        if (attrVal) registerAtributoSugerido(attrVal);
+
         showToast(id ? 'Producto actualizado correctamente.' : 'Producto creado correctamente.', 'success');
 
         // Hook de callback para compras u otros módulos que invocan el modal
@@ -1455,6 +1779,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initCatalogRealtimeValidation('product-form');
     }
     initAtributoCombobox();
+    initCopyProductModal();
 
     const dropzone = document.getElementById('product-image-dropzone');
     const imageFileInput = document.getElementById('imagen_file');

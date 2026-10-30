@@ -30,11 +30,26 @@ class Usuario(Base):
     id_rol = Column(Integer, ForeignKey("rol.id_rol"), nullable=False, index=True)
     nombre_completo = Column(String(100), nullable=False)
     username = Column(String(50), nullable=False, unique=True)
+    email = Column(String(100), unique=True, nullable=True)
     password_hash = Column(String(255), nullable=False)
     estado = Column(String(20), nullable=False)
     fecha_creacion = Column(DateTime, server_default=func.now(), default=datetime.utcnow, nullable=False)
 
     rol = relationship("Rol", back_populates="usuarios")
+    codigos_recuperacion = relationship("CodigoRecuperacion", back_populates="usuario", cascade="all, delete-orphan")
+
+
+class CodigoRecuperacion(Base):
+    __tablename__ = "codigo_recuperacion"
+
+    id_codigo = Column(Integer, primary_key=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario", ondelete="CASCADE"), nullable=False, index=True)
+    codigo = Column(String(6), nullable=False, index=True)
+    expira_en = Column(DateTime, nullable=False)
+    usado = Column(Boolean, default=False, nullable=False)
+    fecha_creacion = Column(DateTime, server_default=func.now(), default=datetime.utcnow, nullable=False)
+
+    usuario = relationship("Usuario", back_populates="codigos_recuperacion")
 
 
 class Permiso(Base):

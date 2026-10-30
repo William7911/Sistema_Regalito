@@ -179,6 +179,52 @@ class ConcreteProductService(ProductService):
             fecha_actualizacion=datetime.utcnow(),
         )
         await self.products.add_inventario(inventario)
+
+        # Variantes adicionales agregadas en la misma pantalla (tallas/colores)
+        if data.variantes_extra:
+            for extra in data.variantes_extra:
+                extra_barcode = extra.codigo_barras.strip() if extra.codigo_barras else None
+                if not extra_barcode:
+                    extra_barcode = await self.generate_unique_barcode()
+                else:
+                    await self._validate_unique_barcode(extra_barcode)
+
+                extra_talla = extra.talla.strip() if extra.talla else None
+                extra_color = extra.color.strip() if extra.color else None
+                if not extra_talla and not extra_color and extra.nombre:
+                    nombre_clean = extra.nombre.strip()
+                    if "," in nombre_clean:
+                        parts = [p.strip() for p in nombre_clean.split(",", 1)]
+                        extra_talla = parts[0][:20] if parts[0] else None
+                        extra_color = parts[1][:30] if len(parts) > 1 and parts[1] else None
+                    else:
+                        extra_color = nombre_clean[:30]
+
+                p_det = extra.precio_detalle if extra.precio_detalle is not None else data.variante.precio_detalle
+                p_may = extra.precio_mayoreo if extra.precio_mayoreo is not None else data.variante.precio_mayoreo
+                c_prom = extra.costo_promedio if extra.costo_promedio is not None else data.variante.costo_promedio
+
+                variante_extra = VarianteProducto(
+                    id_producto=producto.id_producto,
+                    codigo_barras=extra_barcode,
+                    talla=extra_talla,
+                    color=extra_color,
+                    precio_detalle=p_det,
+                    precio_mayoreo=p_may,
+                    costo_promedio=c_prom,
+                )
+                variante_extra = await self.products.add_variante(variante_extra)
+
+                inv_extra = InventarioSucursal(
+                    id_variante=variante_extra.id_variante,
+                    id_sucursal=data.inventario.id_sucursal,
+                    id_area=data.inventario.id_area,
+                    stock_actual=extra.stock_actual,
+                    stock_minimo=data.inventario.stock_minimo,
+                    fecha_actualizacion=datetime.utcnow(),
+                )
+                await self.products.add_inventario(inv_extra)
+
         await self.products.commit()
 
         created = await self.products.get_producto_by_id(producto.id_producto)
@@ -276,6 +322,75 @@ class ConcreteProductService(ProductService):
             if inv.stock_minimo is not None:
                 inventario.stock_minimo = inv.stock_minimo
             inventario.fecha_actualizacion = datetime.utcnow()
+
+        if data.variantes_extra is not None:
+            suc_id = data.inventario.id_sucursal if (data.inventario and data.inventario.id_sucursal) else (inventario.id_sucursal if inventario else 1)
+            ar_id = data.inventario.id_area if data.inventario else (inventario.id_area if inventario else None)
+            min_stk = data.inventario.stock_minimo if (data.inventario and data.inventario.stock_minimo is not None) else (inventario.stock_minimo if inventario else 0)
+
+            for extra in data.variantes_extra:
+                if extra.id_variante:
+                    var_existente = await self.products.get_variante_by_id(extra.id_variante)
+                    if var_existente and var_existente.id_producto == product_id:
+                        if extra.codigo_barras:
+                            await self._validate_unique_barcode(extra.codigo_barras, var_existente.id_variante)
+                            var_existente.codigo_barras = extra.codigo_barras.strip()
+                        if extra.talla is not None:
+                            var_existente.talla = extra.talla.strip() if extra.talla else None
+                        if extra.color is not None:
+                            var_existente.color = extra.color.strip() if extra.color else None
+                        if extra.nombre and not extra.talla and not extra.color:
+                            if "," in extra.nombre:
+                                parts = [p.strip() for p in extra.nombre.split(",", 1)]
+                                var_existente.talla = parts[0][:20]
+                                var_existente.color = parts[1][:30]
+                            else:
+                                var_existente.color = extra.nombre.strip()[:30]
+                        if var_existente.inventarios:
+                            inv_item = var_existente.inventarios[0]
+                            inv_item.stock_actual = extra.stock_actual
+                            inv_item.fecha_actualizacion = datetime.utcnow()
+                else:
+                    extra_barcode = extra.codigo_barras.strip() if extra.codigo_barras else None
+                    if not extra_barcode:
+                        extra_barcode = await self.generate_unique_barcode()
+                    else:
+                        await self._validate_unique_barcode(extra_barcode)
+
+                    extra_talla = extra.talla.strip() if extra.talla else None
+                    extra_color = extra.color.strip() if extra.color else None
+                    if not extra_talla and not extra_color and extra.nombre:
+                        nombre_clean = extra.nombre.strip()
+                        if "," in nombre_clean:
+                            parts = [p.strip() for p in nombre_clean.split(",", 1)]
+                            extra_talla = parts[0][:20] if parts[0] else None
+                            extra_color = parts[1][:30] if len(parts) > 1 and parts[1] else None
+                        else:
+                            extra_color = nombre_clean[:30]
+
+                    base_det = data.variante.precio_detalle if (data.variante and data.variante.precio_detalle) else (variante.precio_detalle if variante else 0)
+                    base_may = data.variante.precio_mayoreo if (data.variante and data.variante.precio_mayoreo) else (variante.precio_mayoreo if variante else 0)
+                    base_cost = data.variante.costo_promedio if (data.variante and data.variante.costo_promedio) else (variante.costo_promedio if variante else 0)
+
+                    new_var = VarianteProducto(
+                        id_producto=product_id,
+                        codigo_barras=extra_barcode,
+                        talla=extra_talla,
+                        color=extra_color,
+                        precio_detalle=extra.precio_detalle or base_det,
+                        precio_mayoreo=extra.precio_mayoreo or base_may,
+                        costo_promedio=extra.costo_promedio or base_cost,
+                    )
+                    new_var = await self.products.add_variante(new_var)
+                    new_inv = InventarioSucursal(
+                        id_variante=new_var.id_variante,
+                        id_sucursal=suc_id,
+                        id_area=ar_id,
+                        stock_actual=extra.stock_actual,
+                        stock_minimo=min_stk,
+                        fecha_actualizacion=datetime.utcnow(),
+                    )
+                    await self.products.add_inventario(new_inv)
 
         await self.products.commit()
 

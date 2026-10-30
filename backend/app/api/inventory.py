@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/inventory", tags=["Inventario"])
 async def list_inventory(
     id_sucursal: Optional[int] = Query(None),
     low_stock_only: bool = Query(False),
-    current_user: Usuario = Depends(require_permission("INV_VER")),
+    current_user: Usuario = Depends(require_permission("INV_INGRESAR_MERCADERIA", "INV_VER", "VENTA_COBRAR")),
     service: ConcreteInventoryService = Depends(get_inventory_service)
 ):
     return await service.get_all_inventory(id_sucursal=id_sucursal, low_stock_only=low_stock_only)
@@ -20,7 +20,7 @@ async def list_inventory(
 async def update_inventory(
     id_inventario: int,
     payload: InventoryUpdate,
-    current_user: Usuario = Depends(require_permission("INV_MODIFICAR")),
+    current_user: Usuario = Depends(require_permission("INV_INGRESAR_MERCADERIA", "INV_MODIFICAR")),
     service: ConcreteInventoryService = Depends(get_inventory_service)
 ):
     return await service.update_inventory(id_inventario, payload, current_user)
@@ -29,7 +29,7 @@ async def update_inventory(
 async def adjust_stock(
     id_inventario: int,
     payload: StockAdjustment,
-    current_user: Usuario = Depends(require_permission("INV_AJUSTAR_STOCK")),
+    current_user: Usuario = Depends(require_permission("INV_INGRESAR_MERCADERIA", "INV_AJUSTAR_STOCK")),
     service: ConcreteInventoryService = Depends(get_inventory_service)
 ):
     return await service.adjust_stock(id_inventario, payload, current_user)
@@ -37,7 +37,7 @@ async def adjust_stock(
 @router.get("/alerts", response_model=List[AlertaStockResponse])
 async def list_alerts(
     id_sucursal: Optional[int] = Query(None),
-    current_user: Usuario = Depends(require_permission("INV_VER_ALERTAS")),
+    current_user: Usuario = Depends(require_permission("INV_INGRESAR_MERCADERIA", "INV_VER_ALERTAS", "VENTA_COBRAR")),
     service: ConcreteInventoryService = Depends(get_inventory_service)
 ):
     return await service.get_alerts(id_sucursal=id_sucursal)

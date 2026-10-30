@@ -1,4 +1,4 @@
-﻿const REPORTES_API_URL = '/api/reportes';
+const REPORTES_API_URL = '/api/reportes';
 
 // Utilidades locales para formateo y seguridad (autocontenido)
 function formatoQuetzal(value) {
@@ -46,6 +46,7 @@ function toDateString(d) {
 
 let reportesChartTab = 'tendencia';
 let reportesChartInstance = null;
+let reportesLastChartData = null;
 let reportesChartToken = 0;
 let reportesRankTipo = 'productos';
 let reportesRankLimite = 5;
@@ -931,6 +932,7 @@ function graficaPlaceholder(innerHTML) {
  *   no se recupera si se instancia oculto o con 0x0).
  */
 function renderGrafica(data) {
+    reportesLastChartData = data;
     const cardBody = document.querySelector('.reportes-chart-card .card-body');
     if (!cardBody) return;
 
@@ -1002,6 +1004,7 @@ const barValueLabelsPlugin = {
         const isHorizontal = chart.config.options.indexAxis === 'y';
         if (!data.datasets || !data.datasets[0] || !data.datasets[0].data) return;
         
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.getAttribute('data-bs-theme') === 'dark';
         const totalSum = data.datasets[0].data.reduce((a, b) => a + (Number(b) || 0), 0);
         
         chart.data.datasets.forEach((dataset, i) => {
@@ -1012,7 +1015,7 @@ const barValueLabelsPlugin = {
                 if (val <= 0) return;
                 ctx.save();
                 ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-                ctx.fillStyle = '#0f172a';
+                ctx.fillStyle = isDark ? '#F8FAFC' : '#0F172A';
                 
                 if (isHorizontal) {
                     const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : '0';
@@ -1044,6 +1047,13 @@ function construirConfiguracionGrafica(tipo, data) {
     const valores = (data.valores || []).map((v) => Number(v) || 0);
     const paleta = ['#0A5C5E', '#0d7377', '#14b8a6', '#059669', '#10b981', '#f59e0b', '#2563eb', '#7c3aed', '#dc2626', '#64748b'];
 
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    const textColor = isDark ? '#F8FAFC' : '#1e293b';
+    const textMutedColor = isDark ? '#CBD5E1' : '#334155';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9';
+    const tooltipBg = isDark ? '#1E293B' : '#0F172A';
+    const tooltipBorder = isDark ? '#334155' : 'transparent';
+
     if (tipo === 'categoria') {
         return {
             type: 'bar',
@@ -1068,6 +1078,11 @@ function construirConfiguracionGrafica(tipo, data) {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: '#FFFFFF',
+                        bodyColor: '#FFFFFF',
+                        borderColor: tooltipBorder,
+                        borderWidth: isDark ? 1 : 0,
                         callbacks: {
                             label: (ctx) => ` Total: ${formatoQuetzal(ctx.parsed.x)}`
                         }
@@ -1077,14 +1092,17 @@ function construirConfiguracionGrafica(tipo, data) {
                     x: {
                         beginAtZero: true,
                         grace: '20%',
-                        ticks: { callback: (v) => `Q${Number(v).toLocaleString('es-GT')}` },
-                        grid: { color: '#f1f5f9' }
+                        ticks: {
+                            color: textMutedColor,
+                            callback: (v) => `Q${Number(v).toLocaleString('es-GT')}`
+                        },
+                        grid: { color: gridColor }
                     },
                     y: {
                         grid: { display: false },
                         ticks: {
                             font: { weight: '600', size: 12 },
-                            color: '#1e293b'
+                            color: textColor
                         }
                     }
                 }
@@ -1101,8 +1119,8 @@ function construirConfiguracionGrafica(tipo, data) {
             datasets: [{
                 label: 'Ventas por Día (Q)',
                 data: valores,
-                backgroundColor: '#0d7377',
-                hoverBackgroundColor: '#0A5C5E',
+                backgroundColor: isDark ? '#14b8a6' : '#0d7377',
+                hoverBackgroundColor: isDark ? '#2dd4bf' : '#0A5C5E',
                 borderRadius: 6,
                 maxBarThickness: 45,
             }],
@@ -1116,6 +1134,11 @@ function construirConfiguracionGrafica(tipo, data) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    backgroundColor: tooltipBg,
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#FFFFFF',
+                    borderColor: tooltipBorder,
+                    borderWidth: isDark ? 1 : 0,
                     callbacks: {
                         label: (ctx) => ` Ventas: ${formatoQuetzal(ctx.parsed.y)}`
                     }
@@ -1125,14 +1148,17 @@ function construirConfiguracionGrafica(tipo, data) {
                 y: {
                     beginAtZero: true,
                     grace: '15%',
-                    ticks: { callback: (v) => `Q${Number(v).toLocaleString('es-GT')}` },
-                    grid: { color: '#f1f5f9' }
+                    ticks: {
+                        color: textMutedColor,
+                        callback: (v) => `Q${Number(v).toLocaleString('es-GT')}`
+                    },
+                    grid: { color: gridColor }
                 },
                 x: {
                     grid: { display: false },
                     ticks: {
                         font: { weight: '600', size: 11 },
-                        color: '#334155'
+                        color: textMutedColor
                     }
                 }
             }
@@ -1282,6 +1308,13 @@ function cargarRanking() {
         });
 }
 
+
+// Adaptación reactiva al cambio de tema claro/oscuro
+window.addEventListener('themeChanged', () => {
+    if (reportesChartInstance && reportesLastChartData) {
+        renderGrafica(reportesLastChartData);
+    }
+});
 
 // Exportaciones globales para integración con app.js y atajos del DOM
 window.initReportesView = initReportesView;

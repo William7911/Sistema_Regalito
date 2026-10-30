@@ -77,8 +77,12 @@ class ConcreteInventoryService:
         resp = InventoryResponse.model_validate(item)
         if item.variante:
             resp.variante_sku = item.variante.codigo_barras
+            resp.talla = item.variante.talla
+            resp.color = item.variante.color
             if item.variante.producto:
+                resp.id_producto = item.variante.producto.id_producto
                 resp.producto_nombre = item.variante.producto.nombre
+                resp.producto_estado = item.variante.producto.estado
                 resp.imagen_url = item.variante.producto.imagen_url
         if item.sucursal:
             resp.sucursal_nombre = item.sucursal.nombre

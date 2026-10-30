@@ -17,7 +17,6 @@ from app.repositories.merma_repository import MermaRepositoryImpl
 from app.repositories.sale_repository import SaleRepositoryImpl
 from app.repositories.fel_repository import FelRepositoryImpl
 from app.repositories.login_attempt_repository import LoginAttemptRepositoryImpl
-from app.repositories.sync_repository import SyncRepositoryImpl
 from app.services.category_service import ConcreteCategoryService
 from app.services.product_service import ConcreteProductService
 from app.services.catalogo_service import ConcreteCatalogoService
@@ -28,7 +27,6 @@ from app.services.cash_service import ConcreteCashService
 from app.services.merma_service import ConcreteMermaService
 from app.services.sale_service import ConcreteSaleService
 from app.services.login_security_service import LoginSecurityService
-from app.services.sync_service import ConcreteSyncService
 from app.repositories.health_repository import HealthRepositoryImpl
 from app.services.health_service import ConcreteHealthService
 
@@ -212,19 +210,20 @@ async def get_current_user(
 from app.core.permissions import check_user_permission
 
 
-def require_permission(permission_code: str):
-    """Dependencia de FastAPI que valida si el usuario autenticado tiene el permiso especificado."""
+def require_permission(*permission_codes: str):
+    """Dependencia de FastAPI que valida si el usuario autenticado tiene al menos uno de los permisos especificados."""
     async def permission_dependency(
         current_user: Usuario = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> Usuario:
-        allowed = await check_user_permission(db, current_user, permission_code)
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"No tiene permisos para realizar esta acción ({permission_code})",
-            )
-        return current_user
+        for code in permission_codes:
+            if await check_user_permission(db, current_user, code):
+                return current_user
+        codes_str = ", ".join(permission_codes)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"No tiene permisos para realizar esta acción ({codes_str})",
+        )
 
     return permission_dependency
 
@@ -311,9 +310,7 @@ def get_login_security_service(db: AsyncSession = Depends(get_db)) -> LoginSecur
     return LoginSecurityService(repository)
 
 
-def get_sync_service(db: AsyncSession = Depends(get_db)) -> ConcreteSyncService:
-    repository = SyncRepositoryImpl(db)
-    return ConcreteSyncService(repository)
+
 
 
 def get_health_service(db: AsyncSession = Depends(get_db)) -> ConcreteHealthService:
