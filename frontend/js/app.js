@@ -5,7 +5,7 @@ const systemModule = document.getElementById('system-module');
 
 // Array of all auth views to easily hide them
 const authViews = ['view-login', 'view-recover', 'view-verify', 'view-reset'];
-const mainViews = ['dashboard', 'pos', 'users', 'roles', 'clients', 'bitacora', 'historial', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras', 'mermas', 'traslados', 'visitas'];
+const mainViews = ['dashboard', 'pos', 'users', 'roles', 'clients', 'bitacora', 'historial', 'catalog', 'cash', 'reportes', 'configuracion', 'inventory', 'compras', 'mermas', 'traslados', 'visitas', 'ventas'];
 let currentView = null;
 
 // ---------------------------------------------------------------------------
@@ -356,6 +356,7 @@ function applyRoleRestrictions() {
         historial: isUserAdmin || window.hasPermission('REPORTE_VER'),
         reportes: isUserAdmin || window.hasPermission('REPORTE_VER'),
         configuracion: isUserAdmin,
+        ventas: isUserAdmin || window.hasPermission('REPORTE_VER') || window.hasPermission('VENTA_COBRAR'),
     };
 
     // 1. Sidebar Items
@@ -417,6 +418,7 @@ function canAccessView(viewKey) {
     if (viewKey === 'bitacora') return window.hasPermission('BITACORA_CONSULTAR');
     if (viewKey === 'historial') return window.hasPermission('REPORTE_VER');
     if (viewKey === 'reportes') return window.hasPermission('REPORTE_VER');
+    if (viewKey === 'ventas') return window.hasPermission('REPORTE_VER') || window.hasPermission('VENTA_COBRAR');
 
     return false;
 }
@@ -563,6 +565,9 @@ function renderView(viewKey) {
     if (viewKey === 'visitas' && typeof window.showVisitasModule === 'function') {
         window.showVisitasModule();
     }
+    if (viewKey === 'ventas' && typeof window.showVentasModule === 'function') {
+        window.showVentasModule();
+    }
 }
 
 // Navega a un módulo actualizando el hash de la URL sin recargar la página.
@@ -647,6 +652,7 @@ const moduleLabels = {
     mermas: 'Mermas',
     traslados: 'Traslados',
     visitas: 'Visitas de Seguimiento',
+    ventas: 'Ventas',
 };
 
 // Abre un módulo desde el dashboard o navegación lateral

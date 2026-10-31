@@ -1496,7 +1496,17 @@
         }
         renderTicketPreview();
         document.body.classList.add('pos-printing');
+
+        // Nombre de archivo único para guardar como PDF (evita nombres repetidos)
+        const idVenta = state.ticket.venta ? state.ticket.venta.id_venta : Date.now();
+        const fechaStr = state.ticket.venta && state.ticket.venta.fecha_venta
+            ? new Date(state.ticket.venta.fecha_venta).toLocaleDateString('es-GT').replace(/\//g, '-')
+            : new Date().toLocaleDateString('es-GT').replace(/\//g, '-');
+        const prevTitle = document.title;
+        document.title = `Ticket-Venta-${idVenta}-${fechaStr}`;
+
         const cleanup = () => {
+            document.title = prevTitle;
             document.body.classList.remove('pos-printing');
             window.removeEventListener('afterprint', cleanup);
         };

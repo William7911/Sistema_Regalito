@@ -230,6 +230,23 @@ class TurnoCajaRepositoryImpl(TurnoCajaRepository):
         res_out = await self.db.execute(stmt_out)
         return Decimal(str(res_in.scalar_one())), Decimal(str(res_out.scalar_one()))
 
+    async def get_resumen_ventas_turno(self, id_turno: int) -> Tuple[Decimal, int]:
+        """Calcula el total de ventas (todos los métodos) y la cantidad de ventas del turno."""
+        stmt = (
+            select(
+                func.coalesce(func.sum(Venta.total_venta), 0),
+                func.count(Venta.id_venta),
+            )
+            .select_from(Venta)
+            .where(
+                Venta.id_turno == id_turno,
+                Venta.estado != "Anulada",
+            )
+        )
+        res = await self.db.execute(stmt)
+        total, cantidad = res.one()
+        return Decimal(str(total)), int(cantidad)
+
     async def create_movimiento(self, movimiento: MovimientoCaja) -> MovimientoCaja:
         self.db.add(movimiento)
         await self.db.flush()

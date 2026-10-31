@@ -135,11 +135,14 @@ class ConcreteCashService(CashRegisterService):
         
         monto_apertura = Decimal(str(active.monto_apertura or 0))
         ventas = await self.uow.turnos.get_efectivo_ventas_turno(active.id_turno)
+        total_ventas, cant_ventas = await self.uow.turnos.get_resumen_ventas_turno(active.id_turno)
         entradas, salidas = await self.uow.turnos.get_movimientos_caja_turno(active.id_turno)
         esperado = monto_apertura + ventas + entradas - salidas
 
         resp = schemas.TurnoResponse.model_validate(active)
         resp.ventas_efectivo = ventas
+        resp.total_ventas = total_ventas
+        resp.cantidad_ventas = cant_ventas
         resp.entradas_efectivo = entradas
         resp.salidas_efectivo = salidas
         resp.efectivo_esperado = esperado

@@ -346,6 +346,8 @@ class TurnoResponse(BaseModel):
 
     # Métricas calculadas para cuadre híbrido y accesibilidad
     ventas_efectivo: Optional[Decimal] = Decimal("0.00")
+    total_ventas: Optional[Decimal] = Decimal("0.00")
+    cantidad_ventas: Optional[int] = 0
     entradas_efectivo: Optional[Decimal] = Decimal("0.00")
     salidas_efectivo: Optional[Decimal] = Decimal("0.00")
     efectivo_esperado: Optional[Decimal] = Decimal("0.00")

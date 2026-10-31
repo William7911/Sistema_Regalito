@@ -24,8 +24,13 @@
         modal: document.getElementById('inventory-modal'),
         form: document.getElementById('inventory-form'),
         inputId: document.getElementById('inv-id'),
+        inputIdProducto: document.getElementById('inv-id-producto'),
         inputProducto: document.getElementById('inv-producto'),
         inputStockActual: document.getElementById('inv-stock-actual'),
+        inputImagenFile: document.getElementById('inv-imagen-file'),
+        inputImagenPreview: document.getElementById('inv-imagen-preview'),
+        inputImagenPlaceholder: document.getElementById('inv-imagen-placeholder'),
+        inputImagenStatus: document.getElementById('inv-imagen-status'),
         inputMotivo: document.getElementById('inv-motivo'),
         inputCantidad: document.getElementById('inv-cantidad'),
         btnSave: document.getElementById('btn-save-inventory')
@@ -177,6 +182,102 @@
                     input.classList.remove('is-invalid');
                 });
             });
+        }
+
+        // Subida de imagen de producto desde el modal de inventario
+        if (DOM.inputImagenFile) {
+            DOM.inputImagenFile.addEventListener('change', handleImageUpload);
+        }
+    }
+
+    async function handleImageUpload(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const idProducto = DOM.inputIdProducto ? DOM.inputIdProducto.value : '';
+        const idInventario = DOM.inputId ? parseInt(DOM.inputId.value, 10) : 0;
+        if (!idProducto) {
+            if (DOM.inputImagenStatus) DOM.inputImagenStatus.innerHTML = '<span class="text-danger">No se encontró el ID de producto asociado.</span>';
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            if (DOM.inputImagenStatus) DOM.inputImagenStatus.innerHTML = '<span class="text-danger">La imagen supera el límite de 5 MB.</span>';
+            DOM.inputImagenFile.value = '';
+            return;
+        }
+
+        if (DOM.inputImagenStatus) {
+            DOM.inputImagenStatus.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Subiendo imagen...</span>';
+        }
+
+        try {
+            const token = (typeof window.getToken === 'function' ? window.getToken() : null) || sessionStorage.getItem('jwt_token') || localStorage.getItem('jwt_token') || '';
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadRes = await fetch('/api/productos/upload-imagen', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (!uploadRes.ok) {
+                const errData = await uploadRes.json().catch(() => null);
+                throw new Error((errData && errData.detail) || 'Error al subir la imagen');
+            }
+
+            const uploadData = await uploadRes.json();
+            const imagenUrl = uploadData.imagen_url;
+
+            // Actualizar producto en backend
+            const patchRes = await fetch(`/api/productos/${idProducto}/imagen`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ imagen_url: imagenUrl })
+            });
+
+            if (!patchRes.ok) {
+                const patchErr = await patchRes.json().catch(() => null);
+                throw new Error((patchErr && patchErr.detail) || 'Error al asociar imagen con el producto');
+            }
+
+            // Actualizar en el estado local de inventario
+            inventoryData.forEach(item => {
+                if (Number(item.id_producto) === Number(idProducto) || Number(item.id_inventario) === idInventario) {
+                    item.imagen_url = imagenUrl;
+                }
+            });
+
+            // Actualizar UI del modal
+            if (DOM.inputImagenPreview) {
+                DOM.inputImagenPreview.src = imagenUrl;
+                DOM.inputImagenPreview.style.display = 'block';
+            }
+            if (DOM.inputImagenPlaceholder) {
+                DOM.inputImagenPlaceholder.style.display = 'none';
+            }
+            if (DOM.inputImagenStatus) {
+                DOM.inputImagenStatus.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Imagen actualizada correctamente.</span>';
+            }
+
+            // Refrescar tabla en segundo plano
+            renderTable();
+
+            if (typeof window.showToast === 'function') {
+                window.showToast('Imagen del producto actualizada', 'success');
+            }
+        } catch (err) {
+            console.error('Error al subir imagen:', err);
+            if (DOM.inputImagenStatus) {
+                DOM.inputImagenStatus.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${esc(err.message)}</span>`;
+            }
+            if (typeof window.showToast === 'function') {
+                window.showToast(err.message, 'danger');
+            }
         }
     }
 
@@ -531,10 +632,32 @@
 
         clearValidation();
         if (DOM.inputId) DOM.inputId.value = item.id_inventario;
+        if (DOM.inputIdProducto) DOM.inputIdProducto.value = item.id_producto || '';
         if (DOM.inputProducto) DOM.inputProducto.value = `${item.producto_nombre || ''} (${item.variante_sku || ''})`;
         if (DOM.inputStockActual) DOM.inputStockActual.value = item.stock_actual;
         if (DOM.inputMotivo) DOM.inputMotivo.value = '';
         if (DOM.inputCantidad) DOM.inputCantidad.value = '';
+
+        // Cargar imagen actual del producto
+        if (DOM.inputImagenFile) DOM.inputImagenFile.value = '';
+        if (DOM.inputImagenStatus) DOM.inputImagenStatus.textContent = '';
+        if (item.imagen_url && item.imagen_url.trim()) {
+            if (DOM.inputImagenPreview) {
+                DOM.inputImagenPreview.src = item.imagen_url.trim();
+                DOM.inputImagenPreview.style.display = 'block';
+            }
+            if (DOM.inputImagenPlaceholder) {
+                DOM.inputImagenPlaceholder.style.display = 'none';
+            }
+        } else {
+            if (DOM.inputImagenPreview) {
+                DOM.inputImagenPreview.src = '';
+                DOM.inputImagenPreview.style.display = 'none';
+            }
+            if (DOM.inputImagenPlaceholder) {
+                DOM.inputImagenPlaceholder.style.display = 'flex';
+            }
+        }
 
         if (DOM.form) {
             initialFormData = new URLSearchParams(new FormData(DOM.form)).toString();

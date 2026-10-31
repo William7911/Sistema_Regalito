@@ -316,7 +316,12 @@ function renderCashStatusCard(turno) {
         const efectivoEsperado = computeExpectedCash(turno);
         activeExpectedCash = efectivoEsperado;
 
+        const totalVentasEl = document.getElementById('cash-active-total-ventas');
+        const cantidadVentasEl = document.getElementById('cash-active-cantidad-ventas');
+
         if (ventasEl) ventasEl.textContent = formatCurrency(ventasEfectivo);
+        if (totalVentasEl) totalVentasEl.textContent = formatCurrency(turno.total_ventas != null ? turno.total_ventas : ventasEfectivo);
+        if (cantidadVentasEl) cantidadVentasEl.textContent = turno.cantidad_ventas != null ? turno.cantidad_ventas : '—';
         if (esperadoEl) esperadoEl.textContent = formatCurrency(efectivoEsperado);
         if (fechaEl) fechaEl.textContent = formatDateTime(turno.fecha_apertura);
 

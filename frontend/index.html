@@ -190,6 +190,11 @@
                         <i class="bi bi-cart-fill me-2"></i> POS / Ventas
                     </a>
                 </li>
+                <li data-module-item="ventas">
+                    <a href="#" id="nav-ventas" class="nav-link text-white-50 sidebar-link" data-nav="ventas" onclick="navigateTo('ventas'); return false;">
+                        <i class="bi bi-receipt me-2"></i> Ventas
+                    </a>
+                </li>
                 <li data-module-item="inventory">
                     <a href="#" id="nav-inventory" class="nav-link text-white-50 sidebar-link" data-nav="inventory" onclick="navigateTo('inventory'); return false;">
                         <i class="bi bi-box-seam-fill me-2"></i> Inventario / Bodega
@@ -437,7 +442,7 @@
                             <div class="card-body p-3 p-md-4">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                                     <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-receipt-cutoff me-2 text-teal"></i>Últimas ventas</h6>
-                                    <a href="#" class="small text-teal text-decoration-none fw-semibold" data-dash-nav="pos">Ver todas las ventas</a>
+                                    <a href="#" class="small text-teal text-decoration-none fw-semibold" data-dash-nav="ventas">Ver todas las ventas</a>
                                 </div>
                                 <div class="dash-skeleton mb-2 d-block" id="dash-ultimas-skeleton">
                                     <div class="dash-skeleton-line mb-2"></div>
@@ -1883,6 +1888,14 @@
                             <div class="col-6 col-md-4 col-lg-2">
                                 <span class="cash-card-label">Ventas en efectivo</span>
                                 <strong class="text-dark fs-5 d-block font-monospace" style="white-space: nowrap;" id="cash-active-ventas">Q 0.00</strong>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-2">
+                                <span class="cash-card-label">Total ventas (todos métodos)</span>
+                                <strong class="text-dark fs-5 d-block font-monospace" style="white-space: nowrap;" id="cash-active-total-ventas">Q 0.00</strong>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-2">
+                                <span class="cash-card-label">Cantidad de ventas</span>
+                                <strong class="text-dark fs-5 d-block font-monospace" style="white-space: nowrap;" id="cash-active-cantidad-ventas">0</strong>
                             </div>
                             <div class="col-6 col-md-4 col-lg-2">
                                 <span class="cash-card-label">Efectivo esperado</span>
@@ -3335,6 +3348,65 @@
                     </div>
                 </div>
             </div>
+        <!-- Vista: Ventas -->
+        <div id="ventas-view" class="p-4 flex-grow-1 overflow-auto d-none" data-main-view="ventas">
+            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                <div>
+                    <h4 class="fw-bold mb-1"><i class="bi bi-receipt-cutoff me-2 text-teal"></i>Historial de Ventas</h4>
+                    <p class="text-muted small mb-0">Ventas registradas en el sistema</p>
+                </div>
+            </div>
+            <!-- Filtros -->
+            <div class="d-flex gap-2 flex-wrap align-items-center mb-4 p-3 bg-light rounded-4">
+                <div class="input-group input-group-sm" style="max-width:320px;">
+                    <span class="input-group-text bg-white text-teal border-end-0"><i class="bi bi-calendar3"></i></span>
+                    <input type="date" id="filter-ventas-from" class="form-control border-start-0 border-end-0 ps-1" title="Desde">
+                    <span class="input-group-text bg-light text-muted px-2 border-start-0 border-end-0"><i class="bi bi-arrow-right small"></i></span>
+                    <input type="date" id="filter-ventas-to" class="form-control border-start-0" title="Hasta">
+                </div>
+                <button id="btn-filter-ventas" class="btn btn-teal btn-sm px-3">
+                    <i class="bi bi-funnel me-1"></i> Filtrar
+                </button>
+                <button id="btn-clear-ventas-filters" class="btn btn-outline-secondary btn-sm px-3" title="Limpiar filtros">
+                    <i class="bi bi-x-circle me-1"></i> Limpiar
+                </button>
+            </div>
+            <!-- Tabla -->
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table align-middle table-hover mb-0">
+                            <thead style="background-color:#0A5C5E !important;">
+                                <tr>
+                                    <th class="text-white fw-bold py-2 px-3 border-0">Venta #</th>
+                                    <th class="text-white fw-bold py-2 border-0">Fecha / Hora</th>
+                                    <th class="text-white fw-bold py-2 border-0">Cajero</th>
+                                    <th class="text-white fw-bold py-2 text-center border-0">Artículos</th>
+                                    <th class="text-white fw-bold py-2 text-end border-0">Subtotal</th>
+                                    <th class="text-white fw-bold py-2 text-end border-0">Descuento</th>
+                                    <th class="text-white fw-bold py-2 text-end px-3 border-0">Total</th>
+                                    <th class="text-white fw-bold py-2 text-center border-0">Estado</th>
+                                    <th class="text-white fw-bold py-2 text-center border-0">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ventas-table-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="ventas-empty" class="text-center text-muted py-5 d-none">
+                        <i class="bi bi-receipt fs-1 d-block mb-2 opacity-50"></i>
+                        <span>No hay ventas registradas en el período seleccionado.</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Paginación -->
+            <div id="ventas-pagination" class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 d-none">
+                <span id="ventas-page-info" class="text-muted small">Página 1 de 1</span>
+                <div class="d-flex align-items-center gap-1">
+                    <button id="ventas-prev-page" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-left"></i></button>
+                    <button id="ventas-next-page" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
         </main>
     </div>
 
@@ -3350,6 +3422,7 @@
                     </div>
                     <div class="modal-body">
                         <input type="hidden" id="inv-id">
+                        <input type="hidden" id="inv-id-producto">
                         <div class="mb-3">
                             <label class="form-label fw-medium">Producto</label>
                             <input type="text" id="inv-producto" class="form-control" disabled>
@@ -3357,6 +3430,25 @@
                         <div class="mb-3">
                             <label class="form-label fw-medium">Stock Actual</label>
                             <input type="text" id="inv-stock-actual" class="form-control" disabled>
+                        </div>
+                        <!-- NUEVA SECCIÓN DE IMAGEN - agregar antes del campo Motivo -->
+                        <div class="mb-3" id="inv-imagen-section">
+                            <label class="form-label fw-medium">Imagen del Producto</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <img id="inv-imagen-preview" src="" alt="Sin imagen"
+                                     class="rounded-3 border object-fit-cover"
+                                     style="width:72px;height:72px;display:none;">
+                                <div id="inv-imagen-placeholder" class="rounded-3 border bg-light d-flex align-items-center justify-content-center text-muted"
+                                     style="width:72px;height:72px;">
+                                    <i class="bi bi-image fs-3"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <input type="file" id="inv-imagen-file" class="form-control form-control-sm"
+                                           accept="image/jpeg,image/png,image/webp,image/gif">
+                                    <div class="form-text">JPG, PNG, WEBP o GIF · Máx. 5 MB</div>
+                                    <div id="inv-imagen-status" class="small mt-1"></div>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-medium">Motivo del Ajuste <span class="text-danger">*</span></label>
@@ -4374,6 +4466,7 @@
     <script src="js/mermas.js?v=2.3"></script>
     <script src="js/traslados.js?v=1.1"></script>
     <script src="js/visitas.js?v=1.1"></script>
+    <script src="js/ventas.js"></script>
 
     <!-- Modales Bloque 2: Sucursales, Áreas, Subcategorías, Unidades -->
     <!-- Modal: Formulario Sucursal -->

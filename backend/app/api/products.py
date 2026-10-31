@@ -121,6 +121,17 @@ async def update_product(
     return await service.update_product(product_id, payload, actor_id=current_user.id_usuario)
 
 
+@router.patch("/{product_id}/imagen", response_model=schemas.ProductoOut)
+async def update_product_image(
+    product_id: int,
+    payload: schemas.ProductoUpdate,
+    service: ConcreteProductService = Depends(get_product_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Actualiza la URL de la imagen del producto."""
+    return await service.update_product(product_id, payload, actor_id=current_user.id_usuario)
+
+
 @router.delete("/{product_id}", response_model=schemas.ProductoOut)
 async def deactivate_product(
     product_id: int,

@@ -324,6 +324,10 @@ class TurnoCajaRepository(ABC):
         ...
 
     @abstractmethod
+    async def get_resumen_ventas_turno(self, id_turno: int) -> Tuple[Decimal, int]:
+        ...
+
+    @abstractmethod
     async def create_movimiento(self, movimiento: Any) -> Any:
         ...
 
