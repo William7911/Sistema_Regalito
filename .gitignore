@@ -29,3 +29,5 @@ scratch/
 
 # Respaldos
 respaldos/
+
+.env

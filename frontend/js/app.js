@@ -636,7 +636,7 @@ window.addEventListener('pageshow', () => {
 // ---------------------------------------------------------------------------
 
 const moduleLabels = {
-    pos: 'POS / Ventas',
+    pos: 'Punto de Venta (POS)',
     inventory: 'Inventario / Bodega',
     compras: 'Compras',
     caja: 'Caja',
@@ -652,7 +652,7 @@ const moduleLabels = {
     mermas: 'Mermas',
     traslados: 'Traslados',
     visitas: 'Visitas de Seguimiento',
-    ventas: 'Ventas',
+    ventas: 'Historial de Ventas',
 };
 
 // Abre un módulo desde el dashboard o navegación lateral
