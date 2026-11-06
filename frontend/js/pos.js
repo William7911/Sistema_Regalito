@@ -431,7 +431,8 @@
         } catch (_) {}
     }
 
-    async function handleBarcodeDetected(code) {
+    async function handleBarcodeDetected(code, options = {}) {
+        const fromCamera = Boolean(options.fromCamera);
         const clean = String(code || '').trim();
         if (!clean) return;
 
@@ -482,6 +483,13 @@
             addToCart(item.id_variante, 1);
             showScannerBanner(`${item.nombre} agregado al carrito`, false);
             toast(`'${item.nombre}' agregado a la venta`, 'success');
+            if (fromCamera && scannerModalInstance) {
+                setTimeout(() => {
+                    if (DOM.scannerModal && DOM.scannerModal.classList.contains('show')) {
+                        scannerModalInstance.hide();
+                    }
+                }, 600);
+            }
         } else {
             playScanBeep(false);
             showScannerBanner(`Código '${clean}' no encontrado`, true);
@@ -606,7 +614,7 @@
                 try {
                     const barcodes = await barcodeDetector.detect(DOM.scannerVideo);
                     if (barcodes && barcodes.length > 0) {
-                        handleBarcodeDetected(barcodes[0].rawValue);
+                        handleBarcodeDetected(barcodes[0].rawValue, { fromCamera: true });
                     }
                 } catch (_) {}
             }
@@ -914,19 +922,35 @@
         });
     }
 
+    function normalizeSearchText(value) {
+        return String(value == null ? '' : value)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+    }
+
     function filteredCatalog() {
-        const term = (DOM.search ? DOM.search.value : '').trim().toLowerCase();
-        return state.catalog.filter((item) => {
+        const term = normalizeSearchText((DOM.search ? DOM.search.value : '').trim());
+        const matches = [];
+        state.catalog.forEach((item, index) => {
             const matchesCategory = state.category === 'Todos' || item.categoria === state.category;
-            if (!matchesCategory) return false;
-            if (!term) return true;
-            return String(item.nombre || '').toLowerCase().includes(term)
-                || String(item.talla || '').toLowerCase().includes(term)
-                || String(item.color || '').toLowerCase().includes(term)
-                || String(item.codigo_barras || '').toLowerCase().includes(term)
-                || String(item.categoria || '').toLowerCase().includes(term)
-                || String(item.subcategoria || '').toLowerCase().includes(term);
+            if (!matchesCategory) return;
+            if (!term) {
+                matches.push({ item, index, score: 0 });
+                return;
+            }
+            const name = normalizeSearchText(item.nombre);
+            const fields = [item.talla, item.color, item.codigo_barras, item.categoria, item.subcategoria]
+                .map((value) => normalizeSearchText(value));
+            if (!name.includes(term) && !fields.some((value) => value.includes(term))) return;
+            let score = 3;
+            if (name === term) score = 0;
+            else if (name.startsWith(term)) score = 1;
+            else if (fields.some((value) => value.startsWith(term))) score = 2;
+            matches.push({ item, index, score });
         });
+        matches.sort((a, b) => a.score - b.score || a.index - b.index);
+        return matches.map((entry) => entry.item);
     }
 
     function renderGrid() {

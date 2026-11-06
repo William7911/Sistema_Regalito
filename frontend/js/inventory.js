@@ -8,6 +8,14 @@
     let sortAsc = true;
     let initialFormData = '';
 
+    function normalizeText(value) {
+        return String(value == null ? '' : value)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+    }
+
     const DOM = {
         tableBody: document.getElementById('inventory-table-body'),
         emptyState: document.getElementById('inventory-empty'),
@@ -71,6 +79,16 @@
 
             DOM.filterSku.addEventListener('input', syncClearButton);
 
+            // Filtra la tabla mientras se escribe (con un pequeño retardo).
+            let filterTimer = null;
+            DOM.filterSku.addEventListener('input', () => {
+                clearTimeout(filterTimer);
+                filterTimer = setTimeout(() => {
+                    currentPage = 1;
+                    applyFilters();
+                }, 250);
+            });
+
             DOM.clearSearch.addEventListener('click', () => {
                 DOM.filterSku.value = '';
                 syncClearButton();
@@ -78,6 +96,27 @@
                 applyFilters();        // Restaura la tabla al instante.
                 DOM.filterSku.focus(); // Mantiene el foco en el buscador.
             });
+
+            const suggestionsEl = document.getElementById('inventory-suggestions');
+            if (suggestionsEl && typeof window.attachProductSuggestions === 'function') {
+                window.attachProductSuggestions({
+                    input: DOM.filterSku,
+                    list: suggestionsEl,
+                    minChars: 1,
+                    debounceMs: 100,
+                    emptyText: 'No se encontraron productos con ese criterio.',
+                    getItems: getInventorySuggestions,
+                    onSelect: () => {
+                        currentPage = 1;
+                        applyFilters();
+                        DOM.filterSku.focus();
+                    },
+                    onSubmit: () => {
+                        currentPage = 1;
+                        applyFilters();
+                    }
+                });
+            }
 
             syncClearButton();
         }
@@ -342,18 +381,56 @@
         }
     }
 
+    function getInventorySuggestions(term) {
+        const buscado = normalizeText(term);
+        if (!buscado) return [];
+
+        const resultados = [];
+        const vistos = new Set();
+
+        for (const item of inventoryData) {
+            if (resultados.length >= 8) break;
+
+            const nombre = item.producto_nombre || '';
+            const sku = item.variante_sku || '';
+            const talla = item.talla || '';
+            const color = item.color || '';
+
+            const coincide = [nombre, sku, talla, color].some(
+                valor => normalizeText(valor).includes(buscado)
+            );
+            if (!coincide) continue;
+
+            const clave = item.id_inventario != null
+                ? `inv-${item.id_inventario}`
+                : `${nombre}|${sku}|${talla}|${color}`;
+            if (vistos.has(clave)) continue;
+            vistos.add(clave);
+
+            const detalles = [sku, talla, color].filter(Boolean).join(' · ');
+            resultados.push({
+                value: sku || nombre,
+                label: nombre || 'Producto sin nombre',
+                sublabel: detalles,
+                meta: `Stock: ${Number(item.stock_actual) || 0}`
+            });
+        }
+
+        return resultados;
+    }
+
     function applyFilters() {
         let data = [...inventoryData];
         
         // Filter by SKU, Name or Variant attributes
         if (DOM.filterSku) {
-            const skuTerm = DOM.filterSku.value.trim().toLowerCase();
+            const skuTerm = normalizeText(DOM.filterSku.value);
             if (skuTerm) {
                 data = data.filter(item => 
-                    (item.producto_nombre && item.producto_nombre.toLowerCase().includes(skuTerm)) ||
-                    (item.variante_sku && item.variante_sku.toLowerCase().includes(skuTerm)) ||
-                    (item.talla && item.talla.toLowerCase().includes(skuTerm)) ||
-                    (item.color && item.color.toLowerCase().includes(skuTerm))
+                    normalizeText(item.producto_nombre).includes(skuTerm) ||
+                    normalizeText(item.variante_sku).includes(skuTerm) ||
+                    normalizeText(item.talla).includes(skuTerm) ||
+                    normalizeText(item.color).includes(skuTerm)
                 );
             }
         }

@@ -7962,3 +7962,77 @@ table th,
     background: #0A5C5E !important;
     color: #FFFFFF !important;
 }
+
+/* ---------------------------------------------------------------------------
+   Sugerencias de productos (autocompletado de Inventario y Catálogo)
+--------------------------------------------------------------------------- */
+.product-suggestion-list {
+    position: static;
+    flex: 1 0 100%;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 0.15rem;
+    padding: 0.35rem;
+    background: #FFFFFF;
+    border: 1px solid #DBE7E5;
+    border-radius: 14px;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.product-suggestion-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+}
+
+.product-suggestion-item:hover,
+.product-suggestion-item.is-active {
+    background: #E8F5F3;
+}
+
+.product-suggestion-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.product-suggestion-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #1F2937;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.product-suggestion-sub {
+    font-size: 0.73rem;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.product-suggestion-meta {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #0F766E;
+    background: #E6F4F1;
+    border-radius: 999px;
+    padding: 0.15rem 0.5rem;
+}
+
+.product-suggestion-empty {
+    padding: 0.65rem 0.7rem;
+    font-size: 0.82rem;
+    color: #64748B;
+    text-align: center;
+}

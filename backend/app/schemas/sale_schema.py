@@ -1,7 +1,14 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _ensure_utc(value):
+    """Marca como UTC los datetimes naive que vienen de la base de datos."""
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 class SaleItemCreate(BaseModel):
@@ -62,6 +69,11 @@ class SaleResponse(BaseModel):
     cambio: Optional[Decimal] = Decimal("0.00")
     detalles: List[SaleItemResponse] = []
     pagos: List[PaymentResponse] = []
+
+    @field_validator("fecha_venta", mode="after")
+    @classmethod
+    def _normalizar_fecha_utc(cls, value):
+        return _ensure_utc(value)
 
     model_config = ConfigDict(from_attributes=True)
 

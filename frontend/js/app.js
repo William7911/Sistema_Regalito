@@ -341,7 +341,7 @@ function applyRoleRestrictions() {
 
     const moduleAllowed = {
         pos: isUserAdmin || window.hasPermission('VENTA_COBRAR'),
-        inventory: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA') || window.hasPermission('VENTA_COBRAR'),
+        inventory: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA') || window.hasPermission('INV_VER') || window.hasPermission('VENTA_COBRAR'),
         compras: isUserAdmin || window.hasPermission('COMPRA_EMITIR_ORDEN') || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         mermas: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),
         traslados: isUserAdmin || window.hasPermission('INV_INGRESAR_MERCADERIA'),

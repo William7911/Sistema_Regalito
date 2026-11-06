@@ -673,6 +673,93 @@ async function loadProducts() {
     }
 }
 
+// Convierte un producto de la API en una opción del autocompletado.
+function buildCatalogSuggestionItem(producto, mode) {
+    const variante = (producto.variantes && producto.variantes[0]) ? producto.variantes[0] : null;
+    const inventario = variante && variante.inventarios && variante.inventarios[0]
+        ? variante.inventarios[0]
+        : null;
+    const barcode = variante && variante.codigo_barras ? String(variante.codigo_barras) : '';
+    const precio = variante && variante.precio_detalle != null
+        ? Number(variante.precio_detalle).toFixed(2)
+        : '';
+
+    const detalles = [];
+    if (barcode) detalles.push(`Código: ${barcode}`);
+    if (precio) detalles.push(`Q ${precio}`);
+
+    return {
+        value: mode === 'barcode' ? (barcode || producto.nombre || '') : (producto.nombre || ''),
+        label: producto.nombre || 'Producto sin nombre',
+        sublabel: detalles.join(' · '),
+        meta: inventario ? `Stock: ${Number(inventario.stock_actual) || 0}` : ''
+    };
+}
+
+async function fetchCatalogSuggestions(term, mode) {
+    const params = new URLSearchParams();
+    if (mode === 'barcode') {
+        params.append('barcode', term);
+    } else {
+        params.append('name', term);
+    }
+    params.append('limit', '8');
+    params.append('sort_by', 'nombre');
+    params.append('sort_dir', 'asc');
+
+    try {
+        const res = await fetch(`${PRODUCTS_API}?${params.toString()}`, {
+            headers: getCatalogAuthHeaders()
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : (data.items || []);
+        return items.map((producto) => buildCatalogSuggestionItem(producto, mode));
+    } catch (err) {
+        return [];
+    }
+}
+
+function initCatalogSearchSuggestions() {
+    if (typeof window.attachProductSuggestions !== 'function') return;
+
+    const nameInput = document.getElementById('filter-product-name');
+    const nameList = document.getElementById('product-name-suggestions');
+    const barcodeInput = document.getElementById('filter-product-barcode');
+    const barcodeList = document.getElementById('product-barcode-suggestions');
+
+    const aplicarBusqueda = () => {
+        productsState.page = 1;
+        loadProducts();
+    };
+
+    if (nameInput && nameList) {
+        window.attachProductSuggestions({
+            input: nameInput,
+            list: nameList,
+            minChars: 2,
+            debounceMs: 250,
+            emptyText: 'No se encontraron productos.',
+            getItems: (term) => fetchCatalogSuggestions(term, 'name'),
+            onSelect: aplicarBusqueda,
+            onSubmit: aplicarBusqueda
+        });
+    }
+
+    if (barcodeInput && barcodeList) {
+        window.attachProductSuggestions({
+            input: barcodeInput,
+            list: barcodeList,
+            minChars: 2,
+            debounceMs: 250,
+            emptyText: 'No se encontraron productos con ese código.',
+            getItems: (term) => fetchCatalogSuggestions(term, 'barcode'),
+            onSelect: aplicarBusqueda,
+            onSubmit: aplicarBusqueda
+        });
+    }
+}
+
 // Renderiza la barra de paginación de productos a partir del estado actual.
 function renderProductPagination() {
     const pagination = document.getElementById('products-pagination');
@@ -1974,6 +2061,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         syncClearVisibility();
     });
+
+    initCatalogSearchSuggestions();
 
     // Paginación de productos
     const pageSize = document.getElementById('products-page-size');

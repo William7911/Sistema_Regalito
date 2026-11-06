@@ -51,7 +51,7 @@ class ConcreteCashService(CashRegisterService):
             id_caja=data.id_caja,
             id_usuario=user_id,
             monto_apertura=data.monto_apertura,
-            fecha_apertura=datetime.now(),
+            fecha_apertura=datetime.utcnow(),
             estado="Abierto",
         )
 
@@ -90,7 +90,7 @@ class ConcreteCashService(CashRegisterService):
         diferencia = Decimal(str(data.monto_cierre)) - esperado
 
         # 3. Actualizar datos de cierre
-        active_turno.fecha_cierre = datetime.now()
+        active_turno.fecha_cierre = datetime.utcnow()
         active_turno.monto_cierre = data.monto_cierre
         
         user_notes = data.notas.strip() if data.notas and data.notas.strip() else ""
@@ -191,7 +191,7 @@ class ConcreteCashService(CashRegisterService):
             id_usuario=user_id,
             monto=data.monto,
             justificacion=data.justificacion.strip(),
-            fecha_hora=datetime.now(),
+            fecha_hora=datetime.utcnow(),
         )
         try:
             created = await self.uow.turnos.create_movimiento(mov)
@@ -292,11 +292,11 @@ class ConcreteCashService(CashRegisterService):
             total_calculado_sistema=total_calculado_sistema,
             diferencia=diferencia,
             observaciones=obs_limpia,
-            fecha_cierre=datetime.now(),
+            fecha_cierre=datetime.utcnow(),
         )
 
         # 7. Actualizar y cerrar turno
-        active_turno.fecha_cierre = datetime.now()
+        active_turno.fecha_cierre = datetime.utcnow()
         active_turno.monto_cierre = total_contado
         active_turno.estado = "Cerrado"
         active_turno.notas = f"Cierre a ciegas: {estado_cierre} (Dif: Q{diferencia:.2f}). {obs_limpia or ''}".strip()

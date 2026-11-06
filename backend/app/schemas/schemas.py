@@ -1,7 +1,15 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _ensure_utc(value):
+    """Marca como UTC los datetimes naive que vienen de la base de datos."""
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
 
 # ---------------------------------------------------------------------------
 # Autenticación
@@ -328,6 +336,11 @@ class MovimientoCajaResponse(BaseModel):
     justificacion: str
     fecha_hora: datetime
 
+    @field_validator("fecha_hora", mode="after")
+    @classmethod
+    def _normalizar_fecha_utc(cls, value):
+        return _ensure_utc(value)
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -352,6 +365,11 @@ class TurnoResponse(BaseModel):
     salidas_efectivo: Optional[Decimal] = Decimal("0.00")
     efectivo_esperado: Optional[Decimal] = Decimal("0.00")
     diferencia: Optional[Decimal] = None
+
+    @field_validator("fecha_apertura", "fecha_cierre", mode="after")
+    @classmethod
+    def _normalizar_fechas_utc(cls, value):
+        return _ensure_utc(value)
 
     model_config = ConfigDict(from_attributes=True)
 

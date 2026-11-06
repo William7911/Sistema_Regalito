@@ -25,7 +25,7 @@
     <!-- Custom CSS -->
     <!-- Corrección UI: versión incrementada para forzar la recarga de los estilos nuevos -->
     <!-- Rediseño de Catálogos: toolbar con tabs/dropdown, buscadores con clear y miniaturas. -->
-    <link rel="stylesheet" href="css/style.css?v=10.2">
+    <link rel="stylesheet" href="css/style.css?v=10.4">
     <style id="pos-ticket-page-style">@page { size: 80mm auto; margin: 0; }</style>
     <style>
         /* Desactivar de inmediato ícono nativo de contraseña en Edge/Chromium */
@@ -1150,18 +1150,20 @@
                                      para la búsqueda rápida del catálogo. -->
                                 <div class="catalog-search-field catalog-search-field--name">
                                     <i class="bi bi-search catalog-search-icon" aria-hidden="true"></i>
-                                    <input type="text" id="filter-product-name" class="form-control catalog-search-input" placeholder="Buscar por nombre..." aria-label="Buscar producto por nombre">
+                                    <input type="text" id="filter-product-name" class="form-control catalog-search-input" placeholder="Buscar por nombre..." aria-label="Buscar producto por nombre" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="product-name-suggestions">
                                     <button type="button" class="catalog-clear-btn" data-clear-target="filter-product-name" aria-label="Limpiar búsqueda por nombre" title="Limpiar"><i class="bi bi-x-lg"></i></button>
                                 </div>
                                 <div class="catalog-search-field catalog-search-field--barcode">
                                     <i class="bi bi-upc-scan catalog-search-icon" aria-hidden="true"></i>
-                                    <input type="text" id="filter-product-barcode" class="form-control catalog-search-input" placeholder="Buscar por código de barras..." aria-label="Buscar producto por código de barras">
+                                    <input type="text" id="filter-product-barcode" class="form-control catalog-search-input" placeholder="Buscar por código de barras..." aria-label="Buscar producto por código de barras" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="product-barcode-suggestions">
                                     <button type="button" class="catalog-clear-btn" data-clear-target="filter-product-barcode" aria-label="Limpiar búsqueda por código de barras" title="Limpiar"><i class="bi bi-x-lg"></i></button>
                                 </div>
                                 <select id="filter-product-subcategoria" class="form-select" style="max-width: 250px;">
                                     <option value="">Todas las subcategorías</option>
                                 </select>
                                 <button id="btn-filter-products" class="btn btn-celeste"><i class="bi bi-funnel"></i> Filtrar</button>
+                                <div id="product-name-suggestions" class="product-suggestion-list d-none" role="listbox" aria-label="Sugerencias de productos"></div>
+                                <div id="product-barcode-suggestions" class="product-suggestion-list d-none" role="listbox" aria-label="Sugerencias por código de barras"></div>
                             </div>
                         </div>
 
@@ -2345,7 +2347,7 @@
                         <!-- Búsqueda principal (se mantiene el id que usa inventory.js) -->
                         <div class="inventory-search">
                             <i class="bi bi-search inventory-search-icon" aria-hidden="true"></i>
-                            <input type="text" id="filter-inv-sku" class="form-control inventory-search-input" placeholder="Buscar por SKU / Código de Barras..." aria-label="Buscar por SKU o código de barras" autocomplete="off">
+                            <input type="text" id="filter-inv-sku" class="form-control inventory-search-input" placeholder="Buscar por SKU / Código de Barras..." aria-label="Buscar por SKU o código de barras" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="inventory-suggestions">
                             <!-- Botón "X" para limpiar input y restaurar inventario -->
                             <button type="button" id="btn-clear-inventory-search" class="inventory-clear-btn" title="Limpiar búsqueda" aria-label="Limpiar búsqueda" aria-controls="inventory-table-body">
                                 <i class="bi bi-x-lg" aria-hidden="true"></i>
@@ -2357,6 +2359,7 @@
                             <label class="form-check-label" for="filter-inv-low-stock">Solo stock crítico</label>
                         </div>
                         <button id="btn-filter-inventory" class="btn btn-teal rounded-3 px-3"><i class="bi bi-funnel me-1"></i> Filtrar</button>
+                        <div id="inventory-suggestions" class="product-suggestion-list d-none" role="listbox" aria-label="Sugerencias de inventario"></div>
                     </div>
                 </div>
 
@@ -4318,6 +4321,7 @@
 
     <!-- App Logic -->
     <script src="js/app.js?v=4.5"></script>
+    <script src="js/product_suggest.js?v=1.0"></script>
     <script src="js/dashboard.js?v=2.0"></script>
     <script src="js/notificaciones.js?v=1.1"></script>
     <!-- Corrección UI: versión incrementada para forzar la recarga de users.js
@@ -4325,7 +4329,7 @@
     <script src="js/users.js?v=2.6"></script>
     <script src="js/clients.js?v=2.1"></script>
     <!-- Catálogos: rediseño visual (tabs agrupadas, miniaturas y soft badges). -->
-    <script src="js/catalog.js?v=4.8"></script>
+    <script src="js/catalog.js?v=4.9"></script>
     <script src="js/cash_register.js?v=2.7"></script>
     <script src="js/reportes.js?v=5.2"></script>
 
@@ -4458,7 +4462,7 @@
     <script src="js/configuracion.js?v=2.4"></script>
     <script src="js/pos.js?v=3.0"></script>
     <!-- Inventario: versión con productos independientes y soft badges -->
-    <script src="js/inventory.js?v=4.1"></script>
+    <script src="js/inventory.js?v=4.2"></script>
     <script src="js/compras.js?v=3.3"></script>
     <script src="js/roles.js?v=1.1"></script>
     <script src="js/bitacora.js?v=1.1"></script>

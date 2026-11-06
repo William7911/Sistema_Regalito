@@ -174,7 +174,7 @@ class ConcreteSaleService:
             id_turno=active_shift.id_turno,
             id_cliente=data.id_cliente,
             id_usuario=user_id,
-            fecha_venta=datetime.now(),
+            fecha_venta=datetime.utcnow(),
             subtotal=subtotal_bruto,
             descuento_total=descuento_total,
             total_venta=total_venta,
