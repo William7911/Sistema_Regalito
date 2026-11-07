@@ -46,22 +46,6 @@ El sistema realiza automáticamente y de forma segura:
 Abra su navegador web en:
 **[http://localhost:9090](http://localhost:9090)**
 
----
-
-## Usuarios Semilla para Inicio de Sesión
-
-| Usuario | Contraseña | Rol | Acceso y Permisos |
-| :--- | :--- | :--- | :--- |
-| `admin` | `admin123` | **Administradora** | Control total, reportes, usuarios, roles, auditoría y catálogos. |
-| `bodega` | `bodega123` | **Bodeguero** | Inventario, alertas, órdenes de compra, recepciones y mermas. |
-| `caja` | `caja123` | **Cajera** | Facturación, punto de venta (POS), cobros y turnos de caja. |
-
-> [!WARNING]
-> **Advertencia de Seguridad:**
-> Las credenciales anteriores corresponden a los usuarios semilla por defecto. En cualquier entorno de producción real, **cambie inmediatamente las contraseñas** al iniciar sesión por primera vez desde el módulo de Usuarios o Perfil.
-
----
-
 ## Comandos Útiles
 
 - **Ver estado de los servicios:**
