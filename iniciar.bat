@@ -53,13 +53,5 @@ echo.
 echo ======================================================================
 echo  Sistema levantado con exito.
 echo  Frontend disponible en: http://localhost:9090
-echo.
-echo  Usuarios semilla:
-echo   - Administradora: admin / admin123
-echo   - Bodeguero:     bodega / bodega123
-echo   - Cajera:        caja / caja123
-echo.
-echo  ADVERTENCIA: Por seguridad, cambie las contrasenas por defecto
-echo  al iniciar sesion en produccion.
 echo ======================================================================
 pause

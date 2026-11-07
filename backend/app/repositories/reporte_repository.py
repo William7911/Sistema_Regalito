@@ -109,6 +109,10 @@ class ReporteRepositoryImpl:
         )
         if estado:
             stmt = stmt.where(func.lower(Usuario.estado) == func.lower(estado))
+        if fecha_desde:
+            stmt = stmt.where(Usuario.fecha_creacion >= datetime.combine(fecha_desde, time.min))
+        if fecha_hasta:
+            stmt = stmt.where(Usuario.fecha_creacion <= datetime.combine(fecha_hasta, time.max))
 
         result = await self.db.execute(stmt)
         return list(result.scalars().all())

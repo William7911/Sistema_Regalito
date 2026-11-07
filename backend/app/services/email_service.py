@@ -53,7 +53,7 @@ class EmailService:
 
     @classmethod
     async def enviar_codigo_recuperacion(cls, to_email: str, nombre_usuario: str, codigo: str) -> bool:
-        logger.info(f"[RECUPERACIÓN DE CONTRASEÑA] Código generado para '{to_email}' ({nombre_usuario}): {codigo}")
+        logger.info(f"[RECUPERACIÓN DE CONTRASEÑA] Código generado para '{to_email}' ({nombre_usuario}).")
 
         subject = f"{codigo} es tu código de recuperación - Tienda El Regalito"
         html_content = f"""<!DOCTYPE html>
